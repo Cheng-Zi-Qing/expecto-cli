@@ -53,3 +53,21 @@ test("renderTranscript appends visible block lines without mouse-only affordance
   assert.match(output.join("\n"), /Assistant/);
   assert.doesNotMatch(output.join("\n"), /\{open\}|wheelup|wheeldown/);
 });
+
+test("renderTranscript preserves code indentation in visible lines", () => {
+  const view = buildTuiViewModel(
+    createSampleTuiState({
+      timeline: [
+        {
+          id: "assistant-code-1",
+          kind: "assistant",
+          summary: "Code sample",
+          body: ["```ts", "function f(x: number) {", "    return x;", "}", "```"].join("\n"),
+        },
+      ],
+    }),
+  );
+
+  const output = renderTranscript(view.transcript, { width: 120, height: 20 });
+  assert.match(output.join("\n"), / {4}return x;/);
+});

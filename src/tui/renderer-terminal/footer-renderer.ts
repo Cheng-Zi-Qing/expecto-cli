@@ -16,10 +16,10 @@ function normalizePositiveInteger(value: number, fallback: number): number {
 export function renderFooter(view: TuiFooterView, options: FooterRenderOptions): string[] {
   const width = normalizePositiveInteger(options.width, 1);
   const composerHeight = normalizePositiveInteger(options.composerHeight, 1);
-  const composerText = view.composer.value.trim().length > 0 ? view.composer.value : "Write a prompt";
+  const composerText = view.composer.value === "" ? "Write a prompt" : view.composer.value;
 
   const composerLines = wrapPlainText(composerText, width);
-  const visibleComposer = composerLines.slice(0, composerHeight).map((line) =>
+  const visibleComposer = composerLines.slice(-composerHeight).map((line) =>
     padOrTrimToWidth(line, width)
   );
 

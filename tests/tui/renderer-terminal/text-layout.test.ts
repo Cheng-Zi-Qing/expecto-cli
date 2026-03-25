@@ -6,7 +6,13 @@ import { padOrTrimToWidth, wrapPlainText } from "../../../src/tui/renderer-termi
 test("wrapPlainText wraps by width and preserves explicit newlines", () => {
   const lines = wrapPlainText("alpha beta\ngamma delta", 7);
 
-  assert.deepEqual(lines, ["alpha", "beta", "gamma", "delta"]);
+  assert.deepEqual(lines, ["alpha", " beta", "gamma", " delta"]);
+});
+
+test("wrapPlainText preserves indentation and repeated spaces", () => {
+  const lines = wrapPlainText("    return  x;", 40);
+
+  assert.deepEqual(lines, ["    return  x;"]);
 });
 
 test("padOrTrimToWidth pads short content and trims long content", () => {
