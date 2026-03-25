@@ -257,8 +257,8 @@ async function runCliCommand(
     explicitEnv,
   );
   const presentationEnv = {
-    ...processEnv,
     ...sessionEnv,
+    ...processEnv,
     ...explicitEnv,
   };
   const context = await buildBootstrapContext({
