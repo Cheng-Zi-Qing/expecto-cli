@@ -13,9 +13,35 @@ export type InteractiveTuiHandlers = {
   onExit: () => void;
 };
 
+export type TerminalTuiInputChunk = string | Buffer | Uint8Array;
+
+export type TerminalTuiInput = {
+  on: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
+  off?: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
+  removeListener?: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
+  setRawMode?: (enabled: boolean) => void;
+  isTTY?: boolean;
+};
+
+export type TerminalTuiOutput = {
+  write: (chunk: string) => unknown;
+  columns?: number;
+  rows?: number;
+  on?: (event: "resize", listener: () => void) => unknown;
+  off?: (event: "resize", listener: () => void) => unknown;
+  removeListener?: (event: "resize", listener: () => void) => unknown;
+};
+
+export type TerminalTuiIo = {
+  stdin?: TerminalTuiInput;
+  stdout?: TerminalTuiOutput;
+  write?: (chunk: string) => void;
+};
+
 export type InteractiveTuiAppFactoryInput = {
   initialState: TuiState;
   handlers: InteractiveTuiHandlers;
+  terminal?: TerminalTuiIo;
 };
 
 export type InteractiveTuiApp = {

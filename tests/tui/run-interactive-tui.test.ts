@@ -9,7 +9,7 @@ import type { RenderedTimelineLayout } from "../../src/tui/renderer-blessed/bloc
 import { renderTimelineItems } from "../../src/tui/renderer-blessed/block-renderer.ts";
 import { createRendererPalette } from "../../src/tui/renderer-blessed/tui-theme.ts";
 import { runInteractiveTui } from "../../src/tui/run-interactive-tui.ts";
-import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput } from "../../src/tui/tui-app.ts";
+import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput, TerminalTuiIo } from "../../src/tui/tui-app.ts";
 import type { TuiState } from "../../src/tui/tui-types.ts";
 
 async function makeProjectRoot(): Promise<string> {
@@ -320,6 +320,53 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
 
   assert.equal(app?.latestState().commandMenu.visible, false);
   assert.deepEqual(app?.latestState().commandMenu.items, []);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui forwards terminal IO through the app factory input", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+  let observedTerminal: TerminalTuiIo | undefined;
+
+  const terminal: TerminalTuiIo = {
+    stdin: {
+      on() {},
+      setRawMode() {},
+      isTTY: true,
+    },
+    stdout: {
+      write() {},
+      columns: 80,
+      rows: 24,
+    },
+  };
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    terminal,
+    createApp: (input) => {
+      observedTerminal = input.terminal;
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => ({
+      output: "assistant: ok",
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  assert.equal(observedTerminal, terminal);
 
   app?.exit();
   await runPromise;

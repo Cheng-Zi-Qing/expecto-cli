@@ -6,7 +6,7 @@ import { SessionManager } from "../runtime/session-manager.ts";
 import { SessionInterruptController } from "../runtime/session-interrupt.ts";
 import type { AssistantStepInput, AssistantStepResult, RuntimeSessionState } from "../runtime/runtime-session.ts";
 import { deriveContextMetrics } from "./context-metrics.ts";
-import type { CreateInteractiveTuiApp } from "./tui-app.ts";
+import type { CreateInteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
 import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
 import { QueuedInteractiveInput } from "./queued-interactive-input.ts";
 import type { ContextMetrics, TuiAction, TuiState } from "./tui-types.ts";
@@ -19,6 +19,7 @@ export type RunInteractiveTuiOptions = {
   write?: (chunk: string) => void;
   assistantStep?: (input: AssistantStepInput) => Promise<AssistantStepResult | null> | AssistantStepResult | null;
   providerRunner?: ProviderRunner;
+  terminal?: TerminalTuiIo;
 };
 
 function noopWrite(): void {}
@@ -157,6 +158,7 @@ export async function runInteractiveTui(
         queuedInput.close();
       },
     },
+    ...(options.terminal ? { terminal: options.terminal } : {}),
   });
 
   await app.start();
