@@ -2,7 +2,8 @@ import blessed from "neo-blessed";
 import type { Widgets } from "blessed";
 
 import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput } from "../tui-app.ts";
-import type { TuiRuntimeState, TuiState } from "../tui-types.ts";
+import type { TuiState } from "../tui-types.ts";
+import { buildTuiFooterView } from "../view-model/tui-view-model.ts";
 import {
   type RendererPalette,
   createRendererPalette,
@@ -28,23 +29,6 @@ const INSPECTOR_WIDTH = 32;
 const COMPOSER_PADDING_LEFT = 1;
 const COMPOSER_PADDING_TOP = 0;
 
-function displayRuntimeState(runtimeState: TuiRuntimeState): string {
-  switch (runtimeState) {
-    case "streaming":
-      return "Thinking";
-    case "tool_running":
-      return "Running tool";
-    case "interrupted":
-      return "Interrupted";
-    case "error":
-      return "Needs attention";
-    case "idle":
-      return "Idle";
-    case "ready":
-      return "Done";
-  }
-}
-
 function escapeTaggedText(value: string): string {
   return blessed.escape(value);
 }
@@ -64,6 +48,8 @@ function renderTimeline(
 }
 
 export function renderInspector(state: TuiState): string {
+  const footer = buildTuiFooterView(state);
+
   return [
     `Session ${escapeTaggedText(state.sessionId)}`,
     `Project ${escapeTaggedText(state.projectLabel)}`,
@@ -76,12 +62,14 @@ export function renderInspector(state: TuiState): string {
     `${state.contextMetrics.hooks} hooks`,
     `${state.contextMetrics.docs} docs`,
     "",
-    `State ${displayRuntimeState(state.runtimeState)}`,
+    `State ${footer.status.runtimeLabel}`,
     state.inputLocked ? "Composer locked" : "Composer ready",
   ].join("\n");
 }
 
 export function renderStatusBar(state: TuiState): string {
+  const footer = buildTuiFooterView(state);
+
   return [
     "beta",
     `${escapeTaggedText(state.providerLabel)}/${escapeTaggedText(state.modelLabel)}`,
@@ -91,7 +79,7 @@ export function renderStatusBar(state: TuiState): string {
     `${state.contextMetrics.rules} rules`,
     `${state.contextMetrics.hooks} hooks`,
     `${state.contextMetrics.docs} docs`,
-    displayRuntimeState(state.runtimeState),
+    footer.status.runtimeLabel,
     "Enter send",
     "Ctrl+J newline",
     "Tab inspector",
