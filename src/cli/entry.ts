@@ -15,12 +15,14 @@ import { parseCliArgs } from "./arg-parser.ts";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type CliCommand = ReturnType<typeof parseCliArgs>;
+type TuiRenderer = "blessed" | "terminal";
 
 export type InteractiveTuiRunnerInput = {
   context: BootstrapContext;
   providerLabel: string;
   modelLabel: string;
   branchLabel: string;
+  tuiRenderer: TuiRenderer;
   providerRunner?: ProviderRunner;
 };
 
@@ -185,13 +187,31 @@ function shouldUseFullscreenTui(
   );
 }
 
+function resolveTuiRenderer(
+  env: Record<string, string | undefined>,
+): TuiRenderer {
+  return env.BETA_TUI_RENDERER === "terminal" ? "terminal" : "blessed";
+}
+
 async function runDefaultInteractiveTui(
   input: InteractiveTuiRunnerInput,
 ): Promise<void> {
-  const [{ runInteractiveTui }, { createBlessedTuiApp }] = await Promise.all([
-    import("../tui/run-interactive-tui.ts"),
-    import("../tui/renderer-blessed/tui-app.ts"),
-  ]);
+  const { runInteractiveTui } = await import("../tui/run-interactive-tui.ts");
+
+  if (input.tuiRenderer === "terminal") {
+    const { createTerminalTuiApp } = await import("../tui/renderer-terminal/tui-app.ts");
+
+    await runInteractiveTui(input.context, {
+      createApp: createTerminalTuiApp,
+      providerLabel: input.providerLabel,
+      modelLabel: input.modelLabel,
+      branchLabel: input.branchLabel,
+      ...(input.providerRunner ? { providerRunner: input.providerRunner } : {}),
+    });
+    return;
+  }
+
+  const { createBlessedTuiApp } = await import("../tui/renderer-blessed/tui-app.ts");
 
   await runInteractiveTui(input.context, {
     createApp: createBlessedTuiApp,
@@ -226,13 +246,21 @@ async function runCliCommand(
   command: CliCommand,
   options: RunCliOptions = {},
 ): Promise<void> {
+  const sessionEnv = await loadSessionEnv({
+    ...(options.homeDir ? { homeDir: options.homeDir } : {}),
+  });
+  const processEnv = options.processEnv ?? process.env;
+  const explicitEnv = options.env ?? {};
   const env = mergeProviderEnv(
-    await loadSessionEnv({
-      ...(options.homeDir ? { homeDir: options.homeDir } : {}),
-    }),
-    options.processEnv ?? process.env,
-    options.env ?? {},
+    sessionEnv,
+    processEnv,
+    explicitEnv,
   );
+  const presentationEnv = {
+    ...processEnv,
+    ...sessionEnv,
+    ...explicitEnv,
+  };
   const context = await buildBootstrapContext({
     command,
     ...(options.cwd ? { cwd: options.cwd } : {}),
@@ -247,12 +275,14 @@ async function runCliCommand(
     const interactiveTuiRunner = options.runInteractiveTui ?? runDefaultInteractiveTui;
     const { providerLabel, modelLabel } = resolveProviderPresentation(env);
     const branchLabel = await resolveBranchLabel(context.projectRoot);
+    const tuiRenderer = resolveTuiRenderer(presentationEnv);
 
     await interactiveTuiRunner({
       context,
       providerLabel,
       modelLabel,
       branchLabel,
+      tuiRenderer,
       ...(providerRunner ? { providerRunner } : {}),
     });
     return;
