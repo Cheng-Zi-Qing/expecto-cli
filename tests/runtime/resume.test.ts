@@ -1,0 +1,163 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { resolveResumeTarget } from "../../src/runtime/resume.ts";
+import { SessionSnapshotStore } from "../../src/runtime/session-snapshot-store.ts";
+
+function makeSnapshot(
+  overrides: Partial<{
+    id: string;
+    sessionId: string;
+    state: "planning" | "executing";
+    compactedSummary: string;
+    headline: string;
+    currentTaskId: string;
+    nextStep: string;
+    updatedAt: string;
+    checkpointId: string;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? "snapshot-1",
+    sessionId: overrides.sessionId ?? "session-1",
+    state: overrides.state ?? "planning",
+    activeArtifacts: [
+      {
+        id: ".beta-agent/docs/01-plan.md",
+        kind: "plan" as const,
+        path: ".beta-agent/docs/01-plan.md",
+        title: "01-plan",
+      },
+      {
+        id: ".beta-agent/docs/tasks/T-001-auth.md",
+        kind: "task" as const,
+        path: ".beta-agent/docs/tasks/T-001-auth.md",
+        title: "T-001-auth",
+      },
+    ],
+    activatedSkills: ["planning-with-files"],
+    toolHistory: [
+      {
+        tool: "read",
+        success: true as const,
+        metadata: {
+          durationMs: 5,
+          sideEffects: [],
+        },
+      },
+    ],
+    compactedSummary: overrides.compactedSummary ?? "Drafted the task plan and captured open questions.",
+    summary: {
+      headline: overrides.headline ?? "Continue the auth task from the active workspace docs.",
+      currentTaskId: overrides.currentTaskId ?? "T-001-auth",
+      nextStep: overrides.nextStep ?? "Run the targeted auth tests before editing.",
+    },
+    checkpoint: {
+      id: overrides.checkpointId ?? "checkpoint-1",
+      createdAt: "2026-03-23T10:00:00.000Z",
+    },
+    updatedAt: overrides.updatedAt ?? "2026-03-23T10:05:00.000Z",
+  };
+}
+
+async function makeProjectRoot(): Promise<string> {
+  return mkdtemp(join(tmpdir(), "beta-agent-resume-"));
+}
+
+test("session snapshot store saves and loads a snapshot", async () => {
+  const projectRoot = await makeProjectRoot();
+  const store = new SessionSnapshotStore(projectRoot);
+  const snapshot = makeSnapshot();
+
+  await store.save(snapshot);
+  const loaded = await store.load(snapshot.id);
+
+  assert.equal(loaded.id, snapshot.id);
+  assert.equal(loaded.sessionId, snapshot.sessionId);
+  assert.equal(loaded.compactedSummary, snapshot.compactedSummary);
+  assert.equal(loaded.summary?.currentTaskId, snapshot.summary.currentTaskId);
+});
+
+test("resolveResumeTarget returns the newest snapshot for a session with a resume summary", async () => {
+  const projectRoot = await makeProjectRoot();
+  const store = new SessionSnapshotStore(projectRoot);
+
+  await store.save(
+    makeSnapshot({
+      id: "snapshot-older",
+      updatedAt: "2026-03-23T10:05:00.000Z",
+      compactedSummary: "Older summary",
+    }),
+  );
+  await store.save(
+    makeSnapshot({
+      id: "snapshot-newer",
+      updatedAt: "2026-03-23T10:15:00.000Z",
+      compactedSummary: "Newer summary",
+      checkpointId: "checkpoint-2",
+    }),
+  );
+  await store.save(
+    makeSnapshot({
+      id: "snapshot-other-session",
+      sessionId: "session-2",
+      updatedAt: "2026-03-23T10:20:00.000Z",
+    }),
+  );
+
+  const resumed = await resolveResumeTarget(store, {
+    sessionId: "session-1",
+  });
+
+  assert.equal(resumed?.snapshot.id, "snapshot-newer");
+  assert.match(resumed?.summary ?? "", /session: session-1/);
+  assert.match(resumed?.summary ?? "", /state: planning/);
+  assert.match(resumed?.summary ?? "", /active artifacts: 01-plan, T-001-auth/);
+  assert.match(resumed?.summary ?? "", /headline: Continue the auth task from the active workspace docs\./);
+  assert.match(resumed?.summary ?? "", /current task: T-001-auth/);
+  assert.match(resumed?.summary ?? "", /next step: Run the targeted auth tests before editing\./);
+  assert.match(resumed?.summary ?? "", /compacted summary: Newer summary/);
+});
+
+test("resolveResumeTarget returns null when there is no matching snapshot", async () => {
+  const projectRoot = await makeProjectRoot();
+  const store = new SessionSnapshotStore(projectRoot);
+
+  const resumed = await resolveResumeTarget(store, {
+    sessionId: "missing-session",
+  });
+
+  assert.equal(resumed, null);
+});
+
+test("resolveResumeTarget without a session id returns the latest snapshot overall", async () => {
+  const projectRoot = await makeProjectRoot();
+  const store = new SessionSnapshotStore(projectRoot);
+
+  await store.save(
+    makeSnapshot({
+      id: "snapshot-1",
+      sessionId: "session-1",
+      updatedAt: "2026-03-23T10:05:00.000Z",
+      compactedSummary: "Earlier session",
+    }),
+  );
+  await store.save(
+    makeSnapshot({
+      id: "snapshot-2",
+      sessionId: "session-2",
+      updatedAt: "2026-03-23T10:25:00.000Z",
+      compactedSummary: "Most recent session",
+    }),
+  );
+
+  const resumed = await resolveResumeTarget(store);
+
+  assert.equal(resumed?.snapshot.id, "snapshot-2");
+  assert.match(resumed?.summary ?? "", /session: session-2/);
+  assert.match(resumed?.summary ?? "", /headline: Continue the auth task from the active workspace docs\./);
+  assert.match(resumed?.summary ?? "", /compacted summary: Most recent session/);
+});

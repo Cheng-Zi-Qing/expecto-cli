@@ -1,0 +1,120 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
+import { SessionManager } from "../../src/runtime/session-manager.ts";
+
+async function makeProjectRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "beta-agent-interactive-"));
+  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
+  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
+  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
+  return root;
+}
+
+test("interactive session processes multiple turns and preserves conversation history", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const observedMessages: Array<string[]> = [];
+  let output = "";
+  const inputs = ["hello", "what did I just say?", "/exit"];
+  const manager = new SessionManager({
+    write: (chunk) => {
+      output += chunk;
+    },
+    readLine: () => Promise.resolve(inputs.shift() ?? null),
+    assistantStep: async (input) => {
+      observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
+
+      if (input.prompt === "hello") {
+        return { output: "assistant: hi there" };
+      }
+
+      return { output: "assistant: you said hello" };
+    },
+  });
+
+  const result = await manager.run(context);
+
+  assert.equal(result.turnCount, 2);
+  assert.deepEqual(observedMessages, [
+    ["user:hello"],
+    ["user:hello", "assistant:assistant: hi there", "user:what did I just say?"],
+  ]);
+  assert.match(output, /assistant: hi there/);
+  assert.match(output, /assistant: you said hello/);
+});
+
+test("interactive session clears conversation history on /clear and stops on /exit", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const observedMessages: Array<string[]> = [];
+  let output = "";
+  const inputs = ["hello", "/clear", "start over", "/exit"];
+  const manager = new SessionManager({
+    write: (chunk) => {
+      output += chunk;
+    },
+    readLine: () => Promise.resolve(inputs.shift() ?? null),
+    assistantStep: async (input) => {
+      observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
+
+      return { output: `assistant: ${input.prompt}` };
+    },
+  });
+
+  const result = await manager.run(context);
+
+  assert.equal(result.turnCount, 2);
+  assert.deepEqual(observedMessages, [
+    ["user:hello"],
+    ["user:start over"],
+  ]);
+  assert.match(output, /conversation cleared/);
+});
+
+test("interactive session executes built-in slash commands without sending them to the assistant", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const observedMessages: Array<string[]> = [];
+  let output = "";
+  const inputs = ["/help", "/status", "/branch", "hello", "/exit"];
+  const manager = new SessionManager({
+    write: (chunk) => {
+      output += chunk;
+    },
+    readLine: () => Promise.resolve(inputs.shift() ?? null),
+    assistantStep: async (input) => {
+      observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
+
+      return { output: `assistant: ${input.prompt}` };
+    },
+  });
+
+  const result = await manager.run(context);
+
+  assert.equal(result.turnCount, 1);
+  assert.deepEqual(observedMessages, [["user:hello"]]);
+  assert.match(output, /Available commands:/);
+  assert.match(output, /\/status/);
+  assert.match(output, /mode: balanced/);
+  assert.match(output, /branch: no-git/);
+});

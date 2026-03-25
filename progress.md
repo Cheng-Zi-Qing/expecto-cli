@@ -1,0 +1,300 @@
+# Progress
+
+## 2026-03-23
+
+- Resumed the approved fullscreen TUI work in `/Users/clement/Workspace/beta-agent`.
+- Read and applied the active skills:
+  - `using-superpowers`
+  - `planning-with-files`
+  - `brainstorming` as a continuation of already approved design work
+  - `test-driven-development`
+- Confirmed that repo-root planning files were missing and created:
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+- Re-read:
+  - `plans/2026-03-23-fullscreen-tui-plan.md`
+  - `specs/v1-tui-architecture.md`
+- Completed the first TDD cycle for pure TUI state and made those tests green.
+- Added and passed new tests for:
+  - queued interactive input delivery and close semantics
+  - renderer-neutral interactive TUI orchestration
+  - CLI routing into fullscreen TUI for `interactive + TTY`
+  - timeline selection movement
+- Implemented:
+  - `src/tui/queued-interactive-input.ts`
+  - `src/tui/tui-app.ts`
+  - `src/tui/run-interactive-tui.ts`
+  - `src/tui/renderer-blessed/tui-app.ts`
+- Installed:
+  - `neo-blessed`
+  - `@types/blessed`
+- Updated CLI routing so:
+  - `beta` uses fullscreen TUI in interactive TTY sessions
+  - `beta "<prompt>"` uses fullscreen TUI with an initial prompt
+  - `beta -p "<prompt>"` stays plain
+- Verification completed:
+  - `npm test`
+  - `npm run check`
+  - `npm run build`
+  - `node --experimental-strip-types src/cli/entry.ts -p "say hello in one sentence"`
+  - `beta -p "say hello in one sentence"`
+  - interactive TTY smoke for `node --experimental-strip-types src/cli/entry.ts "say hello in one sentence"`
+  - interactive TTY smoke for `beta "say hello in one sentence"`
+
+## Next
+
+- Review the first fullscreen TUI slice and decide what to harden next:
+  - markdown rendering quality
+  - slash-command UX
+  - execution/tool cards
+  - richer context metrics and inspector sections
+  - composer editing ergonomics
+
+## 2026-03-24
+
+- Investigated the `Error on xterm-256color.Setulc` startup noise in fullscreen TUI mode.
+- Reproduced it directly in `neo-blessed` with `TERM=xterm-256color` and confirmed it came from terminfo capability compilation, not from beta runtime logic.
+- Added a renderer-local terminal compatibility fallback:
+  - `xterm-256color` -> `screen-256color`
+  - keeps 256 colors while avoiding the `Setulc` stderr noise
+- Investigated the composer bug where `i` could not be typed.
+- Root cause: renderer key handling treated `i` as a global focus shortcut instead of a timeline-only shortcut.
+- Extracted renderer-local helpers:
+  - `src/tui/renderer-blessed/tui-runtime.ts`
+  - pure terminal resolution
+  - pure keypress interpretation
+- Added tests:
+  - `tests/tui/renderer-blessed/tui-runtime.test.ts`
+  - verified terminal fallback
+  - verified `i` is text in composer focus and only a shortcut in timeline focus
+- Cleaned up composer placeholder rendering by removing unsupported `{dim}` markup.
+- Verification completed:
+  - `node --experimental-strip-types --test tests/tui/renderer-blessed/tui-runtime.test.ts tests/tui/renderer-blessed/tui-theme.test.ts`
+  - `npm run check`
+  - `npm run build`
+  - `TERM=xterm-256color beta` no longer prints the `Setulc` error
+  - real TTY input confirmed that typing `i` now appears in the composer
+
+- Switched planning files to a new task:
+  - read the Obsidian design corpus from `00-总纲.md` onward
+  - summarize stable decisions and design drift
+  - produce the next engineering plan
+- Read and summarized design docs `00-08`:
+  - overall thesis and scope
+  - reference project decomposition
+  - product definition and v1 scope
+  - layered architecture
+  - skills/workflow system
+  - memory/state model
+  - multi-agent model
+  - safety/permission model
+  - roadmap and risks
+- Logged the stable themes and major roadmap tension into `findings.md`.
+
+- Read and summarized design docs `09-16`:
+  - Claude Code text and memory management research
+  - evolution/workflow optimization
+  - Markdown-driven artifact layering
+  - module boundaries and fixed APIs
+  - design questionnaire and answered decisions
+  - CLI command tree research
+  - design feedback and refinement
+  - frozen decisions vs still-open questions
+- Recorded the main conclusion:
+  - the design corpus has largely converged
+  - the remaining work is to reconcile already shipped TUI slices with the still-missing contract/workspace/memory layers.
+
+- Read and summarized design docs `17-27`:
+  - fullscreen TUI product design
+  - first TUI implementation checkpoint
+  - readability/IME fixes
+  - timeline hierarchy and execution card styling
+  - fixed-color strategy
+  - composer and timeline surface corrections
+  - inspector and selected-item emphasis
+  - paging and mouse wheel support
+  - semantic visual system and highlighting plan
+- Cross-checked the design corpus against the actual codebase:
+  - confirmed current implemented modules
+  - identified the main gap as “document/instruction/memory layers lag behind the shipped TUI shell”
+- Wrote two new Obsidian docs:
+  - `28-00到27设计总复盘.md`
+  - `29-下一阶段工程计划.md`
+- Used the writing-plans workflow to translate the high-level engineering roadmap into a repo-local execution plan:
+  - `plans/2026-03-24-workspace-instruction-foundation-plan.md`
+- The first implementation track is now explicit:
+  - freeze contracts
+  - connect `.beta-agent/docs/` lifecycle
+  - replace the simple instruction loader with a real resolver
+  - stabilize identity injection
+  - improve session summary and resume catch-up
+
+- Executed the full `workspace-instruction-foundation` plan inline.
+- Task 1 complete:
+  - added failing contract tests
+  - extended artifact refs with optional metadata
+  - extended session snapshots with structured summary fields
+  - wrote `specs/2026-03-24-workspace-instruction-foundation.md`
+- Task 2 complete:
+  - added `src/core/artifact-workspace.ts`
+  - added workspace initialization tests
+  - upgraded `ArtifactStore` to round-trip metadata/status through frontmatter
+  - upgraded summary selection to use metadata such as `taskId` and `updatedAt`
+- Task 3 complete:
+  - added `src/runtime/instruction-resolver.ts`
+  - separated raw project instructions from resolved prompt layers
+  - updated bootstrap to expose `instructionStack`
+  - stopped eager loading of optional artifacts into `loadedArtifacts.optional`
+- Task 4 complete:
+  - added a shared default assistant identity constant
+  - unified default identity behavior across Anthropic and OpenAI-style providers
+- Task 5 complete:
+  - enriched bootstrap/session summaries with mode and optional refs
+  - enriched resume summaries with structured headline/current task/next step fields
+  - updated runtime snapshot persistence to write the new summary object
+- Task 6 complete:
+  - `npm test`
+  - `npm run check`
+  - `npm run build`
+  - manual smoke:
+    - `beta --continue`
+    - `beta` in a real TTY and exit with `Ctrl+D`
+
+- Started the next implementation track from:
+  - `plans/2026-03-24-command-surface-plan.md`
+- Confirmed Task 1 had already been completed:
+  - built-in command registry
+  - slash parser
+  - command metadata tests
+- Completed Task 2:
+  - added `src/commands/command-executor.ts`
+  - replaced hardcoded `/exit` and `/clear` logic in `src/runtime/runtime-session.ts`
+  - routed built-in slash commands through structured runtime effects
+  - kept slash command semantics out of assistant history and renderer-neutral prompt/output hooks
+- Verified Task 2 with targeted tests:
+  - `node --experimental-strip-types --test tests/runtime/interactive-session.test.ts`
+  - `node --experimental-strip-types --test tests/runtime/session-manager.test.ts`
+- Updated repo working-memory files so the active execution context is now the command-surface plan rather than the earlier foundation pass.
+
+- Completed Task 3 from the command-surface plan:
+  - added shared `commandMenu` state to the TUI model
+  - derived slash suggestions from the built-in command registry on draft changes
+  - routed composer selection keys to command suggestions before timeline navigation when the menu is visible
+- Verified Task 3 with targeted tests:
+  - `node --experimental-strip-types --test tests/tui/run-interactive-tui.test.ts`
+  - `node --experimental-strip-types --test tests/tui/tui-state.test.ts`
+
+- Completed Task 4 from the command-surface plan:
+  - added a dedicated `Commands` box to the blessed renderer
+  - added renderer-local command menu layout calculation
+  - added pure command menu markup rendering with selected state and empty state
+- Verified Task 4 with targeted tests:
+  - `node --experimental-strip-types --test tests/tui/renderer-blessed/tui-runtime.test.ts`
+  - `node --experimental-strip-types --test tests/tui/renderer-blessed/tui-theme.test.ts`
+
+- Completed Task 5 from the command-surface plan:
+  - `npm test`
+  - `npm run check`
+  - `npm run build`
+  - interactive smoke:
+    - started fullscreen `beta` entry in a TTY
+    - verified slash palette appears on `/help`
+    - verified built-in command output renders in the timeline
+    - exited cleanly from the TTY session
+
+- The `2026-03-24-command-surface` plan is now complete end-to-end.
+
+- Began the next approved design track:
+  - semantic block renderer first
+  - command-palette refinement second
+- Re-read the current TUI architecture and the relevant Obsidian design docs for:
+  - semantic visual tokens
+  - timeline/execution hierarchy
+  - renderer boundary constraints
+- Converted the approved design discussion into repo-local planning artifacts:
+  - `specs/2026-03-24-semantic-block-renderer.md`
+  - `plans/2026-03-24-semantic-block-renderer-plan.md`
+- Updated working-memory files so the active track is now the semantic block renderer planning/execution path.
+
+- Started subagent-driven execution of `plans/2026-03-24-semantic-block-renderer-plan.md`.
+- Completed Task 1 with a worker subagent plus repeated review loops:
+  - added `src/tui/block-model/block-types.ts`
+  - added `src/tui/block-model/text-tokens.ts`
+  - added `src/tui/view-model/markdown-blocks.ts`
+  - added `tests/tui/view-model/markdown-blocks.test.ts`
+- Task 1 verification completed locally:
+  - `node --experimental-strip-types --test tests/tui/view-model/markdown-blocks.test.ts`
+  - `npm run check`
+- Task 1 review loop found and fixed several fence-edge regressions:
+  - blank lines inside fenced code blocks
+  - ordered-list contract coverage gap
+  - unclosed fence source-loss behavior
+  - overly permissive closing-fence detection
+- Updated plan and working memory to mark Task 1 complete and move the active execution phase to Task 2.
+
+- Completed Task 2 from `plans/2026-03-24-semantic-block-renderer-plan.md`.
+- Fresh spec review passed: no blocking Task 2 deviations.
+- Code quality review found two issues and they were fixed:
+  - empty-string / whitespace-only body fallback now prefers `summary` for welcome/user/system/assistant when the summary has usable text
+  - execution transcript blocks normalize CRLF and ignore a trailing terminal newline without losing meaningful interior blank lines
+- Verification completed:
+  - `node --experimental-strip-types --test tests/tui/view-model/timeline-blocks.test.ts` (14/14)
+  - `npm run check`
+
+- Completed Task 3 from `plans/2026-03-24-semantic-block-renderer-plan.md`.
+- Fresh spec review passed for Task 3: no blocking deviations.
+- Code quality follow-ups were found and fixed:
+  - width-aware line accounting existed but was not wired into the live TUI until `resolveTimelineWrapWidth(...)` + `renderTimelineItems(...)` integration in `src/tui/renderer-blessed/tui-app.ts`
+  - renderer surface tightened to a single public raw-timeline entry point
+  - removed dead `showCursor` parameter from `renderComposerMarkup`
+  - dynamic inspector/status values escaped before tagged blessed rendering
+- Updated/added tests now cover:
+  - block renderer layout and wrap-width behavior
+  - renderer API surface expectations
+  - dynamic brace escaping in `tests/tui/renderer-blessed/tui-app.test.ts`
+- Fresh verification completed:
+  - `node --experimental-strip-types --test tests/tui/renderer-blessed/tui-app.test.ts tests/tui/renderer-blessed/block-renderer.test.ts tests/tui/renderer-blessed/tui-theme.test.ts tests/tui/run-interactive-tui.test.ts` (19/19)
+  - `npm run check`
+
+- Completed Task 4 from `plans/2026-03-24-semantic-block-renderer-plan.md`.
+- Updated `tests/tui/run-interactive-tui.test.ts` so the fake interactive app renders each `TuiState` through the semantic block path and captures `RenderedTimelineLayout`, including selected-line assertions for rendered selection.
+- Fresh verification (renderer integration area):
+  - `node --experimental-strip-types --test tests/tui/run-interactive-tui.test.ts` (4/4)
+  - `npm run check`
+
+- Task 5 verification checkpoint:
+  - `npm test` (144/144)
+  - `npm run check`
+  - `npm run build`
+  - manual fullscreen smoke (dist build):
+    - startup into fullscreen beta TUI
+    - slash palette visibility on `/`
+    - prompt submission rendering as Submitted Input
+    - assistant reply rendering in fullscreen TUI
+    - assistant markdown/list + inline code rendering in fullscreen TUI
+    - clean exit with Ctrl+D
+  - limitation: a real runtime-triggered execution card could not be smoke-tested end-to-end in the live CLI path because the interactive runtime did not expose a natural execution-item emission path during manual smoke
+
+## 2026-03-25
+
+- Closed the remaining semantic-block Task 5 live-smoke gap by adding a minimal real execution-item emission path.
+- `/branch` now emits a renderer-neutral execution item (in addition to the existing system line), which `runInteractiveTui()` maps to `append_execution_item` so the fullscreen TUI can render an execution card on a natural built-in command path.
+- Verification completed:
+  - `node --experimental-strip-types --test tests/runtime/session-manager.test.ts`
+  - `node --experimental-strip-types --test tests/runtime/interactive-session.test.ts`
+  - `node --experimental-strip-types --test tests/tui/run-interactive-tui.test.ts`
+  - `npm test` (148/148)
+  - `npm run check`
+  - `npm run build`
+- Follow-up hardening completed:
+  - unified builtin slash dispatch through `RuntimeSession.processInput()`
+  - covered `interactive.initialPrompt` and one-shot `print` prompt so `/branch` no longer leaks into the user/assistant streams on those entry paths
+  - removed the direct `neo-blessed` import from `tests/tui/run-interactive-tui.test.ts`
+- Real TTY smoke passed for the natural execution-card path using:
+  - `node dist/src/cli/entry.js "/branch"`
+- Captured fullscreen output showed:
+  - `System: branch: no-git`
+  - collapsed `Execution: Read git branch · Details hidden`
+- Exited cleanly with `Ctrl+D`.
+- The semantic-block renderer plan is now complete end-to-end.
