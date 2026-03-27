@@ -31,6 +31,7 @@ function createSampleTuiState(overrides: Partial<TuiState> = {}): TuiState {
       docs: 0,
     },
     ...overrides,
+    activeRequestLedger: overrides.activeRequestLedger ?? null,
   };
 }
 

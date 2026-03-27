@@ -3,38 +3,48 @@ import assert from "node:assert/strict";
 
 import { parseCliArgs } from "../../src/cli/arg-parser.ts";
 
-test("returns interactive mode when no args are provided", () => {
+test("returns empty parsed args when no args are provided", () => {
   const result = parseCliArgs([]);
 
+  assert.deepEqual(result, {});
+});
+
+test("parses a positional prompt without treating it as fullscreen intent", () => {
+  const result = parseCliArgs(["fix auth regression"]);
+
   assert.deepEqual(result, {
-    kind: "interactive",
+    prompt: "fix auth regression",
   });
 });
 
-test("returns interactive mode with an initial prompt for a positional argument", () => {
-  const result = parseCliArgs(["help me refactor auth"]);
-
-  assert.deepEqual(result, {
-    kind: "interactive",
-    initialPrompt: "help me refactor auth",
+test("distinguishes an explicit empty prompt from bare beta", () => {
+  assert.deepEqual(parseCliArgs([""]), {
+    prompt: "",
   });
 });
 
-test("returns print mode for -p with a prompt", () => {
+test("parses --native and --tui as explicit mode selectors", () => {
+  assert.deepEqual(parseCliArgs(["--native"]), {
+    explicitMode: "native",
+  });
+
+  assert.deepEqual(parseCliArgs(["--tui", "fix auth regression"]), {
+    explicitMode: "tui",
+    prompt: "fix auth regression",
+  });
+});
+
+test("marks -p and --print as deprecated prompt aliases", () => {
   const result = parseCliArgs(["-p", "summarize this repository"]);
 
   assert.deepEqual(result, {
-    kind: "print",
     prompt: "summarize this repository",
+    deprecatedPrintAlias: true,
   });
-});
 
-test("returns print mode for --print with a prompt", () => {
-  const result = parseCliArgs(["--print", "summarize this repository"]);
-
-  assert.deepEqual(result, {
-    kind: "print",
+  assert.deepEqual(parseCliArgs(["--print", "summarize this repository"]), {
     prompt: "summarize this repository",
+    deprecatedPrintAlias: true,
   });
 });
 
@@ -67,5 +77,23 @@ test("throws when multiple positional prompts are provided", () => {
   assert.throws(
     () => parseCliArgs(["first prompt", "second prompt"]),
     /single positional prompt/,
+  );
+});
+
+test("rejects conflicting explicit mode flags", () => {
+  assert.throws(
+    () => parseCliArgs(["--native", "--tui"]),
+    /cannot combine --native and --tui/,
+  );
+});
+
+test("rejects reserved legacy flags when they appear after other args", () => {
+  assert.throws(
+    () => parseCliArgs(["--native", "--continue"]),
+    /can only be used as the first argument/,
+  );
+  assert.throws(
+    () => parseCliArgs(["fix auth regression", "--print"]),
+    /can only be used as the first argument/,
   );
 });

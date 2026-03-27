@@ -1,3 +1,21 @@
+type ExplicitMode = "native" | "tui";
+
+type ParsedPromptArgs = {
+  prompt?: string;
+  explicitMode?: ExplicitMode;
+  deprecatedPrintAlias?: true;
+};
+
+type ContinueCommand = {
+  kind: "continue";
+};
+
+type ResumeCommand = {
+  kind: "resume";
+  session: string;
+};
+
+export type ParsedCliArgs = ParsedPromptArgs | ContinueCommand | ResumeCommand;
 export type CliCommand =
   | {
       kind: "interactive";
@@ -15,6 +33,8 @@ export type CliCommand =
       session: string;
     };
 
+const RESERVED_LEGACY_FLAGS = new Set(["--continue", "--resume", "-p", "--print"]);
+
 function requireValue(flag: string, value: string | undefined, expected: string): string {
   if (!value) {
     throw new Error(`${flag} requires ${expected}`);
@@ -23,9 +43,9 @@ function requireValue(flag: string, value: string | undefined, expected: string)
   return value;
 }
 
-export function parseCliArgs(argv: string[]): CliCommand {
+export function parseCliArgs(argv: string[]): ParsedCliArgs {
   if (argv.length === 0) {
-    return { kind: "interactive" };
+    return {};
   }
 
   const [first, second, third] = argv;
@@ -36,8 +56,8 @@ export function parseCliArgs(argv: string[]): CliCommand {
     }
 
     return {
-      kind: "print",
       prompt: requireValue(first, second, "a prompt"),
+      deprecatedPrintAlias: true,
     };
   }
 
@@ -60,18 +80,37 @@ export function parseCliArgs(argv: string[]): CliCommand {
     };
   }
 
-  if (argv.length > 1) {
-    throw new Error("interactive mode accepts only a single positional prompt");
+  let explicitMode: ExplicitMode | undefined;
+  let prompt: string | undefined;
+
+  for (const arg of argv) {
+    if (arg === "--native" || arg === "--tui") {
+      const nextMode: ExplicitMode = arg === "--native" ? "native" : "tui";
+      if (explicitMode && explicitMode !== nextMode) {
+        throw new Error("cannot combine --native and --tui");
+      }
+
+      explicitMode = nextMode;
+      continue;
+    }
+
+    if (RESERVED_LEGACY_FLAGS.has(arg)) {
+      throw new Error(`${arg} can only be used as the first argument`);
+    }
+
+    if (prompt !== undefined) {
+      throw new Error("interactive mode accepts only a single positional prompt");
+    }
+
+    prompt = arg;
   }
 
-  if (first) {
-    return {
-      kind: "interactive",
-      initialPrompt: first,
-    };
+  const parsed: ParsedPromptArgs = {};
+  if (explicitMode) {
+    parsed.explicitMode = explicitMode;
   }
-
-  return {
-    kind: "interactive",
-  };
+  if (prompt !== undefined) {
+    parsed.prompt = prompt;
+  }
+  return parsed;
 }

@@ -69,10 +69,11 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
       docs: 0,
     },
     ...overrides,
+    activeRequestLedger: overrides.activeRequestLedger ?? null,
   };
 }
 
-test("createTerminalTuiApp starts, renders, updates, and closes terminal session", async () => {
+test("createTerminalTuiApp starts on the main screen, reserves a scroll region, and closes cleanly", async () => {
   const stdin = createFakeStdin();
   const stdout = createFakeStdout(54, 12);
   const state = createState({
@@ -110,34 +111,20 @@ test("createTerminalTuiApp starts, renders, updates, and closes terminal session
 
   await app.start();
   assert.deepEqual(stdin.setRawModeCalls, [true]);
-  assert.match(stdout.writes.join(""), /\u001b\[\?1049h/);
+  assert.match(stdout.writes.join(""), /\u001b\[2J/);
+  assert.match(stdout.writes.join(""), /\u001b\[2;7r/);
   assert.match(stdout.writes.join(""), /\u001b\[\?25l/);
+  assert.match(stdout.writes.join(""), /Timeline/);
+  assert.match(stdout.writes.join(""), /Composer/);
   assert.match(stdout.writes.join(""), /assistant: inspect auth flow/);
   assert.match(stdout.writes.join(""), /Status: Done/);
-
-  app.update({
-    ...state,
-    draft: "new prompt",
-    timeline: [
-      ...state.timeline,
-      {
-        id: "assistant-2",
-        kind: "assistant",
-        summary: "assistant: second output",
-        body: "assistant: second output",
-        collapsed: false,
-      },
-    ],
-    selectedTimelineIndex: 1,
-  });
-
-  assert.match(stdout.writes.join(""), /assistant: second output/);
-  assert.match(stdout.writes.join(""), /new prompt/);
+  assert.doesNotMatch(stdout.writes.join(""), /\u001b\[\?1049h/);
 
   await app.close();
   assert.deepEqual(stdin.setRawModeCalls, [true, false]);
   assert.match(stdout.writes.join(""), /\u001b\[\?25h/);
-  assert.match(stdout.writes.join(""), /\u001b\[\?1049l/);
+  assert.match(stdout.writes.join(""), /\u001b\[r/);
+  assert.doesNotMatch(stdout.writes.join(""), /\u001b\[\?1049l/);
 });
 
 test("createTerminalTuiApp maps keyboard input and keeps non-interrupt input disabled while locked", async () => {
@@ -230,6 +217,180 @@ test("createTerminalTuiApp maps keyboard input and keeps non-interrupt input dis
   stdin.emit("data", Buffer.from("\u0004"));
   assert.equal(interrupts, 1);
   assert.equal(exits, 1);
+
+  await app.close();
+});
+
+test("createTerminalTuiApp maps page keys to timeline paging when timeline focus is active", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout(54, 12);
+  let app: InteractiveTuiApp;
+  let state = createState({
+    focus: "timeline",
+    timeline: [
+      {
+        id: "assistant-1",
+        kind: "assistant",
+        summary: "assistant: one",
+        body: "assistant: one",
+        collapsed: false,
+      },
+      {
+        id: "assistant-2",
+        kind: "assistant",
+        summary: "assistant: two",
+        body: "assistant: two",
+        collapsed: false,
+      },
+      {
+        id: "assistant-3",
+        kind: "assistant",
+        summary: "assistant: three",
+        body: "assistant: three",
+        collapsed: false,
+      },
+      {
+        id: "assistant-4",
+        kind: "assistant",
+        summary: "assistant: four",
+        body: "assistant: four",
+        collapsed: false,
+      },
+      {
+        id: "assistant-5",
+        kind: "assistant",
+        summary: "assistant: five",
+        body: "assistant: five",
+        collapsed: false,
+      },
+    ],
+    selectedTimelineIndex: 0,
+  });
+
+  const handlers = {
+    onDraftChange() {},
+    onSubmit() {},
+    onInterrupt() {},
+    onToggleInspector() {},
+    onFocusTimeline: () => {
+      state = {
+        ...state,
+        focus: "timeline",
+      };
+      app.update(state);
+    },
+    onFocusComposer: () => {
+      state = {
+        ...state,
+        focus: "composer",
+      };
+      app.update(state);
+    },
+    onMoveSelectionUp: () => {
+      state = {
+        ...state,
+        selectedTimelineIndex: Math.max(0, state.selectedTimelineIndex - 1),
+      };
+      app.update(state);
+    },
+    onMoveSelectionDown: () => {
+      state = {
+        ...state,
+        selectedTimelineIndex: Math.min(state.timeline.length - 1, state.selectedTimelineIndex + 1),
+      };
+      app.update(state);
+    },
+    onToggleSelectedItem() {},
+    onExit() {},
+  };
+
+  app = createTerminalTuiApp({
+    initialState: state,
+    handlers,
+    terminal: {
+      stdin,
+      stdout,
+    },
+  });
+
+  await app.start();
+
+  stdin.emit("data", Buffer.from("\u001b[6~"));
+  assert.equal(state.selectedTimelineIndex, 3);
+
+  stdin.emit("data", Buffer.from("\u001b[5~"));
+  assert.equal(state.selectedTimelineIndex, 0);
+
+  await app.close();
+});
+
+test("createTerminalTuiApp appends new transcript lines without replaying prior history", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout(54, 12);
+  let app: InteractiveTuiApp;
+  let state = createState({
+    timeline: [
+      {
+        id: "assistant-1",
+        kind: "assistant",
+        summary: "assistant: inspect auth flow",
+        body: "assistant: inspect auth flow",
+        collapsed: false,
+      },
+    ],
+  });
+
+  const handlers = {
+    onDraftChange: (draft: string) => {
+      state = {
+        ...state,
+        draft,
+      };
+      app.update(state);
+    },
+    onSubmit() {},
+    onInterrupt() {},
+    onToggleInspector() {},
+    onFocusTimeline() {},
+    onFocusComposer() {},
+    onMoveSelectionUp() {},
+    onMoveSelectionDown() {},
+    onToggleSelectedItem() {},
+    onExit() {},
+  };
+
+  app = createTerminalTuiApp({
+    initialState: state,
+    handlers,
+    terminal: {
+      stdin,
+      stdout,
+    },
+  });
+
+  await app.start();
+  stdout.writes.length = 0;
+
+  app.update({
+    ...state,
+    draft: "new prompt",
+    timeline: [
+      ...state.timeline,
+      {
+        id: "assistant-2",
+        kind: "assistant",
+        summary: "assistant: second output",
+        body: "assistant: second output",
+        collapsed: false,
+      },
+    ],
+    selectedTimelineIndex: 1,
+  });
+
+  assert.match(stdout.writes.join(""), /assistant: second output/);
+  assert.match(stdout.writes.join(""), /new prompt/);
+  assert.doesNotMatch(stdout.writes.join(""), /assistant: inspect auth flow/);
+  assert.doesNotMatch(stdout.writes.join(""), /\u001b\[1;1Hassistant: inspect auth flow/i);
 
   await app.close();
 });

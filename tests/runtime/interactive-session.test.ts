@@ -7,6 +7,15 @@ import { join } from "node:path";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 import { SessionManager } from "../../src/runtime/session-manager.ts";
 
+function assistantOutputResult(output: string, responseId = "response-1") {
+  return {
+    kind: "output" as const,
+    responseId,
+    output,
+    finishReason: "stop" as const,
+  };
+}
+
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "beta-agent-interactive-"));
   await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
@@ -35,10 +44,10 @@ test("interactive session processes multiple turns and preserves conversation hi
       observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
 
       if (input.prompt === "hello") {
-        return { output: "assistant: hi there" };
+        return assistantOutputResult("assistant: hi there");
       }
 
-      return { output: "assistant: you said hello" };
+      return assistantOutputResult("assistant: you said hello");
     },
   });
 
@@ -72,7 +81,7 @@ test("interactive session clears conversation history on /clear and stops on /ex
     assistantStep: async (input) => {
       observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
 
-      return { output: `assistant: ${input.prompt}` };
+      return assistantOutputResult(`assistant: ${input.prompt}`);
     },
   });
 
@@ -105,7 +114,7 @@ test("interactive session executes built-in slash commands without sending them 
     assistantStep: async (input) => {
       observedMessages.push(input.messages.map((message) => `${message.role}:${message.content}`));
 
-      return { output: `assistant: ${input.prompt}` };
+      return assistantOutputResult(`assistant: ${input.prompt}`);
     },
   });
 

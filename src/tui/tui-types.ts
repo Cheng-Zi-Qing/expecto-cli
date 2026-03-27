@@ -1,3 +1,7 @@
+import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
+import type { ForegroundRequestLedger } from "./request-ledger.ts";
+import type { ExecutionTranscriptBuffer } from "./execution-transcript-buffer.ts";
+
 export type TuiFocus = "composer" | "timeline";
 
 export type CommandMenuItem = {
@@ -35,6 +39,11 @@ export type TimelineItem = {
   summary: string;
   body?: string;
   collapsed?: boolean;
+  requestId?: string;
+  responseId?: string;
+  executionId?: string;
+  executionTranscript?: ExecutionTranscriptBuffer;
+  unreadLineCount?: number;
 };
 
 export type ContextMetrics = {
@@ -49,6 +58,7 @@ export type TuiState = {
   focus: TuiFocus;
   inspectorOpen: boolean;
   runtimeState: TuiRuntimeState;
+  activeRequestLedger: ForegroundRequestLedger | null;
   commandMenu: CommandMenuState;
   timeline: TimelineItem[];
   selectedTimelineIndex: number;
@@ -80,6 +90,14 @@ export type TuiAction =
   | { type: "append_user_message"; prompt: string }
   | { type: "append_assistant_message"; output: string }
   | { type: "append_execution_item"; summary: string; body?: string }
+  | {
+      type: "start_request_lifecycle";
+      requestId: string;
+      turnId: string;
+      startedAt: string;
+    }
+  | { type: "mark_interrupt_intent" }
+  | { type: "project_interaction_event"; event: InteractionEvent }
   | { type: "toggle_selected_item" }
   | { type: "set_draft"; draft: string }
   | { type: "set_input_locked"; locked: boolean }

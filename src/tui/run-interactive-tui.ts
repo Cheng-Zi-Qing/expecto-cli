@@ -1,10 +1,11 @@
 import { basename } from "node:path";
 
+import { listBuiltinCommands } from "../commands/builtin-commands.ts";
 import type { ProviderRunner } from "../providers/provider-runner.ts";
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import { SessionManager } from "../runtime/session-manager.ts";
 import { SessionInterruptController } from "../runtime/session-interrupt.ts";
-import type { AssistantStepInput, AssistantStepResult, RuntimeSessionState } from "../runtime/runtime-session.ts";
+import type { AssistantStepInput, AssistantStepResult } from "../runtime/runtime-session.ts";
 import { deriveContextMetrics } from "./context-metrics.ts";
 import type { CreateInteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
 import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
@@ -54,8 +55,30 @@ function createContextMetrics(
   });
 }
 
-function isInputLockedForState(state: RuntimeSessionState): boolean {
-  return state === "streaming";
+function isKnownBuiltinCommand(prompt: string): boolean {
+  const [commandName] = prompt.trim().split(/\s+/, 1);
+
+  if (!commandName || !commandName.startsWith("/")) {
+    return false;
+  }
+
+  return listBuiltinCommands().some((command) => {
+    return (
+      command.name === commandName ||
+      command.aliases.includes(commandName as `/${string}`)
+    );
+  });
+}
+
+function parsePromptTurnSequence(turnId: string): number | null {
+  const match = /^turn-(\d+)$/.exec(turnId);
+
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[1] ?? "", 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export async function runInteractiveTui(
@@ -65,6 +88,7 @@ export async function runInteractiveTui(
   const queuedInput = new QueuedInteractiveInput();
   const interruptController = new SessionInterruptController();
   const conversation: string[] = [];
+  let promptTurnSequence = 0;
   let state = createInitialTuiState({
     sessionId: "pending-session",
     projectLabel: basename(context.projectRoot),
@@ -79,13 +103,12 @@ export async function runInteractiveTui(
     ),
   });
 
-  const applyAction = (action: TuiAction): void => {
+  const applyActionWithoutRender = (action: TuiAction): void => {
     state = reduceTuiState(state, action);
-    app.update(state);
   };
 
-  const refreshContextMetrics = (): void => {
-    applyAction({
+  const updateContextMetrics = (dispatch: (action: TuiAction) => void): void => {
+    dispatch({
       type: "set_context_metrics",
       contextMetrics: createContextMetrics(
         context,
@@ -94,6 +117,48 @@ export async function runInteractiveTui(
         conversation,
       ),
     });
+  };
+
+  const seedForegroundPromptLifecycle = (
+    prompt: string,
+    dispatch: (action: TuiAction) => void,
+  ): void => {
+    promptTurnSequence += 1;
+    const turnId = `turn-${promptTurnSequence}`;
+
+    dispatch({
+      type: "append_user_message",
+      prompt,
+    });
+    dispatch({
+      type: "start_request_lifecycle",
+      requestId: `request-${turnId}`,
+      turnId,
+      startedAt: new Date().toISOString(),
+    });
+    conversation.push(`user: ${prompt}`);
+    updateContextMetrics(dispatch);
+  };
+
+  if (context.entry.kind === "interactive") {
+    const initialPrompt = context.entry.initialPrompt ?? "";
+    const trimmedInitialPrompt = initialPrompt.trim();
+
+    if (
+      trimmedInitialPrompt.length > 0 &&
+      !isKnownBuiltinCommand(trimmedInitialPrompt)
+    ) {
+      seedForegroundPromptLifecycle(initialPrompt, applyActionWithoutRender);
+    }
+  }
+
+  const applyAction = (action: TuiAction): void => {
+    state = reduceTuiState(state, action);
+    app.update(state);
+  };
+
+  const refreshContextMetrics = (): void => {
+    updateContextMetrics(applyAction);
   };
 
   const app = options.createApp({
@@ -106,7 +171,9 @@ export async function runInteractiveTui(
         });
       },
       onSubmit: (prompt) => {
-        if (prompt.trim().length === 0) {
+        const trimmedPrompt = prompt.trim();
+
+        if (trimmedPrompt.length === 0) {
           return;
         }
 
@@ -114,13 +181,17 @@ export async function runInteractiveTui(
           type: "set_draft",
           draft: "",
         });
-        applyAction({
-          type: "set_input_locked",
-          locked: true,
-        });
+
+        if (!isKnownBuiltinCommand(trimmedPrompt)) {
+          seedForegroundPromptLifecycle(prompt, applyAction);
+        }
+
         queuedInput.submit(prompt);
       },
       onInterrupt: () => {
+        applyAction({
+          type: "mark_interrupt_intent",
+        });
         interruptController.interruptCurrentTurn();
       },
       onToggleInspector: () => {
@@ -173,27 +244,29 @@ export async function runInteractiveTui(
     ...(options.providerRunner ? { providerRunner: options.providerRunner } : {}),
     interruptController,
     onUserPrompt: (prompt) => {
-      conversation.push(`user: ${prompt}`);
-      applyAction({
-        type: "append_user_message",
-        prompt,
-      });
+      const expectedConversationEntry = `user: ${prompt}`;
+      const latestTimelineItem = state.timeline.at(-1);
+
+      if (conversation.at(-1) !== expectedConversationEntry) {
+        conversation.push(expectedConversationEntry);
+      }
+
+      if (!(latestTimelineItem?.kind === "user" && latestTimelineItem.summary === prompt)) {
+        applyAction({
+          type: "append_user_message",
+          prompt,
+        });
+      }
+
       refreshContextMetrics();
     },
     onAssistantOutput: (output) => {
-      conversation.push(`assistant: ${output}`);
-      applyAction({
-        type: "append_assistant_message",
-        output,
-      });
-      refreshContextMetrics();
-    },
-    onExecutionItem: (item) => {
-      applyAction({
-        type: "append_execution_item",
-        summary: item.summary,
-        ...(item.body ? { body: item.body } : {}),
-      });
+      const expectedConversationEntry = `assistant: ${output}`;
+
+      if (conversation.at(-1) !== expectedConversationEntry) {
+        conversation.push(expectedConversationEntry);
+        refreshContextMetrics();
+      }
     },
     onSystemLine: (line) => {
       if (line.startsWith("session: ")) {
@@ -219,9 +292,20 @@ export async function runInteractiveTui(
         type: "set_runtime_state",
         state: runtimeState,
       });
+    },
+    onInteractionEvent: (event) => {
+      const observedPromptTurnSequence = parsePromptTurnSequence(event.turnId);
+
+      if (
+        observedPromptTurnSequence !== null &&
+        observedPromptTurnSequence > promptTurnSequence
+      ) {
+        promptTurnSequence = observedPromptTurnSequence;
+      }
+
       applyAction({
-        type: "set_input_locked",
-        locked: isInputLockedForState(runtimeState),
+        type: "project_interaction_event",
+        event,
       });
     },
     onConversationCleared: () => {
@@ -239,10 +323,6 @@ export async function runInteractiveTui(
       applyAction({
         type: "set_draft",
         draft: prompt,
-      });
-      applyAction({
-        type: "set_input_locked",
-        locked: false,
       });
     },
   });

@@ -1,5 +1,6 @@
 import type { AssistantStepInput, AssistantStepResult } from "../runtime/runtime-session.ts";
 import type { SessionMode } from "../runtime/bootstrap-context.ts";
+import type { AssistantNonToolCallFinishReason } from "../contracts/interaction-event-schema.ts";
 import { ProviderRegistry } from "./provider-registry.ts";
 import { ProviderRouter } from "./provider-router.ts";
 import {
@@ -23,6 +24,18 @@ export type ProviderCompletionInput = {
 
 function defaultModelName(providerId: string): string {
   return `${providerId}/default`;
+}
+
+function mapStopReasonToFinishReason(stopReason: string): AssistantNonToolCallFinishReason {
+  if (stopReason === "max_tokens") {
+    return "max_tokens";
+  }
+
+  if (stopReason === "content_filter") {
+    return "content_filter";
+  }
+
+  return "stop";
 }
 
 export class ProviderRunner {
@@ -52,7 +65,7 @@ export class ProviderRunner {
 
   createAssistantStep(): (input: AssistantStepInput) => Promise<AssistantStepResult | null> {
     return async (input) => {
-      if (!input.prompt) {
+      if (input.messages.length === 0) {
         return null;
       }
 
@@ -64,7 +77,10 @@ export class ProviderRunner {
       });
 
       return {
+        kind: "output",
+        responseId: `response-${input.turnId}`,
         output: response.outputText,
+        finishReason: mapStopReasonToFinishReason(response.stopReason),
       };
     };
   }

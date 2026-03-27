@@ -37,6 +37,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
       docs: 1,
     },
     ...overrides,
+    activeRequestLedger: overrides.activeRequestLedger ?? null,
   };
 }
 
@@ -69,7 +70,7 @@ test("renderStatusBar escapes brace characters in dynamic values while preservin
   );
 });
 
-test("createBlessedTuiApp leaves timeline mouse capture disabled for terminal-native selection", () => {
+test("createBlessedTuiApp keeps timeline mouse capture disabled for terminal-native selection", () => {
   const createdBoxes: Array<{
     options: Record<string, unknown>;
     events: string[];

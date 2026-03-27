@@ -48,9 +48,22 @@ tests/
 
 The current `v1` bootstrap supports:
 
-- `beta` -> fullscreen TUI
-- `beta "<prompt>"` -> fullscreen TUI with the first prompt sent on entry
-- `beta -p "<prompt>"` -> plain one-shot execution
+- `beta` -> fullscreen TUI (requires stdin + stdout TTY)
+- `beta --tui` -> fullscreen TUI (requires stdin + stdout TTY)
+- `beta --tui "<prompt>"` -> fullscreen TUI with the initial prompt submitted inside the app
+- `beta "<prompt>"` -> plain one-shot execution (streams to stdout)
+- `beta --native` -> native REPL (requires stdin + stdout TTY)
+- `beta --native "<prompt>"` -> plain one-shot execution (streams to stdout)
+
+If stdin or stdout is non-TTY, the CLI never starts fullscreen or REPL mode and falls back to single-shot stream semantics. If stdout is redirected while stdin is still interactive and no prompt was provided, the process fails fast with an error instead of opening an invisible interactive session.
+
+## Deprecated Compatibility Surface
+
+- `beta -p/--print "<prompt>"` -> deprecated alias for one-shot execution (emits a warning on stderr)
+
+Deprecated environment knobs:
+
+- `BETA_TUI_RENDERER=terminal` is deprecated and no longer controls routing (warning-only).
 
 The runtime keeps a stable contract layer, markdown-driven project context loading, and renderer-agnostic runtime/provider plumbing.
 
@@ -93,7 +106,7 @@ Interactive TUI shortcuts:
 One-shot mode stays plain:
 
 ```bash
-beta -p "say hello in one sentence"
+beta "say hello in one sentence"
 ```
 
 ## Development Entry

@@ -17,10 +17,12 @@ export type SessionManagerOptions = {
   assistantStep?: (input: AssistantStepInput) => Promise<AssistantStepResult | null> | AssistantStepResult | null;
   providerRunner?: ProviderRunner;
   interruptController?: SessionInterruptController;
+  maxTurnLimit?: number;
   onSystemLine?: RuntimeSessionHooks["onSystemLine"];
   onUserPrompt?: RuntimeSessionHooks["onUserPrompt"];
   onAssistantOutput?: RuntimeSessionHooks["onAssistantOutput"];
   onExecutionItem?: RuntimeSessionHooks["onExecutionItem"];
+  onInteractionEvent?: RuntimeSessionHooks["onInteractionEvent"];
   onRuntimeStateChange?: RuntimeSessionHooks["onRuntimeStateChange"];
   onConversationCleared?: RuntimeSessionHooks["onConversationCleared"];
   onPromptInterrupted?: RuntimeSessionHooks["onPromptInterrupted"];
@@ -37,6 +39,7 @@ export class SessionManager {
   private readonly assistantStep?: SessionManagerOptions["assistantStep"];
   private readonly providerRunner: ProviderRunner | undefined;
   private readonly interruptController: SessionInterruptController | undefined;
+  private readonly maxTurnLimit: number | undefined;
   private readonly hooks: RuntimeSessionHooks;
 
   constructor(options: SessionManagerOptions = {}) {
@@ -46,11 +49,13 @@ export class SessionManager {
     this.assistantStep = options.assistantStep;
     this.providerRunner = options.providerRunner;
     this.interruptController = options.interruptController;
+    this.maxTurnLimit = options.maxTurnLimit;
     this.hooks = {
       ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
       ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
       ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
       ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
+      ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
       ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
       ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),
       ...(options.onPromptInterrupted ? { onPromptInterrupted: options.onPromptInterrupted } : {}),
@@ -65,6 +70,7 @@ export class SessionManager {
       ...(this.closeInput ? { closeInput: this.closeInput } : {}),
       ...(assistantStep ? { assistantStep } : {}),
       ...(this.interruptController ? { interruptController: this.interruptController } : {}),
+      ...(this.maxTurnLimit !== undefined ? { maxTurnLimit: this.maxTurnLimit } : {}),
       ...this.hooks,
     });
 

@@ -15,12 +15,13 @@ test("createAnsiWriter emits clear and cursor movement sequences in order", () =
   assert.deepEqual(writes, ["\u001b[?25l", "\u001b[4;10H", "\u001b[2K", "\u001b[?25h"]);
 });
 
-test("createAnsiWriter emits alternate-screen enter and exit sequences", () => {
+test("createAnsiWriter emits clear-screen and scroll-region sequences", () => {
   const writes: string[] = [];
   const writer = createAnsiWriter((chunk) => writes.push(chunk));
 
-  writer.enterAlternateScreen();
-  writer.exitAlternateScreen();
+  writer.clearScreen();
+  writer.setScrollRegion(1, 20);
+  writer.resetScrollRegion();
 
-  assert.deepEqual(writes, ["\u001b[?1049h", "\u001b[?1049l"]);
+  assert.deepEqual(writes, ["\u001b[2J", "\u001b[1;20r", "\u001b[r"]);
 });

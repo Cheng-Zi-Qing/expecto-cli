@@ -19,8 +19,11 @@ function createFooter(overrides: Partial<TuiFooterView> = {}): TuiFooterView {
 
 test("renderFooter emits a dark composer line and concise status line", () => {
   const footer = renderFooter(createFooter(), { width: 80, composerHeight: 4 });
-  assert.match(footer.join("\n"), /Write a prompt/);
-  assert.match(footer.join("\n"), /Thinking|Done|Running tool/);
+  assert.match(footer.lines.join("\n"), /╭ Composer/);
+  assert.match(footer.lines.join("\n"), /Write a prompt/);
+  assert.match(footer.lines.join("\n"), /╰ Status: Thinking/);
+  assert.equal(footer.composerBodyTop, 1);
+  assert.equal(footer.composerContentColumn, 3);
 });
 
 test("renderFooter keeps newest composer lines when content overflows", () => {
@@ -34,9 +37,9 @@ test("renderFooter keeps newest composer lines when content overflows", () => {
     { width: 20, composerHeight: 3 },
   );
 
-  assert.equal(footer[0], "line 3              ");
-  assert.equal(footer[1], "line 4              ");
-  assert.equal(footer[2], "line 5              ");
+  assert.equal(footer.lines[1], "│ line 3           │");
+  assert.equal(footer.lines[2], "│ line 4           │");
+  assert.equal(footer.lines[3], "│ line 5           │");
 });
 
 test("renderFooter does not replace whitespace-only draft with placeholder", () => {
@@ -50,6 +53,6 @@ test("renderFooter does not replace whitespace-only draft with placeholder", () 
     { width: 8, composerHeight: 2 },
   );
 
-  assert.doesNotMatch(footer.join("\n"), /Write a prompt/);
-  assert.equal(footer[0], "        ");
+  assert.doesNotMatch(footer.lines.join("\n"), /Write a prompt/);
+  assert.equal(footer.lines[1], "│      │");
 });

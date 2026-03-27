@@ -13,24 +13,13 @@ export type CreateTerminalSessionOptions = {
 export function createTerminalSession(options: CreateTerminalSessionOptions): TerminalSession {
   return {
     enter: () => {
-      options.writer.enterAlternateScreen();
-      try {
-        options.setRawMode(true);
-      } catch (error) {
-        try {
-          options.writer.exitAlternateScreen();
-        } catch {}
-        throw error;
-      }
+      options.setRawMode(true);
 
       try {
         options.writer.hideCursor();
       } catch (error) {
         try {
           options.setRawMode(false);
-        } catch {}
-        try {
-          options.writer.exitAlternateScreen();
         } catch {}
         throw error;
       }
@@ -49,7 +38,7 @@ export function createTerminalSession(options: CreateTerminalSessionOptions): Te
 
       runCleanup(() => options.writer.showCursor());
       runCleanup(() => options.setRawMode(false));
-      runCleanup(() => options.writer.exitAlternateScreen());
+      runCleanup(() => options.writer.resetScrollRegion());
 
       if (firstError !== undefined) {
         throw firstError;

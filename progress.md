@@ -218,6 +218,95 @@
 - Updated working-memory files so the active track is now the semantic block renderer planning/execution path.
 
 - Started subagent-driven execution of `plans/2026-03-24-semantic-block-renderer-plan.md`.
+
+## 2026-03-26
+
+- Continued the deep design pass for the post-`v1` interaction model instead of writing code immediately.
+- Consolidated the approved cross-cutting interaction contracts into:
+  - `specs/2026-03-26-cli-interaction-contract.md`
+- Captured and froze the currently approved decisions for:
+  - CLI routing and non-TTY guards
+  - pipeline semantics
+  - blessed scroll/select behavior
+  - focus, keymap, and help behavior
+  - render-tree ownership and render scheduling
+  - persistence split across JSON/JSONL/SQLite
+  - stale draft quarantine and garbage collection
+  - command history as recall cache rather than audit log
+  - execution and assistant event payload contracts
+  - execution card transcript buffering and unread behavior
+- Left one major design area explicitly open in the new spec:
+  - request coordinator and input unlock state machine across assistant plus parallel execution flows
+- Continued the design pass and closed that last major gap.
+- Updated `specs/2026-03-26-cli-interaction-contract.md` to freeze:
+  - request ledger structure
+  - `plannedExecutionIds` on assistant tool-call completion
+  - `request_completed` as the sole request terminal unlock event
+  - execution-wave completion semantics under parallel tool calls
+  - interrupt handling through the request ledger
+  - runtime `max_turn_limit` circuit breaker with `AGENT_LOOP_LIMIT_EXCEEDED`
+- Switched from design freeze to implementation planning.
+- Wrote a focused implementation plan for the first runtime-foundation track:
+  - `plans/2026-03-26-interaction-runtime-foundation-plan.md`
+- Deliberately scoped that first implementation plan to:
+  - typed interaction event schema
+  - runtime request terminal closure
+  - request ledger
+  - capped execution transcript buffering
+  - blessed interactive-path migration
+- Explicitly deferred into later plans:
+  - native stream presenter
+  - CLI routing / non-TTY guard implementation
+  - SQLite command history and draft persistence
+
+## 2026-03-27
+
+- Continued from the approved interaction contract and executed:
+  - `plans/2026-03-27-cli-routing-and-stream-presenter-plan.md`
+- Kept the implementation inside the isolated worktree:
+  - `/Users/clement/Workspace/beta-agent/.worktrees/interaction-runtime-foundation`
+- Used subagent-driven execution for the Task 5 review loop:
+  - spec review first
+  - code-quality review second
+  - re-review after fixes
+- Completed Task 1:
+  - split raw CLI parsing from runtime bootstrap commands
+  - added explicit parsed surface for:
+    - positional prompt
+    - `--native`
+    - `--tui`
+    - deprecated `-p/--print`
+    - legacy `--continue` / `--resume`
+- Completed Task 2:
+  - added pure route resolution and warnings in `src/cli/route-resolution.ts`
+  - locked non-TTY guard behavior in `tests/cli/route-resolution.test.ts`
+- Completed Task 3:
+  - added pure stdin helpers in `src/cli/stdin-pipeline.ts`
+  - covered string, Buffer, Uint8Array, and split UTF-8 chunk cases in `tests/cli/stdin-pipeline.test.ts`
+- Completed Task 4:
+  - added `StreamPresenter` and `runNativeSession(...)`
+  - routed native output through interaction events rather than the old terminal renderer entry path
+- Completed Task 5:
+  - rewired `src/cli/entry.ts` around:
+    - parsed args
+    - pure route resolution
+    - stdin pipeline assembly
+    - native session runner
+  - migrated docs/tests to the approved routing contract and deprecation path
+  - fixed a legacy-route regression so `--continue` / `--resume` no longer consume piped stdin before routing
+  - de-coupled entry tests from default runtime/system-line output for routing assertions
+  - added a direct fail-fast regression for redirected stdout + interactive stdin + no prompt
+- Completed Task 6 verification:
+  - `node --experimental-strip-types --test tests/cli/arg-parser.test.ts tests/cli/route-resolution.test.ts tests/cli/stdin-pipeline.test.ts tests/cli/stream-presenter.test.ts tests/cli/run-native-session.test.ts tests/cli/entry.test.ts tests/cli/entry-terminal-renderer.test.ts tests/cli/install-metadata.test.ts`
+  - `npm test`
+  - `npm run check`
+  - `npm run build`
+- Cleaned accidental Task 5 spillover from the main worktree:
+  - `README.md`
+  - `tests/cli/entry.test.ts`
+  - `tests/cli/entry-terminal-renderer.test.ts`
+  - `tests/cli/install-metadata.test.ts`
+- Updated `task_plan.md` so the active execution context now points at the runtime-foundation plan rather than the older terminal transcript work.
 - Completed Task 1 with a worker subagent plus repeated review loops:
   - added `src/tui/block-model/block-types.ts`
   - added `src/tui/block-model/text-tokens.ts`
@@ -298,3 +387,193 @@
   - collapsed `Execution: Read git branch · Details hidden`
 - Exited cleanly with `Ctrl+D`.
 - The semantic-block renderer plan is now complete end-to-end.
+
+- Re-opened the terminal renderer scroll problem after manual verification showed the timeline still used a fake viewport model instead of terminal-native scrolling semantics.
+- Wrote a focused follow-up plan:
+  - `plans/2026-03-25-terminal-native-transcript-plan.md`
+- Reworked `renderer-terminal` to move away from alternate-screen whole-frame redraws:
+  - `terminal-session` now stays on the main screen and resets only raw mode / cursor / scroll region
+  - `ansi-writer` now exposes clear-screen and scroll-region primitives
+  - `transcript-renderer` now exposes full transcript line rendering plus append-vs-replay diffing
+  - `tui-app` now uses a fixed footer with a top scroll region and append-only transcript updates for normal history growth
+- Updated terminal renderer tests to lock the new behavior:
+  - no alternate-screen expectation
+  - scroll-region reservation
+  - append-only transcript updates without replaying prior history
+- Verification completed:
+  - `node --experimental-strip-types --test tests/tui/renderer-terminal/ansi-writer.test.ts tests/tui/renderer-terminal/terminal-session.test.ts tests/tui/renderer-terminal/transcript-renderer.test.ts tests/tui/renderer-terminal/tui-app.test.ts`
+  - `npm test` (176/176)
+  - `npm run check`
+- Real TTY smoke completed with:
+  - `stty rows 12 cols 80 && BETA_TUI_RENDERER=terminal node --experimental-strip-types src/cli/entry.ts`
+- Smoke evidence:
+  - startup output no longer enters alternate screen (`?1049h` absent)
+  - transcript reserves `1..8` as a scroll region in a 12-row terminal
+  - `/help` output appends through the transcript region while footer stays fixed at the bottom
+  - exit restores cursor and resets the scroll region with `Ctrl+D`
+
+## 2026-03-26
+
+- Resumed the unfinished terminal-native transcript follow-up in `/Users/clement/Workspace/beta-agent`.
+- Recovered context from:
+  - `task_plan.md`
+  - `progress.md`
+  - `findings.md`
+  - `plans/2026-03-25-terminal-native-transcript-plan.md`
+- Re-verified the terminal renderer changes with:
+  - `node --experimental-strip-types --test tests/tui/renderer-terminal/ansi-writer.test.ts tests/tui/renderer-terminal/terminal-session.test.ts tests/tui/renderer-terminal/transcript-renderer.test.ts tests/tui/renderer-terminal/tui-app.test.ts`
+  - `node --experimental-strip-types --test tests/cli/entry-terminal-renderer.test.ts`
+- Found an unintended regression during resume verification:
+  - fullscreen CLI renderer selection had been flipped so `terminal` became the default instead of an explicit opt-in
+- Fixed that regression with a TDD red-green cycle:
+  - restored the CLI default fullscreen renderer to `blessed`
+  - kept explicit `BETA_TUI_RENDERER=terminal` override behavior intact
+  - updated `tests/cli/entry-terminal-renderer.test.ts` to lock the intended contract
+- Re-ran full verification after the fix:
+  - `npm test` (177/177)
+  - `npm run check`
+  - `npm run build`
+- Synchronized working-memory files so the active completed track is now the terminal-native transcript plan rather than the earlier semantic-block renderer plan.
+
+- Continued the terminal renderer repair after reviewing the modified input/scroll path.
+- Found a real follow-up bug:
+  - `input-driver.ts` parsed `PageUp` / `PageDown`
+  - but `createTerminalTuiApp()` never wired those actions to actual timeline paging behavior
+- Fixed that gap with a TDD red-green cycle:
+  - added a failing regression test in `tests/tui/renderer-terminal/tui-app.test.ts`
+  - added renderer-local page selection logic in `src/tui/renderer-terminal/tui-app.ts`
+  - wired terminal input page actions to that local paging path
+- Fresh verification after the paging fix:
+  - `node --experimental-strip-types --test tests/tui/renderer-terminal/ansi-writer.test.ts tests/tui/renderer-terminal/footer-renderer.test.ts tests/tui/renderer-terminal/terminal-session.test.ts tests/tui/renderer-terminal/transcript-renderer.test.ts tests/tui/renderer-terminal/tui-app.test.ts tests/tui/run-interactive-tui.test.ts`
+  - `npm test` (178/178)
+  - `npm run check`
+  - `npm run build`
+
+- Read the user PRD from:
+  - `/Users/clement/Documents/Obsidian Vault/个性项目/beta-agent/32-CLI TUI 交互优化与视觉规范.md`
+- Cross-checked it against:
+  - `specs/v1-tui-architecture.md`
+  - `plans/2026-03-25-terminal-native-transcript-plan.md`
+- Recorded the key design constraint for the upcoming discussion:
+  - the scroll-vs-copy conflict mainly belongs to the default `renderer-blessed` path
+  - the explicit `renderer-terminal` path already exists as a terminal-native alternative
+- Continued the PRD discussion and locked the first product-level decision:
+  - keep the dual-track renderer model
+  - `blessed` stays interaction-first
+  - `terminal` stays terminal-native and copy/scrollback-first
+- Continued the design discussion and locked the next product-level decision:
+  - the terminal-native route should not remain a lightweight TUI
+  - it should become a true standard-stream mode
+  - no raw mode, no fixed footer, no screen ownership
+- Continued the design discussion and captured the user’s proposed routing matrix:
+  - explicit flags first
+  - environment variables second
+  - automatic inference last
+  - explicit native without a prompt should enter line-based REPL
+  - prompt-driven native execution should stay single-shot
+- Identified one remaining compatibility question before the routing design can be treated as frozen:
+  - whether `beta "<prompt>"` should keep the current fullscreen-TUI behavior or become the new default single-shot stream path
+- Continued the design discussion and closed that compatibility question:
+  - `beta "<prompt>"` should become the default single-shot stream path
+  - fullscreen with an initial prompt becomes explicit-only via a future `--tui` / interactive flag
+- Continued the routing design and locked another hard rule:
+  - non-TTY detection must outrank explicit UI flags
+  - redirected or piped environments must never start fullscreen/blessed behavior
+- Continued the routing design and locked the blind-interactive guard:
+  - commands like `beta --tui > output.txt` must fail fast on `stderr`
+  - redirected stdout plus no prompt must never silently fall into REPL or waiting-for-input behavior
+- Continued the fullscreen interaction design discussion and locked the blessed-path scroll/copy direction:
+  - use explicit `Scroll Mode` / `Select Mode`
+  - do not use heuristic auto mouse-mode switching
+  - keep a concise mode label plus a small macOS `Option-drag` hint
+- Continued the blessed-path design discussion and locked the deeper `Select Mode` semantics:
+  - `Select Mode` means viewport ownership shifts to the user
+  - automatic follow-to-latest is suspended
+  - keyboard navigation remains available
+  - unread output needs a subtle indicator while the viewport is locked
+  - visible viewport content must not reflow or jump during copy mode
+- Reviewed the current runtime/session hook code against the newly chosen dual-presenter architecture.
+- Recorded the main architectural gap:
+  - runtime hooks are already renderer-neutral in spirit
+  - but they are still exposed as separate callbacks rather than a unified event envelope with correlation metadata
+- Continued the runtime event contract discussion and locked the assistant-output shape:
+  - assistant output should always be modeled as streaming chunks plus a completion event
+  - presenters should not support a second full-text-only contract branch
+- Returned to the blessed fullscreen UX track and locked the first half of focus flow:
+  - focus stays on the composer after submit
+  - composer becomes visibly locked/read-only during streaming
+  - timeline scrolling must still work while the composer is locked
+  - `Ctrl+C` remains the universal interrupt path
+- Continued the blessed focus-flow discussion and locked the manual switching contract:
+  - `Tab` handles explicit focus traversal
+  - `Esc` exits toward safer browsing state
+  - `i` jumps from timeline back to composer input
+  - `Enter` performs the primary action for the focused target
+- Continued the blessed composer interaction discussion and locked the history/cursor direction:
+  - reject simplistic `Up/Down` rules based only on empty draft or history-first behavior
+  - use spatial boundary escape into history navigation
+  - preserve the live unsent draft as a restorable zero-index state
+  - keep `Ctrl+P` / `Ctrl+N` as unconditional history navigation keys
+- Continued the blessed composer contract and locked submit/newline behavior:
+  - `Enter` submits
+  - `Alt+Enter` / `Option+Enter` inserts newline
+  - `Ctrl+J` inserts newline
+  - `Shift+Enter` is deliberately excluded from the formal cross-terminal contract
+- Continued the blessed discoverability discussion and locked the layered help model:
+  - contextual bottom action bar
+  - global mode indicator
+  - modal help overlay
+  - context-sensitive macOS copy hinting rather than a permanent global warning
+- Continued the fullscreen architecture discussion and reviewed the proposed blessed render tree:
+  - accepted the layered Base / Overlay / Modal direction
+  - noted that blessed should use explicit anchored geometry rather than abstract flex assumptions
+  - confirmed that only the top-level app root should own `screen.render()`
+  - identified one additional transient layer need for items such as the slash palette
+- Reviewed the existing persistence layer (`event-log-store`, `session-snapshot-store`) against the new product direction.
+- Locked the persistence split:
+  - project-scoped session context remains file-based
+  - global command history should move to SQLite
+  - draft snapshots remain isolated hot-state files with debounced/transition/exit writes only
+- Continued the recovery-priority discussion and identified one remaining disagreement:
+  - stale draft detection logic looks right
+  - but immediate silent deletion on stale detection may be too destructive
+- Closed the remaining Task 5 runtime hardening pass in the interaction-runtime-foundation worktree:
+  - normalized malformed `kind: "output"` assistant results before emitting interaction envelopes
+  - fail-fast rejected malformed `kind: "tool_calls"` results with `InvalidAssistantStepResult` instead of leaking schema-invalid events
+  - removed the active user prompt from conversation state when `AGENT_LOOP_LIMIT_EXCEEDED` terminates a request, so the next interactive prompt starts from clean context
+  - added regression coverage for malformed assistant results and post-loop-limit recovery
+  - fresh verification passed:
+    - `node --experimental-strip-types --test tests/contracts/interaction-event-schema.test.ts tests/runtime/session-manager.test.ts tests/runtime/interactive-session.test.ts tests/providers/provider-runner.test.ts`
+    - `npm run check`
+- Closed Task 6 and the whole interaction-runtime-foundation plan:
+  - focused plan verification passed:
+    - `node --experimental-strip-types --test tests/contracts/interaction-event-schema.test.ts tests/runtime/session-manager.test.ts tests/runtime/interactive-session.test.ts tests/tui/request-ledger.test.ts tests/tui/execution-transcript-buffer.test.ts tests/tui/tui-state.test.ts tests/tui/run-interactive-tui.test.ts`
+  - full regression passed:
+    - `npm test`
+  - final compile/build checks passed:
+    - `npm run check`
+    - `npm run build`
+  - synchronized working-memory artifacts:
+    - `task_plan.md`
+    - `findings.md`
+    - `progress.md`
+    - `plans/2026-03-26-interaction-runtime-foundation-plan.md`
+- Closed the final post-review blocker fixes on the same branch:
+  - fixed `src/tui/run-interactive-tui.ts` so local prompt turn tracking resyncs from emitted interaction `turnId`s after `tool_calls` continuation
+  - fixed `src/cli/entry.ts` so incomplete provider env is suppressed only for legacy `--continue` / `--resume`
+  - fixed native request terminal error propagation across:
+    - `src/cli/stream-presenter.ts`
+    - `src/cli/run-native-session.ts`
+    - `src/cli/entry.ts`
+  - added regression coverage in:
+    - `tests/cli/entry.test.ts`
+    - `tests/cli/stream-presenter.test.ts`
+    - `tests/cli/run-native-session.test.ts`
+    - `tests/tui/run-interactive-tui.test.ts`
+- Re-ran targeted post-review verification:
+  - `node --experimental-strip-types --test tests/cli/entry.test.ts tests/cli/stream-presenter.test.ts tests/cli/run-native-session.test.ts tests/tui/run-interactive-tui.test.ts tests/runtime/session-manager.test.ts` (`55/55`)
+- Re-ran final whole-repo verification:
+  - `npm test` (`273/273`)
+  - `npm run check`
+  - `npm run build`
+- The `feat/interaction-runtime-foundation` worktree is now in a verified ready-to-integrate state.

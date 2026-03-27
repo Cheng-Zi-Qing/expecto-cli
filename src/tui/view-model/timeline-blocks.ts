@@ -92,6 +92,37 @@ const buildTranscriptBlock = (body: string): TranscriptBlock => {
   };
 };
 
+function buildTranscriptLinesFromBuffer(item: TimelineItem): string[] {
+  const buffer = item.executionTranscript;
+
+  if (buffer === undefined) {
+    return [];
+  }
+
+  const overlapCount = Math.max(
+    0,
+    buffer.headLines.length +
+      buffer.tailLines.length -
+      buffer.totalCommittedLineCount,
+  );
+  const committedLines =
+    buffer.omittedLineCount > 0
+      ? [
+          ...buffer.headLines,
+          `... ${buffer.omittedLineCount} lines omitted ...`,
+          ...buffer.tailLines,
+        ]
+      : [...buffer.headLines, ...buffer.tailLines.slice(overlapCount)];
+
+  const pendingFragment = buffer.pendingFragment.replaceAll("\r", "");
+
+  if (pendingFragment.length > 0) {
+    committedLines.push(pendingFragment);
+  }
+
+  return committedLines;
+}
+
 const buildBlocks = (item: TimelineItem, collapsed: boolean): TimelineCardBlock[] => {
   if (
     item.kind === "welcome" ||
@@ -109,9 +140,22 @@ const buildBlocks = (item: TimelineItem, collapsed: boolean): TimelineCardBlock[
     if (collapsed) {
       return [];
     }
+
+    const transcriptLines = buildTranscriptLinesFromBuffer(item);
+
+    if (transcriptLines.length > 0) {
+      return [
+        {
+          kind: "transcript_block",
+          lines: transcriptLines,
+        },
+      ];
+    }
+
     if (item.body === undefined || item.body === "") {
       return [];
     }
+
     return [buildTranscriptBlock(item.body)];
   }
 

@@ -7,10 +7,29 @@ import type {
 } from "../view-model/tui-view-types.ts";
 import { wrapPlainText } from "./text-layout.ts";
 
+const USER_HEADER_LABEL = "Submitted Input";
+
 export type TranscriptViewport = {
   width: number;
   height: number;
 };
+
+export type RenderedTranscriptLayout = {
+  lines: string[];
+  itemStartLines: number[];
+  selectedLine: number;
+  topLine: number;
+};
+
+export type TranscriptDiff =
+  | {
+    mode: "append";
+    lines: string[];
+  }
+  | {
+    mode: "replay";
+    lines: string[];
+  };
 
 function renderTokens(tokens: TextToken[]): string {
   return tokens.map((token) => token.text).join("");
@@ -50,7 +69,11 @@ function renderContentBlock(block: TuiTranscriptContentBlock): string[] {
 }
 
 function renderCard(card: TuiTranscriptBlock, width: number): string[] {
-  const lines: string[] = [`${card.headerLabel}: ${card.summary}`];
+  const header =
+    card.kind === "user"
+      ? USER_HEADER_LABEL
+      : `${card.headerLabel}: ${card.summary}`;
+  const lines: string[] = [header];
 
   if (card.kind === "execution" && card.collapsed) {
     lines.push("Details hidden");
@@ -66,16 +89,88 @@ function renderCard(card: TuiTranscriptBlock, width: number): string[] {
   return lines.flatMap((line) => wrapPlainText(line, width));
 }
 
-export function renderTranscript(view: TuiTranscriptView, viewport: TranscriptViewport): string[] {
+function resolveSelectedIndex(view: TuiTranscriptView): number {
+  const selectedIndex = view.blocks.findIndex((card) => card.selected);
+
+  if (selectedIndex !== -1) {
+    return selectedIndex;
+  }
+
+  return Math.max(0, view.blocks.length - 1);
+}
+
+function resolveViewportTopLine(totalLines: number, height: number, selectedLine: number): number {
+  if (totalLines <= height) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(selectedLine, totalLines - height));
+}
+
+export function renderTranscriptLayout(
+  view: TuiTranscriptView,
+  viewport: TranscriptViewport,
+): RenderedTranscriptLayout {
   const width = Number.isFinite(viewport.width) && viewport.width > 0
     ? Math.floor(viewport.width)
     : 1;
-  const rendered = view.blocks.flatMap((card) => renderCard(card, width));
 
   if (!Number.isFinite(viewport.height) || viewport.height <= 0) {
-    return [];
+    return {
+      lines: [],
+      itemStartLines: [],
+      selectedLine: 0,
+      topLine: 0,
+    };
   }
 
   const height = Math.floor(viewport.height);
-  return rendered.slice(-height);
+  const renderedCards = view.blocks.map((card) => renderCard(card, width));
+  const itemStartLines: number[] = [];
+  const rendered: string[] = [];
+
+  for (const cardLines of renderedCards) {
+    itemStartLines.push(rendered.length);
+    rendered.push(...cardLines);
+  }
+
+  const selectedIndex = Math.max(
+    0,
+    Math.min(resolveSelectedIndex(view), Math.max(0, itemStartLines.length - 1)),
+  );
+  const selectedAbsoluteLine = itemStartLines[selectedIndex] ?? Math.max(0, rendered.length - 1);
+  const topLine = resolveViewportTopLine(rendered.length, height, selectedAbsoluteLine);
+
+  return {
+    lines: rendered.slice(topLine, topLine + height),
+    itemStartLines,
+    selectedLine: Math.max(0, selectedAbsoluteLine - topLine),
+    topLine,
+  };
+}
+
+export function renderTranscriptLines(view: TuiTranscriptView, width: number): string[] {
+  const normalizedWidth = Number.isFinite(width) && width > 0 ? Math.floor(width) : 1;
+  return view.blocks.flatMap((card) => renderCard(card, normalizedWidth));
+}
+
+export function diffTranscriptLines(previous: string[], next: string[]): TranscriptDiff {
+  const isAppendOnly =
+    next.length >= previous.length && previous.every((line, index) => next[index] === line);
+
+  if (isAppendOnly) {
+    return {
+      mode: "append",
+      lines: next.slice(previous.length),
+    };
+  }
+
+  return {
+    mode: "replay",
+    lines: next,
+  };
+}
+
+export function renderTranscript(view: TuiTranscriptView, viewport: TranscriptViewport): string[] {
+  return renderTranscriptLayout(view, viewport).lines;
 }

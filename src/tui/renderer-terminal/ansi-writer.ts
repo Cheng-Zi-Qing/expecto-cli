@@ -3,8 +3,9 @@ export type AnsiWriter = {
   showCursor: () => void;
   moveCursor: (column: number, row: number) => void;
   clearLine: () => void;
-  enterAlternateScreen: () => void;
-  exitAlternateScreen: () => void;
+  clearScreen: () => void;
+  setScrollRegion: (top: number, bottom: number) => void;
+  resetScrollRegion: () => void;
 };
 
 export function createAnsiWriter(write: (chunk: string) => void): AnsiWriter {
@@ -21,11 +22,14 @@ export function createAnsiWriter(write: (chunk: string) => void): AnsiWriter {
     clearLine: () => {
       write("\u001b[2K");
     },
-    enterAlternateScreen: () => {
-      write("\u001b[?1049h");
+    clearScreen: () => {
+      write("\u001b[2J");
     },
-    exitAlternateScreen: () => {
-      write("\u001b[?1049l");
+    setScrollRegion: (top, bottom) => {
+      write(`\u001b[${top};${bottom}r`);
+    },
+    resetScrollRegion: () => {
+      write("\u001b[r");
     },
   };
 }

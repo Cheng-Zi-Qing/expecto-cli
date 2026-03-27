@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { TimelineItem } from "../../../src/tui/tui-types.ts";
+import {
+  appendTranscriptChunk,
+  createExecutionTranscriptBuffer,
+} from "../../../src/tui/execution-transcript-buffer.ts";
 import { buildTimelineCards } from "../../../src/tui/view-model/timeline-blocks.ts";
 
 const createItem = (overrides: Partial<TimelineItem>): TimelineItem => {
@@ -17,6 +21,10 @@ const createItem = (overrides: Partial<TimelineItem>): TimelineItem => {
 
   if (overrides.collapsed !== undefined) {
     item.collapsed = overrides.collapsed;
+  }
+
+  if (overrides.executionTranscript !== undefined) {
+    item.executionTranscript = overrides.executionTranscript;
   }
 
   return item;
@@ -346,4 +354,28 @@ test("execution transcript avoids phantom empty line for LF trailing newline", (
   assert.ok(transcriptBlock);
   assert.equal(transcriptBlock.kind, "transcript_block");
   assert.deepEqual(transcriptBlock.lines, ["success"]);
+});
+
+test("execution transcript buffer pending fragment strips raw trailing carriage return", () => {
+  let transcriptBuffer = createExecutionTranscriptBuffer();
+  transcriptBuffer = appendTranscriptChunk(transcriptBuffer, "line from split crlf\r");
+
+  const timeline = [
+    createItem({
+      id: "execution-pending-cr",
+      kind: "execution",
+      summary: "Tool output",
+      collapsed: false,
+      executionTranscript: transcriptBuffer,
+    }),
+  ];
+
+  const cards = buildTimelineCards(timeline, 0);
+  const card = cards[0];
+  assert.ok(card);
+  assert.equal(card.blocks.length, 1);
+  const transcriptBlock = card.blocks[0];
+  assert.ok(transcriptBlock);
+  assert.equal(transcriptBlock.kind, "transcript_block");
+  assert.deepEqual(transcriptBlock.lines, ["line from split crlf"]);
 });

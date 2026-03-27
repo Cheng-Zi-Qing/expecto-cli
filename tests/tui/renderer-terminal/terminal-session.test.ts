@@ -13,16 +13,19 @@ function createWriter(calls: string[]) {
     },
     moveCursor: () => {},
     clearLine: () => {},
-    enterAlternateScreen: () => {
-      calls.push("screen:enter");
+    clearScreen: () => {
+      calls.push("screen:clear");
     },
-    exitAlternateScreen: () => {
-      calls.push("screen:exit");
+    setScrollRegion: (top: number, bottom: number) => {
+      calls.push(`region:${top}-${bottom}`);
+    },
+    resetScrollRegion: () => {
+      calls.push("region:reset");
     },
   };
 }
 
-test("createTerminalSession enter orders alt-screen, raw-mode, and cursor hide", () => {
+test("createTerminalSession enter stays on the main screen and hides the cursor after raw mode", () => {
   const calls: string[] = [];
   const session = createTerminalSession({
     setRawMode: (enabled) => {
@@ -33,10 +36,10 @@ test("createTerminalSession enter orders alt-screen, raw-mode, and cursor hide",
 
   session.enter();
 
-  assert.deepEqual(calls, ["screen:enter", "raw:true", "cursor:hide"]);
+  assert.deepEqual(calls, ["raw:true", "cursor:hide"]);
 });
 
-test("createTerminalSession exit orders cursor show, raw-mode disable, and alt-screen off", () => {
+test("createTerminalSession exit shows cursor, disables raw mode, and resets the scroll region", () => {
   const calls: string[] = [];
   const session = createTerminalSession({
     setRawMode: (enabled) => {
@@ -47,10 +50,10 @@ test("createTerminalSession exit orders cursor show, raw-mode disable, and alt-s
 
   session.exit();
 
-  assert.deepEqual(calls, ["cursor:show", "raw:false", "screen:exit"]);
+  assert.deepEqual(calls, ["cursor:show", "raw:false", "region:reset"]);
 });
 
-test("createTerminalSession enter exits alternate screen if enabling raw mode throws", () => {
+test("createTerminalSession enter does not attempt screen cleanup if enabling raw mode throws", () => {
   const calls: string[] = [];
   const session = createTerminalSession({
     setRawMode: (enabled) => {
@@ -63,10 +66,10 @@ test("createTerminalSession enter exits alternate screen if enabling raw mode th
   });
 
   assert.throws(() => session.enter(), /raw-on failed/);
-  assert.deepEqual(calls, ["screen:enter", "raw:true", "screen:exit"]);
+  assert.deepEqual(calls, ["raw:true"]);
 });
 
-test("createTerminalSession enter disables raw mode and exits alternate screen if hiding cursor throws", () => {
+test("createTerminalSession enter disables raw mode if hiding cursor throws", () => {
   const calls: string[] = [];
   const writer = createWriter(calls);
   const session = createTerminalSession({
@@ -83,7 +86,7 @@ test("createTerminalSession enter disables raw mode and exits alternate screen i
   });
 
   assert.throws(() => session.enter(), /hide failed/);
-  assert.deepEqual(calls, ["screen:enter", "raw:true", "cursor:hide", "raw:false", "screen:exit"]);
+  assert.deepEqual(calls, ["raw:true", "cursor:hide", "raw:false"]);
 });
 
 test("createTerminalSession exit attempts all cleanup steps even if one throws", () => {
@@ -104,5 +107,5 @@ test("createTerminalSession exit attempts all cleanup steps even if one throws",
   });
 
   assert.throws(() => session.exit(), /show failed/);
-  assert.deepEqual(calls, ["cursor:show", "raw:false", "screen:exit"]);
+  assert.deepEqual(calls, ["cursor:show", "raw:false", "region:reset"]);
 });

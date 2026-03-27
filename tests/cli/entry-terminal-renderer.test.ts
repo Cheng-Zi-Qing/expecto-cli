@@ -25,43 +25,47 @@ async function makeHomeDirWithSessionEnv(contents: string): Promise<string> {
   return homeDir;
 }
 
-test("runCli forwards terminal renderer selection to the interactive runner", async () => {
+test("runCli defaults to the blessed renderer for fullscreen TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRenderer = "";
 
-  await runCli(["inspect auth"], {
+  await runCli(["--tui"], {
     cwd: projectRoot,
-    env: {
-      BETA_TUI_RENDERER: "terminal",
-    },
     processEnv: {},
     homeDir,
     stdinIsTTY: true,
+    stdoutIsTTY: true,
     runInteractiveTui: async (input) => {
       observedRenderer = input.tuiRenderer;
     },
   });
 
-  assert.equal(observedRenderer, "terminal");
+  assert.equal(observedRenderer, "blessed");
 });
 
-test("runCli lets shell renderer env override session env", async () => {
+test("BETA_TUI_RENDERER=terminal is warning-only and does not switch renderers", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv("BETA_TUI_RENDERER=blessed\n");
   let observedRenderer = "";
+  let stderr = "";
 
-  await runCli(["inspect auth"], {
+  await runCli(["--tui"], {
     cwd: projectRoot,
     processEnv: {
       BETA_TUI_RENDERER: "terminal",
     },
     homeDir,
     stdinIsTTY: true,
+    stdoutIsTTY: true,
+    writeStderr: (chunk) => {
+      stderr += chunk;
+    },
     runInteractiveTui: async (input) => {
       observedRenderer = input.tuiRenderer;
     },
   });
 
-  assert.equal(observedRenderer, "terminal");
+  assert.equal(observedRenderer, "blessed");
+  assert.match(stderr, /BETA_TUI_RENDERER=terminal is deprecated/i);
 });

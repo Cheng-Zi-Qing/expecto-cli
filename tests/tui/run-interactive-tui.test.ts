@@ -270,6 +270,291 @@ test("runInteractiveTui interrupts generation and restores the prompt draft", as
   await runPromise;
 });
 
+test("runInteractiveTui keeps input locked until request_completed arrives", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: ({ signal }) =>
+      new Promise((_resolve, reject) => {
+        signal?.addEventListener(
+          "abort",
+          () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.submit("inspect auth flow");
+  await waitFor(() => app?.latestState().runtimeState === "streaming", "expected streaming state");
+
+  app?.interrupt();
+
+  await waitFor(() => {
+    return app?.states.some((state) => {
+      return state.runtimeState === "ready" && state.draft === "inspect auth flow";
+    }) ?? false;
+  }, "expected interrupted flow to return runtime state to ready");
+
+  const interruptingStateIndex = app?.states.findIndex((state) => {
+    return (
+      state.activeRequestLedger?.phase === "interrupting" &&
+      state.activeRequestLedger.interruptRequested &&
+      state.inputLocked
+    );
+  }) ?? -1;
+
+  assert.ok(
+    interruptingStateIndex >= 0,
+    "expected Ctrl+C to mark interrupt intent on active request ledger while input remains locked",
+  );
+
+  const firstReadyLockedIndex = app?.states.findIndex((state) => {
+    return (
+      state.runtimeState === "ready" &&
+      state.draft === "inspect auth flow" &&
+      state.inputLocked
+    );
+  }) ?? -1;
+
+  assert.ok(
+    firstReadyLockedIndex >= 0,
+    "expected composer to remain locked through ready-state transition before request completion",
+  );
+
+  const firstReadyUnlockedIndex = app?.states.findIndex((state) => {
+    return (
+      state.runtimeState === "ready" &&
+      state.draft === "inspect auth flow" &&
+      !state.inputLocked
+    );
+  }) ?? -1;
+
+  assert.ok(firstReadyUnlockedIndex > firstReadyLockedIndex);
+  assert.ok(firstReadyUnlockedIndex > interruptingStateIndex);
+  assert.equal(app?.latestState().inputLocked, false);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui pre-seeds non-builtin interactive initialPrompt into foreground request lifecycle", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+      initialPrompt: "inspect auth flow",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  const firstState = app?.states[0];
+  assert.ok(firstState);
+  assert.equal(firstState.inputLocked, true);
+  assert.equal(firstState.activeRequestLedger?.requestId, "request-turn-1");
+  assert.equal(firstState.timeline[0]?.kind, "user");
+  assert.equal(firstState.timeline[0]?.summary, "inspect auth flow");
+
+  await waitFor(() => {
+    const latestState = app?.latestState();
+
+    return (
+      latestState?.timeline.length === 2 &&
+      latestState.timeline[0]?.kind === "user" &&
+      latestState.timeline[1]?.kind === "assistant" &&
+      latestState.inputLocked === false
+    );
+  }, "expected initial prompt lifecycle to complete and unlock the composer");
+
+  app?.submit("follow up");
+
+  await waitFor(() => {
+    const latestState = app?.latestState();
+
+    return (
+      latestState?.timeline.length === 4 &&
+      latestState.timeline[2]?.kind === "user" &&
+      latestState.timeline[3]?.kind === "assistant"
+    );
+  }, "expected second prompt submission to append another user+assistant pair");
+
+  const hasSecondPromptRequestLedger = app?.states.some((state) => {
+    return state.activeRequestLedger?.requestId === "request-turn-2";
+  }) ?? false;
+
+  assert.equal(hasSecondPromptRequestLedger, true);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui keeps builtin interactive initialPrompt outside prompt-ledger locking", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+      initialPrompt: "/branch",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => {
+      assert.fail("builtin initial prompt should not call the assistant");
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  const firstState = app?.states[0];
+  assert.ok(firstState);
+  assert.equal(firstState.inputLocked, false);
+  assert.equal(firstState.activeRequestLedger, null);
+
+  await waitFor(() => {
+    const latestState = app?.latestState();
+    return (
+      latestState?.timeline.length === 2 &&
+      latestState.timeline[0]?.kind === "system" &&
+      latestState.timeline[1]?.kind === "execution"
+    );
+  }, "expected builtin initial prompt to render system + execution timeline items");
+
+  const hasPromptLedgerState = app?.states.some((state) => {
+    return state.activeRequestLedger?.requestId.startsWith("request-turn-") ?? false;
+  }) ?? false;
+
+  assert.equal(hasPromptLedgerState, false);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui accepts a second prompt after a tool-call continuation completes", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+  let assistantCalls = 0;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => {
+      assistantCalls += 1;
+
+      if (assistantCalls === 1) {
+        assert.equal(input.prompt, "first prompt");
+        return {
+          kind: "tool_calls" as const,
+          responseId: "response-tool-calls",
+          plannedExecutionIds: ["execution-1"],
+        };
+      }
+
+      if (assistantCalls === 2) {
+        assert.equal(input.prompt, undefined);
+        return {
+          kind: "output" as const,
+          responseId: "response-follow-up",
+          output: "assistant: first prompt complete",
+          finishReason: "stop" as const,
+        };
+      }
+
+      return {
+        kind: "output" as const,
+        responseId: `response-${assistantCalls}`,
+        output: `assistant: ${input.prompt}`,
+        finishReason: "stop" as const,
+      };
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.submit("first prompt");
+
+  await waitFor(() => {
+    const state = app?.latestState();
+    return (
+      state?.timeline.length === 4 &&
+      state.timeline[0]?.kind === "user" &&
+      state.timeline[1]?.kind === "assistant" &&
+      state.timeline[2]?.kind === "execution" &&
+      state.timeline[3]?.kind === "assistant" &&
+      state.timeline[3]?.summary.includes("first prompt complete") &&
+      state.inputLocked === false
+    );
+  }, "expected first prompt to finish after the tool-call continuation");
+
+  app?.submit("second prompt");
+
+  await waitFor(() => {
+    const state = app?.latestState();
+    return (
+      state?.timeline.length === 6 &&
+      state.timeline[4]?.kind === "user" &&
+      state.timeline[5]?.kind === "assistant" &&
+      state.timeline[5]?.summary.includes("assistant: second prompt") &&
+      state.inputLocked === false
+    );
+  }, "expected second prompt to complete after a prior tool-call continuation");
+
+  app?.exit();
+  await runPromise;
+});
+
 test("runInteractiveTui exposes slash command suggestions from the composer draft", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -431,7 +716,8 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     assert.ok(layout, "expected interactive TUI app to capture rendered timeline layout");
     const header = selectedRenderedHeaderText(layout);
     assert.match(header, /^> /);
-    assert.match(header, /Submitted Input:/);
+    assert.match(header, /Submitted Input/);
+    assert.doesNotMatch(header, /inspect auth flow/);
   }
 
   app?.moveSelectionDown();
@@ -496,10 +782,10 @@ test("runInteractiveTui projects /branch execution output into a real execution 
   assert.equal(state.timeline[1]?.summary, "Read git branch");
   assert.equal(state.timeline[1]?.collapsed, true);
   assert.equal(state.inputLocked, false);
-  assert.equal(
-    state.timeline[1]?.body,
-    "$ git rev-parse --abbrev-ref HEAD\nno-git",
-  );
+  assert.deepEqual(state.timeline[1]?.executionTranscript?.headLines, [
+    "$ git rev-parse --abbrev-ref HEAD",
+  ]);
+  assert.equal(state.timeline[1]?.executionTranscript?.pendingFragment, "no-git");
   assert.match(latestRenderedTimelineContent(app), /Execution/);
   assert.match(latestRenderedTimelineContent(app), /Read git branch/);
   assert.doesNotMatch(latestRenderedTimelineContent(app), /git rev-parse --abbrev-ref HEAD/);

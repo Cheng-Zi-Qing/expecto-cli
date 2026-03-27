@@ -113,7 +113,77 @@ test("provider runner converts assistant-step input into a routed completion req
 
   assert.equal(observedPrompt, "fix auth regression");
   assert.deepEqual(result, {
+    kind: "output",
+    responseId: "response-turn-1",
     output: "assistant: provider output",
+    finishReason: "stop",
+  });
+});
+
+test("provider runner uses message history when assistant-step input has no prompt field", async () => {
+  const registry = new ProviderRegistry();
+  const router = new ProviderRouter({
+    main: "history-provider:history-model",
+  });
+  let observedLastMessage = "";
+
+  registry.register(
+    createStaticProvider({
+      id: "history-provider",
+      complete: async (request) => {
+        observedLastMessage = request.messages.at(-1)?.content ?? "";
+
+        return {
+          providerId: "history-provider",
+          model: request.model,
+          outputText: "assistant: history output",
+          stopReason: "end_turn",
+        };
+      },
+    }),
+  );
+
+  const runner = createProviderRunner({
+    registry,
+    router,
+  });
+  const assistantStep = runner.createAssistantStep();
+  const result = await assistantStep({
+    sessionId: "session-1",
+    turnId: "turn-2",
+    messages: [
+      {
+        role: "user",
+        content: "continue from history",
+      },
+    ],
+    context: {
+      projectRoot: "/tmp/project",
+      mode: "balanced",
+      entry: {
+        kind: "continue",
+      },
+      instructions: [],
+      memory: [],
+      activeArtifacts: {
+        required: [],
+        optional: [],
+        onDemand: [],
+      },
+      loadedArtifacts: {
+        required: [],
+        optional: [],
+      },
+      sessionSummary: "required docs: none",
+    },
+  });
+
+  assert.equal(observedLastMessage, "continue from history");
+  assert.deepEqual(result, {
+    kind: "output",
+    responseId: "response-turn-2",
+    output: "assistant: history output",
+    finishReason: "stop",
   });
 });
 

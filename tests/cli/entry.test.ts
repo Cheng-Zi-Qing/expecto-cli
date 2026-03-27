@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 
 import { runCli } from "../../src/cli/entry.ts";
 
@@ -23,87 +24,21 @@ async function makeEmptyHomeDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), "beta-agent-home-empty-"));
 }
 
-async function captureCli(argv: string[], cwd: string): Promise<string> {
-  let output = "";
-  const homeDir = await makeEmptyHomeDir();
-
-  await runCli(argv, {
-    cwd,
-    env: {},
-    processEnv: {},
-    homeDir,
-    write: (chunk) => {
-      output += chunk;
+function makeUnreadableStdinStream(): Readable {
+  return new Readable({
+    read() {
+      throw new Error("stdin should not be consumed");
     },
   });
-
-  return output;
 }
 
-test("beta with no args starts interactive bootstrap in balanced mode", async () => {
-  const projectRoot = await makeProjectRoot();
-  const output = await captureCli([], projectRoot);
-
-  assert.match(output, /beta interactive session/);
-  assert.match(output, /mode: balanced/);
-  assert.match(output, new RegExp(`project: ${projectRoot}`));
-});
-
-test("beta with a positional prompt starts interactive bootstrap with the first user message", async () => {
-  const projectRoot = await makeProjectRoot();
-  const output = await captureCli(["fix auth regression"], projectRoot);
-
-  assert.match(output, /beta interactive session/);
-  assert.match(output, /initial prompt: fix auth regression/);
-});
-
-test("beta -p runs one-shot bootstrap with the provided prompt", async () => {
-  const projectRoot = await makeProjectRoot();
-  const output = await captureCli(["-p", "summarize the plan"], projectRoot);
-
-  assert.match(output, /beta one-shot session/);
-  assert.match(output, /prompt: summarize the plan/);
-  assert.match(output, /mode: balanced/);
-});
-
-test("beta with no args uses the fullscreen TUI runner when stdin is a TTY", async () => {
+test("beta with a positional prompt routes to one-shot native execution", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
-  let output = "";
-  let interactiveRuns = 0;
+  let observedRouteKind = "";
   let observedEntryKind = "";
-  let observedInitialPrompt = "";
-
-  await runCli([], {
-    cwd: projectRoot,
-    env: {},
-    processEnv: {},
-    homeDir,
-    stdinIsTTY: true,
-    runInteractiveTui: async (input) => {
-      interactiveRuns += 1;
-      observedEntryKind = input.context.entry.kind;
-      observedInitialPrompt =
-        input.context.entry.kind === "interactive"
-          ? input.context.entry.initialPrompt ?? ""
-          : "";
-    },
-    write: (chunk) => {
-      output += chunk;
-    },
-  });
-
-  assert.equal(interactiveRuns, 1);
-  assert.equal(observedEntryKind, "interactive");
-  assert.equal(observedInitialPrompt, "");
-  assert.equal(output, "");
-});
-
-test("beta with a positional prompt uses the fullscreen TUI runner when stdin is a TTY", async () => {
-  const projectRoot = await makeProjectRoot();
-  const homeDir = await makeEmptyHomeDir();
-  let interactiveRuns = 0;
-  let observedInitialPrompt = "";
+  let observedPrompt = "";
+  let stderr = "";
 
   await runCli(["fix auth regression"], {
     cwd: projectRoot,
@@ -111,24 +46,32 @@ test("beta with a positional prompt uses the fullscreen TUI runner when stdin is
     processEnv: {},
     homeDir,
     stdinIsTTY: true,
-    runInteractiveTui: async (input) => {
-      interactiveRuns += 1;
-      observedInitialPrompt =
-        input.context.entry.kind === "interactive"
-          ? input.context.entry.initialPrompt ?? ""
-          : "";
+    stdoutIsTTY: true,
+    writeStderr: (chunk) => {
+      stderr += chunk;
+    },
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+      observedEntryKind = input.context.entry.kind;
+      if (input.context.entry.kind === "print") {
+        observedPrompt = input.context.entry.prompt;
+      }
     },
   });
 
-  assert.equal(interactiveRuns, 1);
-  assert.equal(observedInitialPrompt, "fix auth regression");
+  assert.equal(observedRouteKind, "stream_single");
+  assert.equal(observedEntryKind, "print");
+  assert.equal(observedPrompt, "fix auth regression");
+  assert.equal(stderr, "");
 });
 
-test("beta -p stays on the plain path even when stdin is a TTY", async () => {
+test("beta -p routes to one-shot native execution and emits a deprecation warning on stderr", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
-  let output = "";
-  let interactiveRuns = 0;
+  let observedRouteKind = "";
+  let observedEntryKind = "";
+  let observedPrompt = "";
+  let stderr = "";
 
   await runCli(["-p", "summarize the plan"], {
     cwd: projectRoot,
@@ -136,23 +79,318 @@ test("beta -p stays on the plain path even when stdin is a TTY", async () => {
     processEnv: {},
     homeDir,
     stdinIsTTY: true,
-    runInteractiveTui: async () => {
-      interactiveRuns += 1;
+    stdoutIsTTY: true,
+    writeStderr: (chunk) => {
+      stderr += chunk;
     },
-    write: (chunk) => {
-      output += chunk;
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+      observedEntryKind = input.context.entry.kind;
+      if (input.context.entry.kind === "print") {
+        observedPrompt = input.context.entry.prompt;
+      }
+    },
+  });
+
+  assert.equal(observedRouteKind, "stream_single");
+  assert.equal(observedEntryKind, "print");
+  assert.equal(observedPrompt, "summarize the plan");
+  assert.match(stderr, /-p\/--print alias is deprecated/i);
+});
+
+test("beta with no args uses the fullscreen TUI runner only in full TTY sessions", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let interactiveRuns = 0;
+  let nativeRuns = 0;
+  let observedEntryKind = "";
+  let observedRenderer = "";
+
+  await runCli([], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runInteractiveTui: async (input) => {
+      interactiveRuns += 1;
+      observedEntryKind = input.context.entry.kind;
+      observedRenderer = input.tuiRenderer;
+    },
+    runNativeSession: async () => {
+      nativeRuns += 1;
+    },
+  });
+
+  assert.equal(interactiveRuns, 1);
+  assert.equal(nativeRuns, 0);
+  assert.equal(observedEntryKind, "interactive");
+  assert.equal(observedRenderer, "blessed");
+});
+
+test("beta with a positional prompt does not use fullscreen TUI even in full TTY sessions", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let interactiveRuns = 0;
+  let nativeRuns = 0;
+  let observedKind = "";
+  let observedPrompt = "";
+
+  await runCli(["fix auth regression"], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runInteractiveTui: async (input) => {
+      interactiveRuns += 1;
+      observedKind = input.context.entry.kind;
+    },
+    runNativeSession: async (input) => {
+      nativeRuns += 1;
+      observedKind = input.context.entry.kind;
+      observedPrompt = input.context.entry.kind === "print" ? input.context.entry.prompt : "";
     },
   });
 
   assert.equal(interactiveRuns, 0);
-  assert.match(output, /beta one-shot session/);
+  assert.equal(nativeRuns, 1);
+  assert.equal(observedKind, "print");
+  assert.equal(observedPrompt, "fix auth regression");
 });
 
-test("beta -p uses a configured provider runner from environment variables", async () => {
+test("beta --tui uses the fullscreen TUI runner in full TTY sessions", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let interactiveRuns = 0;
+  let observedKind = "";
+  let observedRenderer = "";
+
+  await runCli(["--tui"], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runInteractiveTui: async (input) => {
+      interactiveRuns += 1;
+      observedKind = input.context.entry.kind;
+      observedRenderer = input.tuiRenderer;
+    },
+  });
+
+  assert.equal(interactiveRuns, 1);
+  assert.equal(observedKind, "interactive");
+  assert.equal(observedRenderer, "blessed");
+});
+
+test("beta --native with no prompt uses the native REPL route in full TTY sessions", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let interactiveRuns = 0;
+  let nativeRuns = 0;
+  let observedRouteKind = "";
+  let observedEntryKind = "";
+
+  await runCli(["--native"], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runInteractiveTui: async () => {
+      interactiveRuns += 1;
+    },
+    runNativeSession: async (input) => {
+      nativeRuns += 1;
+      observedRouteKind = input.route.kind;
+      observedEntryKind = input.context.entry.kind;
+    },
+  });
+
+  assert.equal(interactiveRuns, 0);
+  assert.equal(nativeRuns, 1);
+  assert.equal(observedRouteKind, "native_repl");
+  assert.equal(observedEntryKind, "interactive");
+});
+
+test("beta with no prompt fails fast when stdout is redirected but stdin stays interactive", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let interactiveRuns = 0;
+  let nativeRuns = 0;
+
+  await assert.rejects(
+    runCli([], {
+      cwd: projectRoot,
+      env: {},
+      processEnv: {},
+      homeDir,
+      stdinIsTTY: true,
+      stdoutIsTTY: false,
+      runInteractiveTui: async () => {
+        interactiveRuns += 1;
+      },
+      runNativeSession: async () => {
+        nativeRuns += 1;
+      },
+    }),
+    /non-TTY environment/i,
+  );
+
+  assert.equal(interactiveRuns, 0);
+  assert.equal(nativeRuns, 0);
+});
+
+test("beta assembles a stdin-only prompt when stdin is non-TTY and no prompt is provided", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedPrompt = "";
+
+  await runCli([], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: false,
+    stdoutIsTTY: false,
+    stdinStream: Readable.from(["hello from stdin"]),
+    runNativeSession: async (input) => {
+      if (input.context.entry.kind === "print") {
+        observedPrompt = input.context.entry.prompt;
+      }
+    },
+  });
+
+  assert.match(observedPrompt, /Please analyze the following input/i);
+  assert.match(observedPrompt, /\[Input\]\nhello from stdin/);
+});
+
+test("beta preserves explicit empty prompt vs undefined when assembling stdin pipeline prompts", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedPrompt = "";
+
+  await runCli([""], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: false,
+    stdoutIsTTY: false,
+    stdinStream: Readable.from(["extra context"]),
+    runNativeSession: async (input) => {
+      if (input.context.entry.kind === "print") {
+        observedPrompt = input.context.entry.prompt;
+      }
+    },
+  });
+
+  assert.match(observedPrompt, /\[User Instruction\]/);
+  assert.match(observedPrompt, /\[Additional Context\]\nextra context/);
+  assert.doesNotMatch(observedPrompt, /Please analyze the following input/i);
+});
+
+test("beta --continue preserves legacy routing without consuming piped stdin", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedRouteKind = "";
+
+  await runCli(["--continue"], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: false,
+    stdoutIsTTY: false,
+    stdinStream: makeUnreadableStdinStream(),
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+    },
+  });
+
+  assert.equal(observedRouteKind, "continue");
+});
+
+test("beta --resume preserves legacy routing without consuming piped stdin", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedRouteKind = "";
+  let observedSession = "";
+
+  await runCli(["--resume", "session-123"], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: false,
+    stdoutIsTTY: false,
+    stdinStream: makeUnreadableStdinStream(),
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+      if (input.route.kind === "resume") {
+        observedSession = input.route.bootstrapCommand.session;
+      }
+    },
+  });
+
+  assert.equal(observedRouteKind, "resume");
+  assert.equal(observedSession, "session-123");
+});
+
+test("beta --continue ignores incomplete provider env on the legacy route", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedRouteKind = "";
+
+  await runCli(["--continue"], {
+    cwd: projectRoot,
+    env: {
+      BETA_PROVIDER: "openai",
+    },
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+    },
+  });
+
+  assert.equal(observedRouteKind, "continue");
+});
+
+test("beta --resume ignores incomplete provider env on the legacy route", async () => {
+  const projectRoot = await makeProjectRoot();
+  const homeDir = await makeEmptyHomeDir();
+  let observedRouteKind = "";
+
+  await runCli(["--resume", "session-123"], {
+    cwd: projectRoot,
+    env: {
+      BETA_PROVIDER: "openai",
+    },
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runNativeSession: async (input) => {
+      observedRouteKind = input.route.kind;
+    },
+  });
+
+  assert.equal(observedRouteKind, "resume");
+});
+
+test("beta with a positional prompt uses a configured provider runner from environment variables", async () => {
   const projectRoot = await makeProjectRoot();
   let output = "";
 
-  await runCli(["-p", "say hello"], {
+  await runCli(["say hello"], {
     cwd: projectRoot,
     env: {
       BETA_PROVIDER: "openai",
@@ -162,6 +400,9 @@ test("beta -p uses a configured provider runner from environment variables", asy
     },
     processEnv: {},
     homeDir: await makeEmptyHomeDir(),
+    stdinIsTTY: true,
+    stdoutIsTTY: false,
+    writeStderr: () => {},
     fetch: async () =>
       new Response(
         JSON.stringify({
@@ -184,7 +425,7 @@ test("beta -p uses a configured provider runner from environment variables", asy
   assert.match(output, /hello from model/);
 });
 
-test("beta -p loads provider config from ~/.beta-agent/session.env", async () => {
+test("beta with a positional prompt loads provider config from ~/.beta-agent/session.env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
 BETA_PROVIDER=anthropic
@@ -195,10 +436,13 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   let output = "";
   let observedUrl = "";
 
-  await runCli(["-p", "say hello"], {
+  await runCli(["say hello"], {
     cwd: projectRoot,
     env: {},
     homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: false,
+    writeStderr: () => {},
     fetch: async (url) => {
       observedUrl = String(url);
 
@@ -230,7 +474,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   assert.match(output, /hello from session env/);
 });
 
-test("beta -p lets explicit env vars override ~/.beta-agent/session.env", async () => {
+test("beta with a positional prompt lets explicit env vars override ~/.beta-agent/session.env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
 BETA_PROVIDER=anthropic
@@ -241,12 +485,15 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   let output = "";
   let observedUrl = "";
 
-  await runCli(["-p", "say hello"], {
+  await runCli(["say hello"], {
     cwd: projectRoot,
     env: {
       ANTHROPIC_BASE_URL: "https://override-gateway.example.com/claude",
     },
     homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: false,
+    writeStderr: () => {},
     fetch: async (url) => {
       observedUrl = String(url);
 
@@ -278,7 +525,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   assert.match(output, /override worked/);
 });
 
-test("beta -p treats ~/.beta-agent/session.env as authoritative over ambient provider env", async () => {
+test("beta with a positional prompt treats ~/.beta-agent/session.env as authoritative over ambient provider env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
 ANTHROPIC_AUTH_TOKEN=file-anthropic-token
@@ -288,13 +535,16 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   let output = "";
   let observedUrl = "";
 
-  await runCli(["-p", "say hello"], {
+  await runCli(["say hello"], {
     cwd: projectRoot,
     env: {},
     processEnv: {
       NEO_KEY: "ambient-neo-key",
     },
     homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: false,
+    writeStderr: () => {},
     fetch: async (url) => {
       observedUrl = String(url);
 

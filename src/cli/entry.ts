@@ -3,6 +3,7 @@
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
+import { Readable } from "node:stream";
 import { execa } from "execa";
 
 import { loadSessionEnv } from "./session-env.ts";
@@ -10,12 +11,16 @@ import { createProviderRunnerFromEnv } from "../providers/provider-bootstrap.ts"
 import type { ProviderRunner } from "../providers/provider-runner.ts";
 import { buildBootstrapContext, type BootstrapContext } from "../runtime/bootstrap-context.ts";
 import type { ReadLine, CloseInteractiveInput } from "../runtime/interactive-input.ts";
-import { SessionManager } from "../runtime/session-manager.ts";
-import { parseCliArgs } from "./arg-parser.ts";
+import { parseCliArgs, type ParsedCliArgs, type CliCommand } from "./arg-parser.ts";
+import { resolveCliRoute, type CliRoute } from "./route-resolution.ts";
+import { assemblePromptFromPipeline, readAllStdin } from "./stdin-pipeline.ts";
+import {
+  runNativeSession as defaultRunNativeSession,
+  type RunNativeSessionInput,
+} from "./run-native-session.ts";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-type CliCommand = ReturnType<typeof parseCliArgs>;
-type TuiRenderer = "blessed" | "terminal";
+type TuiRenderer = "blessed";
 
 export type InteractiveTuiRunnerInput = {
   context: BootstrapContext;
@@ -39,8 +44,12 @@ export type RunCliOptions = {
   readLine?: ReadLine;
   closeInput?: CloseInteractiveInput;
   write?: (chunk: string) => void;
+  writeStderr?: (chunk: string) => void;
   stdinIsTTY?: boolean;
+  stdoutIsTTY?: boolean;
+  stdinStream?: Readable;
   runInteractiveTui?: InteractiveTuiRunner;
+  runNativeSession?: (input: RunNativeSessionInput) => Promise<void>;
 };
 
 const PROVIDER_ENV_KEYS = [
@@ -175,42 +184,10 @@ async function resolveBranchLabel(cwd: string): Promise<string> {
   return "no-git";
 }
 
-function shouldUseFullscreenTui(
-  command: CliCommand,
-  options: RunCliOptions,
-): boolean {
-  return (
-    command.kind === "interactive" &&
-    (options.stdinIsTTY ?? Boolean(process.stdin.isTTY)) &&
-    options.readLine === undefined &&
-    options.closeInput === undefined
-  );
-}
-
-function resolveTuiRenderer(
-  env: Record<string, string | undefined>,
-): TuiRenderer {
-  return env.BETA_TUI_RENDERER === "terminal" ? "terminal" : "blessed";
-}
-
 async function runDefaultInteractiveTui(
   input: InteractiveTuiRunnerInput,
 ): Promise<void> {
   const { runInteractiveTui } = await import("../tui/run-interactive-tui.ts");
-
-  if (input.tuiRenderer === "terminal") {
-    const { createTerminalTuiApp } = await import("../tui/renderer-terminal/tui-app.ts");
-
-    await runInteractiveTui(input.context, {
-      createApp: createTerminalTuiApp,
-      providerLabel: input.providerLabel,
-      modelLabel: input.modelLabel,
-      branchLabel: input.branchLabel,
-      ...(input.providerRunner ? { providerRunner: input.providerRunner } : {}),
-    });
-    return;
-  }
-
   const { createBlessedTuiApp } = await import("../tui/renderer-blessed/tui-app.ts");
 
   await runInteractiveTui(input.context, {
@@ -242,8 +219,24 @@ function mergeProviderEnv(
   };
 }
 
+function defaultWriteStderr(chunk: string): void {
+  process.stderr.write(chunk);
+}
+
+function readPromptFromParsed(parsed: ParsedCliArgs): string | undefined {
+  if ("kind" in parsed) {
+    return undefined;
+  }
+
+  return parsed.prompt;
+}
+
+function shouldSuppressProviderBootstrapError(route: CliRoute): boolean {
+  return route.kind === "continue" || route.kind === "resume";
+}
+
 async function runCliCommand(
-  command: CliCommand,
+  parsed: ParsedCliArgs,
   options: RunCliOptions = {},
 ): Promise<void> {
   const sessionEnv = await loadSessionEnv({
@@ -261,48 +254,105 @@ async function runCliCommand(
     ...processEnv,
     ...explicitEnv,
   };
+  const stdinIsTTY = options.stdinIsTTY ?? Boolean(process.stdin.isTTY);
+  const stdoutIsTTY = options.stdoutIsTTY ?? Boolean(process.stdout.isTTY);
+  const writeStderr = options.writeStderr ?? defaultWriteStderr;
+  const shouldBypassStdinRead = "kind" in parsed;
+
+  let stdinText = "";
+  if (!stdinIsTTY && !shouldBypassStdinRead) {
+    stdinText = await readAllStdin(options.stdinStream ?? process.stdin);
+  }
+
+  const route = resolveCliRoute({
+    parsed,
+    stdinIsTTY,
+    stdoutIsTTY,
+    hasStdinPayload: stdinText.length > 0,
+    deprecatedTerminalRendererEnv: presentationEnv.BETA_TUI_RENDERER === "terminal",
+  });
+
+  for (const warning of route.warnings) {
+    writeStderr(`${warning.message}\n`);
+  }
+
+  if (route.kind === "error") {
+    throw new Error(route.message);
+  }
+
+  let command: CliCommand;
+  let runnableRoute: CliRoute = route;
+
+  if (route.kind === "stream_single") {
+    const prompt = readPromptFromParsed(parsed);
+    const assembledPrompt = assemblePromptFromPipeline({
+      prompt,
+      stdinText,
+    });
+
+    command = { kind: "print", prompt: assembledPrompt };
+    runnableRoute = {
+      ...route,
+      bootstrapCommand: command,
+    };
+  } else {
+    command = route.bootstrapCommand;
+  }
+
   const context = await buildBootstrapContext({
     command,
     ...(options.cwd ? { cwd: options.cwd } : {}),
   });
-  const providerRunner = createProviderRunnerFromEnv({
-    env,
-    ...(options.fetch ? { fetch: options.fetch } : {}),
-  });
-  const shouldUseTui = shouldUseFullscreenTui(command, options);
 
-  if (shouldUseTui) {
+  let providerRunner: ProviderRunner | null = null;
+  try {
+    providerRunner = createProviderRunnerFromEnv({
+      env,
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    });
+  } catch (error) {
+    if (!shouldSuppressProviderBootstrapError(runnableRoute)) {
+      throw error;
+    }
+  }
+
+  if (runnableRoute.kind === "tui") {
     const interactiveTuiRunner = options.runInteractiveTui ?? runDefaultInteractiveTui;
     const { providerLabel, modelLabel } = resolveProviderPresentation(env);
     const branchLabel = await resolveBranchLabel(context.projectRoot);
-    const tuiRenderer = resolveTuiRenderer(presentationEnv);
 
     await interactiveTuiRunner({
       context,
       providerLabel,
       modelLabel,
       branchLabel,
-      tuiRenderer,
+      tuiRenderer: "blessed",
       ...(providerRunner ? { providerRunner } : {}),
     });
     return;
   }
 
-  const sessionManager = new SessionManager(
-    {
-      ...(options.write ? { write: options.write } : {}),
-      ...(options.readLine ? { readLine: options.readLine } : {}),
-      ...(options.closeInput ? { closeInput: options.closeInput } : {}),
-      ...(providerRunner ? { providerRunner } : {}),
-    },
-  );
+  const nativeRunner = options.runNativeSession ?? defaultRunNativeSession;
+  const createInteractiveInput = options.readLine
+    ? () => ({
+      readLine: options.readLine!,
+      close: options.closeInput ?? (async () => {}),
+    })
+    : undefined;
 
-  await sessionManager.run(context);
+  await nativeRunner({
+    context,
+    route: runnableRoute,
+    ...(providerRunner ? { providerRunner } : {}),
+    ...(options.write ? { writeStdout: options.write } : {}),
+    writeStderr,
+    ...(createInteractiveInput ? { createInteractiveInput } : {}),
+  });
 }
 
 export async function runCli(argv: string[], options: RunCliOptions = {}): Promise<void> {
-  const command = parseCliArgs(argv);
-  await runCliCommand(command, options);
+  const parsed = parseCliArgs(argv);
+  await runCliCommand(parsed, options);
 }
 
 export function isDirectExecution(
@@ -322,11 +372,21 @@ export function isDirectExecution(
 
 async function main(): Promise<void> {
   try {
-    const command = parseCliArgs(process.argv.slice(2));
-    await runCliCommand(command, {
+    const parsed = parseCliArgs(process.argv.slice(2));
+    await runCliCommand(parsed, {
       stdinIsTTY: Boolean(process.stdin.isTTY),
+      stdoutIsTTY: Boolean(process.stdout.isTTY),
     });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      "alreadyPresented" in error &&
+      error.alreadyPresented === true
+    ) {
+      process.exitCode = 1;
+      return;
+    }
+
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     process.exitCode = 1;

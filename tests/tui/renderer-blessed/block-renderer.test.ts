@@ -55,7 +55,7 @@ test("user cards render as submitted-input cards with distinct chrome", () => {
   );
 
   assert.match(markup, /Submitted Input/);
-  assert.match(markup, /Inspect auth flow/);
+  assert.equal((markup.match(/Inspect auth flow/g) ?? []).length, 1);
   assert.match(markup, /#4FAF7C-fg/);
   assert.match(markup, /#2563EB-fg/);
   assert.match(markup, /╭/);

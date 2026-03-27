@@ -92,6 +92,10 @@ function renderHeader(card: TimelineCard, palette: RendererPalette): string {
     bold: true,
   });
 
+  if (card.kind === "user") {
+    return `${marker} ${title}`;
+  }
+
   return `${marker} ${title}: ${summary}`;
 }
 
