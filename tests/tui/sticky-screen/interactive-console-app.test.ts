@@ -569,6 +569,70 @@ test("interactive console app routes picker navigation keys locally while theme 
   await app.close();
 });
 
+test("interactive console app restores the prior transcript after closing the theme picker", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout();
+  const screenWriter = createFakeScreenWriter();
+  const terminalSession = createFakeTerminalSession();
+  const timeline = [
+    {
+      id: "user-1",
+      kind: "user" as const,
+      summary: "hello",
+      body: "hello",
+      collapsed: false,
+    },
+    {
+      id: "assistant-1",
+      kind: "assistant" as const,
+      summary: "assistant: hi",
+      body: "assistant: hi",
+      collapsed: false,
+    },
+  ];
+
+  const app = createInteractiveConsoleApp(
+    {
+      initialState: createState({
+        timeline,
+      }),
+      handlers: createHandlers(),
+      terminal: { stdin, stdout },
+    },
+    {
+      screenWriter,
+      terminalSession,
+    },
+  );
+
+  await app.start();
+
+  const initialTimelineOutput = screenWriter.timelineChunks.join("");
+  assert.match(initialTimelineOutput, /hello/);
+  assert.match(initialTimelineOutput, /assistant: hi/);
+
+  app.update(createState({
+    timeline,
+    themePicker: {
+      reason: "command",
+      selectedThemeId: "hufflepuff",
+      themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+    },
+  }));
+
+  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /Hufflepuff/);
+
+  app.update(createState({
+    timeline,
+    themePicker: null,
+  }));
+
+  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /hello/);
+  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /assistant: hi/);
+
+  await app.close();
+});
+
 test("interactive console app pauses stdin on close so the process can return to the shell", async () => {
   const stdin = createFakeStdin();
   const stdout = createFakeStdout();

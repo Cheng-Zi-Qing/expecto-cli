@@ -101,6 +101,7 @@ export function createInteractiveConsoleApp(
   let state = input.initialState;
   let started = false;
   let renderedTranscriptLines: string[] = [];
+  let transcriptSurfaceWasReplaced = false;
   let startedWithWelcomeOnly =
     state.timeline.length === 1 && state.timeline[0]?.kind === "welcome";
   let idleInterruptArmed = false;
@@ -166,8 +167,10 @@ export function createInteractiveConsoleApp(
     if (renderedTranscriptLines.length === 0) {
       if (state.themePicker !== null) {
         screenWriter.replaceTimeline(`${nextLines.join("\n")}\n`);
+        transcriptSurfaceWasReplaced = true;
       } else {
         appendTimelineLines(screenWriter, nextLines);
+        transcriptSurfaceWasReplaced = false;
       }
       renderedTranscriptLines = nextLines;
       return;
@@ -178,21 +181,27 @@ export function createInteractiveConsoleApp(
     if (diff.mode === "append") {
       appendTimelineLines(screenWriter, diff.lines);
       renderedTranscriptLines = nextLines;
+      transcriptSurfaceWasReplaced = false;
       if (!(state.timeline.length === 1 && state.timeline[0]?.kind === "welcome")) {
         startedWithWelcomeOnly = false;
       }
       return;
     }
 
-    if (state.themePicker !== null) {
+    if (state.themePicker !== null || transcriptSurfaceWasReplaced) {
       screenWriter.replaceTimeline(`${nextLines.join("\n")}\n`);
       renderedTranscriptLines = nextLines;
+      transcriptSurfaceWasReplaced = state.themePicker !== null;
+      if (!(state.timeline.length === 1 && state.timeline[0]?.kind === "welcome")) {
+        startedWithWelcomeOnly = false;
+      }
       return;
     }
 
     if (startedWithWelcomeOnly && !(state.timeline.length === 1 && state.timeline[0]?.kind === "welcome")) {
       appendTimelineLines(screenWriter, nextLines);
       renderedTranscriptLines = nextLines;
+      transcriptSurfaceWasReplaced = false;
       startedWithWelcomeOnly = false;
     }
   };
