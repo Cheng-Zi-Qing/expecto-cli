@@ -58,7 +58,26 @@ function renderFramedBodyLine(content: string, width: number): string {
 export function renderFooter(view: TuiFooterView, options: FooterRenderOptions): RenderedFooter {
   const width = normalizePositiveInteger(options.width, 1);
   const composerHeight = normalizePositiveInteger(options.composerHeight, 1);
-  const composerText = view.composer.value === "" ? "Write a prompt" : view.composer.value;
+  const pickerEntry = view.themePicker?.entries.find((entry) => entry.selected)
+    ?? view.themePicker?.entries.find((entry) => entry.id === view.themePicker?.selectedThemeId)
+    ?? null;
+  const pickerLines = view.themePicker === undefined
+    ? null
+    : [
+        pickerEntry
+          ? `${pickerEntry.displayName} · ${pickerEntry.animal} · ${pickerEntry.paletteLabel}`
+          : "Theme preview",
+        "Use ↑↓ to move",
+        pickerEntry?.availability === "planned"
+          ? "Preview only · not yet available"
+          : "Enter apply",
+        view.themePicker.required ? "Required before entering" : "Press /theme any time",
+      ];
+  const composerText = pickerLines
+    ? pickerLines.join("\n")
+    : view.composer.value === ""
+      ? "Write a prompt"
+      : view.composer.value;
   const composerContentWidth = width < FRAME_SIDE_WIDTH ? width : Math.max(1, width - FRAME_SIDE_WIDTH);
   const composerContentColumn = width < FRAME_SIDE_WIDTH ? 1 : FRAMED_CONTENT_COLUMN;
 
@@ -73,7 +92,7 @@ export function renderFooter(view: TuiFooterView, options: FooterRenderOptions):
 
   return {
     lines: [
-      renderLabeledFrameLine(width, "╭", "╮", " Composer "),
+      renderLabeledFrameLine(width, "╭", "╮", view.themePicker ? " Theme Picker " : " Composer "),
       ...visibleComposer,
       renderLabeledFrameLine(width, "╰", "╯", ` Status: ${view.status.runtimeLabel} `),
     ],

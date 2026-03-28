@@ -13,12 +13,14 @@ export type KeypressSnapshot = {
   focus: TuiFocus;
   inputLocked: boolean;
   draft: string;
+  themePickerActive?: boolean;
 };
 
 export type KeypressAction =
   | "exit"
   | "interrupt"
   | "toggle_inspector"
+  | "toggle_timeline_mode"
   | "focus_timeline"
   | "focus_composer"
   | "move_selection_up"
@@ -92,15 +94,53 @@ export function interpretKeypress(
     };
   }
 
+  if (key.name === "f2") {
+    return {
+      actions: ["toggle_timeline_mode"],
+    };
+  }
+
   if (snapshot.inputLocked && key.ctrl && key.name === "c") {
     return {
       actions: ["interrupt"],
     };
   }
 
+  if (snapshot.themePickerActive) {
+    if (key.name === "up") {
+      return {
+        actions: ["move_selection_up"],
+      };
+    }
+
+    if (key.name === "down") {
+      return {
+        actions: ["move_selection_down"],
+      };
+    }
+
+    if (key.name === "enter") {
+      return {
+        actions: ["toggle_selected_item"],
+      };
+    }
+  }
+
+  if (key.name === "pageup") {
+    return {
+      actions: ["move_selection_page_up"],
+    };
+  }
+
+  if (key.name === "pagedown") {
+    return {
+      actions: ["move_selection_page_down"],
+    };
+  }
+
   if (key.name === "tab") {
     return {
-      actions: ["toggle_inspector"],
+      actions: [snapshot.focus === "timeline" ? "focus_composer" : "focus_timeline"],
     };
   }
 
@@ -117,6 +157,12 @@ export function interpretKeypress(
       };
     }
 
+    if (key.name === "o") {
+      return {
+        actions: ["toggle_inspector"],
+      };
+    }
+
     if (key.name === "up") {
       return {
         actions: ["move_selection_up"],
@@ -126,18 +172,6 @@ export function interpretKeypress(
     if (key.name === "down") {
       return {
         actions: ["move_selection_down"],
-      };
-    }
-
-    if (key.name === "pageup") {
-      return {
-        actions: ["move_selection_page_up"],
-      };
-    }
-
-    if (key.name === "pagedown") {
-      return {
-        actions: ["move_selection_page_down"],
       };
     }
 

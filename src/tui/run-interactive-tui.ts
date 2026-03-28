@@ -1,13 +1,20 @@
 import { basename } from "node:path";
 
-import { listBuiltinCommands } from "../commands/builtin-commands.ts";
+import { execa } from "execa";
+
+import { createUserConfigStore, type UserConfigStore } from "../cli/user-config.ts";
 import type { ProviderRunner } from "../providers/provider-runner.ts";
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
+import {
+  createExecutionLogStore,
+  type ExecutionLogStore,
+} from "../runtime/execution-log-store.ts";
 import { SessionManager } from "../runtime/session-manager.ts";
 import { SessionInterruptController } from "../runtime/session-interrupt.ts";
 import type { AssistantStepInput, AssistantStepResult } from "../runtime/runtime-session.ts";
 import { deriveContextMetrics } from "./context-metrics.ts";
-import type { CreateInteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
+import { getThemeDefinition } from "./theme/theme-registry.ts";
+import type { CreateInteractiveTuiApp, InteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
 import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
 import { QueuedInteractiveInput } from "./queued-interactive-input.ts";
 import type { ContextMetrics, TuiAction, TuiState } from "./tui-types.ts";
@@ -21,9 +28,20 @@ export type RunInteractiveTuiOptions = {
   assistantStep?: (input: AssistantStepInput) => Promise<AssistantStepResult | null> | AssistantStepResult | null;
   providerRunner?: ProviderRunner;
   terminal?: TerminalTuiIo;
+  executionLogStore?: ExecutionLogStore;
+  openPager?: (logPath: string) => Promise<void>;
+  userConfigStore?: UserConfigStore;
 };
 
 function noopWrite(): void {}
+
+async function defaultOpenPager(logPath: string): Promise<void> {
+  const pager = process.env.PAGER?.trim() || "less";
+  await execa(pager, [logPath], {
+    stdio: "inherit",
+    reject: false,
+  });
+}
 
 function shouldHideSystemLine(line: string): boolean {
   return (
@@ -55,19 +73,18 @@ function createContextMetrics(
   });
 }
 
-function isKnownBuiltinCommand(prompt: string): boolean {
-  const [commandName] = prompt.trim().split(/\s+/, 1);
+function isLocalCommandCandidate(prompt: string): boolean {
+  return normalizeInteractiveCommandPrompt(prompt).trim().startsWith("/");
+}
 
-  if (!commandName || !commandName.startsWith("/")) {
-    return false;
+function normalizeInteractiveCommandPrompt(prompt: string): string {
+  const trimmed = prompt.trim().toLowerCase();
+
+  if (trimmed === "exit" || trimmed === "quit") {
+    return "/exit";
   }
 
-  return listBuiltinCommands().some((command) => {
-    return (
-      command.name === commandName ||
-      command.aliases.includes(commandName as `/${string}`)
-    );
-  });
+  return prompt;
 }
 
 function parsePromptTurnSequence(turnId: string): number | null {
@@ -87,6 +104,12 @@ export async function runInteractiveTui(
 ) {
   const queuedInput = new QueuedInteractiveInput();
   const interruptController = new SessionInterruptController();
+  const userConfigStore = options.userConfigStore ?? createUserConfigStore();
+  const userConfig = await userConfigStore.load();
+  const executionLogStore = options.executionLogStore ?? createExecutionLogStore({
+    projectRoot: context.projectRoot,
+  });
+  const openPager = options.openPager ?? defaultOpenPager;
   const conversation: string[] = [];
   let promptTurnSequence = 0;
   let state = createInitialTuiState({
@@ -95,6 +118,7 @@ export async function runInteractiveTui(
     branchLabel: options.branchLabel,
     providerLabel: options.providerLabel,
     modelLabel: options.modelLabel,
+    savedThemeId: userConfig.themeId,
     contextMetrics: createContextMetrics(
       context,
       options.providerLabel,
@@ -142,11 +166,12 @@ export async function runInteractiveTui(
 
   if (context.entry.kind === "interactive") {
     const initialPrompt = context.entry.initialPrompt ?? "";
-    const trimmedInitialPrompt = initialPrompt.trim();
+    const normalizedInitialPrompt = normalizeInteractiveCommandPrompt(initialPrompt);
+    const trimmedInitialPrompt = normalizedInitialPrompt.trim();
 
     if (
       trimmedInitialPrompt.length > 0 &&
-      !isKnownBuiltinCommand(trimmedInitialPrompt)
+      !isLocalCommandCandidate(normalizedInitialPrompt)
     ) {
       seedForegroundPromptLifecycle(initialPrompt, applyActionWithoutRender);
     }
@@ -157,21 +182,80 @@ export async function runInteractiveTui(
     app.update(state);
   };
 
+  const applySelectedTheme = async (): Promise<void> => {
+    const picker = state.themePicker;
+
+    if (picker === null) {
+      applyAction({
+        type: "toggle_selected_item",
+      });
+      return;
+    }
+
+    if (getThemeDefinition(picker.selectedThemeId).availability !== "available") {
+      return;
+    }
+
+    await userConfigStore.save({
+      themeId: picker.selectedThemeId,
+    });
+    applyAction({
+      type: "toggle_selected_item",
+    });
+  };
+
   const refreshContextMetrics = (): void => {
     updateContextMetrics(applyAction);
+  };
+
+  const inspectExecution = async (
+    executionId: string,
+    app: InteractiveTuiApp,
+  ): Promise<void> => {
+    await executionLogStore.flush(executionId);
+    const logPath = await executionLogStore.resolveLogPath(executionId);
+
+    if (logPath === null) {
+      applyAction({
+        type: "append_system_message",
+        line: `No execution log found for ${executionId}`,
+      });
+      return;
+    }
+
+    try {
+      await app.suspendForPager?.();
+      await openPager(logPath);
+    } catch {
+      applyAction({
+        type: "append_system_message",
+        line: `Log saved to ${logPath}`,
+      });
+    } finally {
+      await app.resumeFromPager?.();
+    }
   };
 
   const app = options.createApp({
     initialState: state,
     handlers: {
       onDraftChange: (draft) => {
+        if (state.themePicker !== null) {
+          return;
+        }
+
         applyAction({
           type: "set_draft",
           draft,
         });
       },
       onSubmit: (prompt) => {
-        const trimmedPrompt = prompt.trim();
+        if (state.themePicker !== null) {
+          return;
+        }
+
+        const normalizedPrompt = normalizeInteractiveCommandPrompt(prompt);
+        const trimmedPrompt = normalizedPrompt.trim();
 
         if (trimmedPrompt.length === 0) {
           return;
@@ -182,11 +266,14 @@ export async function runInteractiveTui(
           draft: "",
         });
 
-        if (!isKnownBuiltinCommand(trimmedPrompt)) {
-          seedForegroundPromptLifecycle(prompt, applyAction);
+        if (!isLocalCommandCandidate(normalizedPrompt)) {
+          seedForegroundPromptLifecycle(normalizedPrompt, applyAction);
         }
 
-        queuedInput.submit(prompt);
+        queuedInput.submit(normalizedPrompt);
+      },
+      onInspectExecution: (executionId) => {
+        void inspectExecution(executionId, app);
       },
       onInterrupt: () => {
         applyAction({
@@ -197,6 +284,11 @@ export async function runInteractiveTui(
       onToggleInspector: () => {
         applyAction({
           type: "toggle_inspector",
+        });
+      },
+      onToggleTimelineMode: () => {
+        applyAction({
+          type: "toggle_timeline_mode",
         });
       },
       onFocusTimeline: () => {
@@ -220,6 +312,11 @@ export async function runInteractiveTui(
         });
       },
       onToggleSelectedItem: () => {
+        if (state.themePicker !== null) {
+          void applySelectedTheme();
+          return;
+        }
+
         applyAction({
           type: "toggle_selected_item",
         });
@@ -293,7 +390,22 @@ export async function runInteractiveTui(
         state: runtimeState,
       });
     },
+    onOpenThemePicker: () => {
+      applyAction({
+        type: "open_theme_picker",
+        reason: "command",
+      });
+    },
     onInteractionEvent: (event) => {
+      if (event.eventType === "execution_item_started") {
+        void executionLogStore.ensureExecutionLog(event.payload.executionId).catch(() => {});
+      } else if (event.eventType === "execution_item_chunk") {
+        void executionLogStore.appendChunk(
+          event.payload.executionId,
+          event.payload.output,
+        ).catch(() => {});
+      }
+
       const observedPromptTurnSequence = parsePromptTurnSequence(event.turnId);
 
       if (

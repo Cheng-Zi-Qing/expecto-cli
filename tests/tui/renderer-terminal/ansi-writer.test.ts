@@ -25,3 +25,13 @@ test("createAnsiWriter emits clear-screen and scroll-region sequences", () => {
 
   assert.deepEqual(writes, ["\u001b[2J", "\u001b[1;20r", "\u001b[r"]);
 });
+
+test("createAnsiWriter emits save and restore cursor sequences", () => {
+  const writes: string[] = [];
+  const writer = createAnsiWriter((chunk) => writes.push(chunk));
+
+  writer.saveCursor();
+  writer.restoreCursor();
+
+  assert.deepEqual(writes, ["\u001b7", "\u001b8"]);
+});

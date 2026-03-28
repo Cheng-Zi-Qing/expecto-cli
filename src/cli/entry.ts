@@ -20,7 +20,7 @@ import {
 } from "./run-native-session.ts";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-type TuiRenderer = "blessed";
+type TuiRenderer = "terminal";
 
 export type InteractiveTuiRunnerInput = {
   context: BootstrapContext;
@@ -188,10 +188,10 @@ async function runDefaultInteractiveTui(
   input: InteractiveTuiRunnerInput,
 ): Promise<void> {
   const { runInteractiveTui } = await import("../tui/run-interactive-tui.ts");
-  const { createBlessedTuiApp } = await import("../tui/renderer-blessed/tui-app.ts");
+  const { createTerminalTuiApp } = await import("../tui/renderer-terminal/tui-app.ts");
 
   await runInteractiveTui(input.context, {
-    createApp: createBlessedTuiApp,
+    createApp: createTerminalTuiApp,
     providerLabel: input.providerLabel,
     modelLabel: input.modelLabel,
     branchLabel: input.branchLabel,
@@ -326,7 +326,7 @@ async function runCliCommand(
       providerLabel,
       modelLabel,
       branchLabel,
-      tuiRenderer: "blessed",
+      tuiRenderer: "terminal",
       ...(providerRunner ? { providerRunner } : {}),
     });
     return;

@@ -47,10 +47,84 @@ test("interpretKeypress treats i as a focus shortcut only in timeline focus", ()
   assert.equal(result.nextDraft, undefined);
 });
 
-test("interpretKeypress maps page navigation keys to timeline paging actions", () => {
-  const pageUp = interpretKeypress(
+test("interpretKeypress uses Tab for focus traversal instead of inspector toggling", () => {
+  const composerTab = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+    },
+    undefined,
+    {
+      name: "tab",
+    },
+  );
+  const timelineTab = interpretKeypress(
     {
       focus: "timeline",
+      inputLocked: false,
+      draft: "draft",
+    },
+    undefined,
+    {
+      name: "tab",
+    },
+  );
+
+  assert.deepEqual(composerTab.actions, ["focus_timeline"]);
+  assert.deepEqual(timelineTab.actions, ["focus_composer"]);
+});
+
+test("interpretKeypress reserves o for inspector toggling only in timeline focus", () => {
+  const timelineToggle = interpretKeypress(
+    {
+      focus: "timeline",
+      inputLocked: false,
+      draft: "draft",
+    },
+    "o",
+    {
+      name: "o",
+    },
+  );
+  const composerText = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+    },
+    "o",
+    {
+      name: "o",
+    },
+  );
+
+  assert.deepEqual(timelineToggle.actions, ["toggle_inspector"]);
+  assert.equal(timelineToggle.nextDraft, undefined);
+  assert.deepEqual(composerText.actions, []);
+  assert.equal(composerText.nextDraft, "drafto");
+});
+
+test("interpretKeypress toggles timeline scroll and select modes with F2", () => {
+  const result = interpretKeypress(
+    {
+      focus: "timeline",
+      inputLocked: false,
+      draft: "",
+    },
+    undefined,
+    {
+      name: "f2",
+    },
+  );
+
+  assert.deepEqual(result.actions, ["toggle_timeline_mode"]);
+});
+
+test("interpretKeypress maps page navigation keys to timeline paging actions globally", () => {
+  const pageUp = interpretKeypress(
+    {
+      focus: "composer",
       inputLocked: false,
       draft: "",
     },
@@ -61,7 +135,7 @@ test("interpretKeypress maps page navigation keys to timeline paging actions", (
   );
   const pageDown = interpretKeypress(
     {
-      focus: "timeline",
+      focus: "composer",
       inputLocked: false,
       draft: "",
     },
@@ -87,13 +161,13 @@ test("getCommandMenuLayout only reserves space when the slash palette is visible
     query: "st",
     items: [
       {
-        id: "status",
+        id: "session.status",
         name: "/status",
         aliases: [],
         description: "Show the current session status.",
       },
       {
-        id: "branch",
+        id: "project.branch",
         name: "/branch",
         aliases: [],
         description: "Show the current git branch for the project root.",
@@ -120,4 +194,49 @@ test("getCommandMenuLayout only reserves space when the slash palette is visible
     visible: true,
     height: 3,
   });
+});
+
+test("interpretKeypress routes up/down/enter to the theme picker before normal composer behavior", () => {
+  const moveUp = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+      themePickerActive: true,
+    },
+    undefined,
+    {
+      name: "up",
+    },
+  );
+  const moveDown = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+      themePickerActive: true,
+    },
+    undefined,
+    {
+      name: "down",
+    },
+  );
+  const apply = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+      themePickerActive: true,
+    },
+    undefined,
+    {
+      name: "enter",
+    },
+  );
+
+  assert.deepEqual(moveUp.actions, ["move_selection_up"]);
+  assert.equal(moveUp.nextDraft, undefined);
+  assert.deepEqual(moveDown.actions, ["move_selection_down"]);
+  assert.deepEqual(apply.actions, ["toggle_selected_item"]);
+  assert.equal(apply.submitPrompt, undefined);
 });

@@ -1,6 +1,11 @@
 import type { MarkdownBlock } from "../block-model/block-types.ts";
 import type { TimelineItem } from "../tui-types.ts";
-import type { TimelineCard, TimelineCardBlock, TranscriptBlock } from "../view-model/timeline-blocks.ts";
+import type {
+  ThemeWelcomeBlock,
+  TimelineCard,
+  TimelineCardBlock,
+  TranscriptBlock,
+} from "../view-model/timeline-blocks.ts";
 import { buildTimelineCards } from "../view-model/timeline-blocks.ts";
 import { layoutRenderedCards, type RenderedTimelineLayout } from "./block-layout.ts";
 import {
@@ -197,6 +202,49 @@ function renderTranscriptBlock(
   );
 }
 
+function renderThemeWelcome(
+  block: ThemeWelcomeBlock,
+  palette: RendererPalette,
+): string[] {
+  const glyphLines = block.glyphRows.map((row) =>
+    `${BLOCK_INDENT}${row.map((segment) =>
+      styleText(segment.text, {
+        fg: palette.timeline.glyph[segment.color],
+        bold: segment.color === "chin" || segment.color === "highlight",
+      })
+    ).join("")}`,
+  );
+  const highlightLine = block.highlightTokens.map((token) =>
+    renderInlineTextTokens([{ kind: token.kind, text: token.text }], palette)
+  ).join(` ${styleText("·", { fg: palette.timeline.muted })} `);
+
+  return [
+    styleText(block.title, {
+      fg: palette.timeline.card.welcome.summary,
+      bold: true,
+    }),
+    styleText(block.subtitle, {
+      fg: palette.timeline.card.welcome.body,
+    }),
+    "",
+    ...glyphLines,
+    "",
+    styleText(block.tipTitle, {
+      fg: palette.timeline.card.welcome.label,
+      bold: true,
+    }),
+    styleText(block.tipText, {
+      fg: palette.timeline.card.welcome.body,
+    }),
+    "",
+    styleText(block.highlightTitle, {
+      fg: palette.timeline.card.welcome.label,
+      bold: true,
+    }),
+    highlightLine,
+  ].map((line) => (line.length > 0 ? `${BLOCK_INDENT}${line}` : ""));
+}
+
 function renderBlock(
   block: TimelineCardBlock,
   palette: RendererPalette,
@@ -212,6 +260,8 @@ function renderBlock(
       return renderCodeBlock(block, palette);
     case "transcript_block":
       return renderTranscriptBlock(block, palette);
+    case "theme_welcome":
+      return renderThemeWelcome(block, palette);
     case "badge_row":
       return [
         `${BLOCK_INDENT}${block.badges.map((badge) =>
@@ -252,6 +302,10 @@ export function renderTimelineCardMarkup(
   card: TimelineCard,
   palette: RendererPalette,
 ): string {
+  if (card.kind === "welcome") {
+    return card.blocks.flatMap((block) => renderBlock(block, palette)).join("\n");
+  }
+
   if (card.kind === "user") {
     return renderUserCard(card, palette);
   }

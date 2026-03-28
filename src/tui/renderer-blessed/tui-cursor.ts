@@ -1,6 +1,7 @@
 import blessed from "neo-blessed";
 
 import type { TuiFocus } from "../tui-types.ts";
+import { getVisibleComposerLines } from "./composer-layout.ts";
 
 type BlessedUnicodeApi = {
   unicode: {
@@ -27,6 +28,7 @@ type GetComposerCursorPlacementInput = {
   paddingLeft: number;
   paddingTop: number;
   maxVisibleLines?: number;
+  maxLineWidth?: number;
 };
 
 function displayWidth(text: string): number {
@@ -44,8 +46,10 @@ export function getComposerCursorPlacement(
 
   const contentStartX = input.composerBox.xi + 1 + input.paddingLeft;
   const contentStartY = input.composerBox.yi + 1 + input.paddingTop;
-  const lines = input.draft.length > 0 ? input.draft.split("\n") : [""];
-  const visibleLines = lines.slice(-(input.maxVisibleLines ?? 4));
+  const visibleLines = getVisibleComposerLines(input.draft, {
+    maxVisibleLines: input.maxVisibleLines,
+    maxLineWidth: input.maxLineWidth,
+  });
   const lastLine = visibleLines.at(-1) ?? "";
 
   return {

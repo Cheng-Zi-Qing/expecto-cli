@@ -1,46 +1,68 @@
-import type { BuiltinCommand } from "./command-types.ts";
+import { findCommandByInput, listAllCommands } from "./command-registry.ts";
+import type {
+  BuiltinCommand,
+  BuiltinCommandId,
+  CommandDescriptor,
+  CommandId,
+} from "./command-types.ts";
 
-const builtinCommands: BuiltinCommand[] = [
-  {
-    id: "help",
-    name: "/help",
-    aliases: [],
-    description: "Show the built-in session commands.",
-  },
-  {
-    id: "clear",
-    name: "/clear",
-    aliases: [],
-    description: "Clear the current conversation history.",
-  },
-  {
-    id: "status",
-    name: "/status",
-    aliases: [],
-    description: "Show the current session status.",
-  },
-  {
-    id: "branch",
-    name: "/branch",
-    aliases: [],
-    description: "Show the current git branch for the project root.",
-  },
-  {
-    id: "exit",
-    name: "/exit",
-    aliases: [],
-    description: "Exit the current interactive session.",
-  },
+const legacyIdByCommandId: Record<CommandId, BuiltinCommandId> = {
+  "session.help": "help",
+  "session.status": "status",
+  "session.clear": "clear",
+  "session.theme": "theme",
+  "session.exit": "exit",
+  "project.branch": "branch",
+  "debug.inspect": "inspect",
+};
+
+const legacyBuiltinOrder: BuiltinCommandId[] = [
+  "help",
+  "clear",
+  "status",
+  "branch",
+  "inspect",
+  "theme",
+  "exit",
 ];
 
+function toBuiltinCommand(command: CommandDescriptor): BuiltinCommand {
+  return {
+    id: legacyIdByCommandId[command.id],
+    name: command.name,
+    aliases: [...command.aliases],
+    description: command.description,
+  };
+}
+
 export function listBuiltinCommands(): BuiltinCommand[] {
-  return builtinCommands;
+  const orderIndex = new Map(legacyBuiltinOrder.map((id, index) => [id, index]));
+
+  return listAllCommands()
+    .filter((command) => command.availability !== "planned")
+    .map(toBuiltinCommand)
+    .sort((left, right) => {
+      const leftIndex = orderIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = orderIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+
+      return leftIndex - rightIndex;
+    });
 }
 
 export function findBuiltinCommand(name: string): BuiltinCommand | undefined {
-  const slashName = name.startsWith("/") ? name : `/${name}`;
+  const command = findCommandByInput(name);
 
-  return builtinCommands.find(
-    (command) => command.name === slashName || command.aliases.includes(slashName as `/${string}`),
-  );
+  if (!command) {
+    return undefined;
+  }
+
+  return toBuiltinCommand(command);
 }
+
+export {
+  createHelpSections,
+  findCommandByInput,
+  listAllCommands,
+  listImplementedCommands,
+  listImplementedCommandsByCategory,
+} from "./command-registry.ts";

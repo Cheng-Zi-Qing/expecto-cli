@@ -137,3 +137,80 @@ test("inline code becomes inline_code tokens", () => {
     { kind: "default", text: " code spans" },
   ]);
 });
+
+test("semantic tokenizer recognizes command path shortcut and status", () => {
+  const source =
+    "Run /help then open README.md, press Ctrl+C, status: running.";
+  const blocks = parseMarkdownBlocks(source);
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.kind, "paragraph");
+  assert.deepEqual(blocks[0]?.tokens, [
+    { kind: "default", text: "Run " },
+    { kind: "command", text: "/help" },
+    { kind: "default", text: " then open " },
+    { kind: "path", text: "README.md" },
+    { kind: "default", text: ", press " },
+    { kind: "shortcut", text: "Ctrl+C" },
+    { kind: "default", text: ", status: " },
+    { kind: "status", text: "running" },
+    { kind: "default", text: "." },
+  ]);
+});
+
+test("semantic tokenizer includes slash paths and does not highlight freeform nouns", () => {
+  const source = "Use ./scripts/install-local-beta.sh while the branch is ready";
+  const blocks = parseMarkdownBlocks(source);
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.kind, "paragraph");
+  assert.deepEqual(blocks[0]?.tokens, [
+    { kind: "default", text: "Use " },
+    { kind: "path", text: "./scripts/install-local-beta.sh" },
+    { kind: "default", text: " while the branch is " },
+    { kind: "status", text: "ready" },
+  ]);
+});
+
+test("inline_code remains highest priority over semantic tokenization", () => {
+  const source = "Literal `/branch` and `README.md` stay code, but /inspect works";
+  const blocks = parseMarkdownBlocks(source);
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.kind, "paragraph");
+  assert.deepEqual(blocks[0]?.tokens, [
+    { kind: "default", text: "Literal " },
+    { kind: "inline_code", text: "/branch" },
+    { kind: "default", text: " and " },
+    { kind: "inline_code", text: "README.md" },
+    { kind: "default", text: " stay code, but " },
+    { kind: "command", text: "/inspect" },
+    { kind: "default", text: " works" },
+  ]);
+});
+
+test("multi-backtick inline_code also wins over semantic tokenization", () => {
+  const source = "Literal ``/branch`` and ``README.md`` stay code";
+  const blocks = parseMarkdownBlocks(source);
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.kind, "paragraph");
+  assert.deepEqual(blocks[0]?.tokens, [
+    { kind: "default", text: "Literal " },
+    { kind: "inline_code", text: "/branch" },
+    { kind: "default", text: " and " },
+    { kind: "inline_code", text: "README.md" },
+    { kind: "default", text: " stay code" },
+  ]);
+});
+
+test("semantic tokenizer avoids version numbers and email domains as paths", () => {
+  const source = "Version 1.2.3 is out; contact a@b.com for details";
+  const blocks = parseMarkdownBlocks(source);
+
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.kind, "paragraph");
+  assert.deepEqual(blocks[0]?.tokens, [
+    { kind: "default", text: "Version 1.2.3 is out; contact a@b.com for details" },
+  ]);
+});

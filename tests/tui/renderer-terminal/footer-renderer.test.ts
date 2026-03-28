@@ -56,3 +56,44 @@ test("renderFooter does not replace whitespace-only draft with placeholder", () 
   assert.doesNotMatch(footer.lines.join("\n"), /Write a prompt/);
   assert.equal(footer.lines[1], "│      │");
 });
+
+test("renderFooter keeps explicit Composer and Status frame chrome", () => {
+  const footer = renderFooter(createFooter(), { width: 32, composerHeight: 2 });
+  const output = footer.lines.join("\n");
+
+  assert.match(output, /^╭ Composer .*╮$/m);
+  assert.match(output, /^╰ Status: Thinking .*╯$/m);
+  assert.doesNotMatch(output, /^Status: Thinking$/m);
+});
+
+test("renderFooter renders theme picker controls instead of the normal composer placeholder", () => {
+  const footer = renderFooter(
+    createFooter({
+      composer: {
+        value: "",
+        locked: true,
+      },
+      status: {
+        runtimeLabel: "Selection required",
+      },
+      themePicker: {
+        selectedThemeId: "hufflepuff",
+        entries: [
+          { id: "hufflepuff", displayName: "Hufflepuff", animal: "Badger", paletteLabel: "yellow / gray", availability: "available", selected: true },
+          { id: "gryffindor", displayName: "Gryffindor", animal: "Lion", paletteLabel: "red / gold", availability: "planned", selected: false },
+          { id: "ravenclaw", displayName: "Ravenclaw", animal: "Eagle", paletteLabel: "blue / bronze", availability: "planned", selected: false },
+          { id: "slytherin", displayName: "Slytherin", animal: "Serpent", paletteLabel: "green / silver", availability: "planned", selected: false },
+        ],
+        required: true,
+      },
+    }),
+    { width: 72, composerHeight: 4 },
+  );
+
+  const output = footer.lines.join("\n");
+
+  assert.match(output, /Theme Picker/);
+  assert.match(output, /Use ↑↓ to move/);
+  assert.match(output, /Enter apply/);
+  assert.doesNotMatch(output, /Write a prompt/);
+});

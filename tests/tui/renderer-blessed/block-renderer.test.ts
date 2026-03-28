@@ -56,8 +56,8 @@ test("user cards render as submitted-input cards with distinct chrome", () => {
 
   assert.match(markup, /Submitted Input/);
   assert.equal((markup.match(/Inspect auth flow/g) ?? []).length, 1);
-  assert.match(markup, /#4FAF7C-fg/);
-  assert.match(markup, /#2563EB-fg/);
+  assert.match(markup, /#D6A93D-fg/);
+  assert.match(markup, /#F2D16B-fg/);
   assert.match(markup, /╭/);
   assert.match(markup, /╰/);
 });
@@ -141,7 +141,7 @@ test("assistant cards render markdown paragraph, list, quote, and code blocks fr
   assert.match(markup, /quoted line/);
   assert.match(markup, /ts/);
   assert.match(markup, /const status = 'ok';/);
-  assert.match(markup, /#B7791F-fg/);
+  assert.match(markup, /#B8892C-fg/);
 });
 
 test("execution cards keep collapsed hints compact and render expanded transcripts with separate styling", () => {
@@ -180,7 +180,7 @@ test("execution cards keep collapsed hints compact and render expanded transcrip
   assert.match(expanded, /Enter collapse/);
   assert.match(expanded, /rg --files src/);
   assert.match(expanded, /sed -n '1,40p' src\/main\.ts/);
-  assert.match(expanded, /#B7791F-fg/);
+  assert.match(expanded, /#B8892C-fg/);
   assert.match(expanded, /#F3F4F6-bg/);
 });
 
@@ -217,11 +217,10 @@ test("semantic inline tokens render with dedicated highlighting across supported
   assert.match(markup, /Ctrl\+C/);
   assert.match(markup, /blocked/);
   assert.match(markup, /npm run check/);
-  assert.match(markup, /#2563EB-fg/);
-  assert.match(markup, /#4FAF7C-fg/);
-  assert.match(markup, /#7C3AED-fg/);
-  assert.match(markup, /#B7791F-fg/);
-  assert.match(markup, /#111827-bg/);
+  assert.match(markup, /#D6A93D-fg/);
+  assert.match(markup, /#7A746C-fg/);
+  assert.match(markup, /#7AA9D9-fg/);
+  assert.match(markup, /#2C2620-bg/);
 });
 
 test("timeline renderer returns content plus item start lines for scrolling", () => {
@@ -254,6 +253,31 @@ test("timeline renderer returns content plus item start lines for scrolling", ()
   assert.ok(secondStartLine > firstStartLine);
   assert.match(rendered.content, /Inspect auth flow/);
   assert.match(rendered.content, /Found the session check\./);
+});
+
+test("welcome cards render the themed mascot block instead of the legacy placeholder body", () => {
+  const [card] = buildTimelineCards(
+    [
+      {
+        id: "welcome-1",
+        kind: "welcome",
+        summary: "beta is ready",
+        body: "Enter send",
+      },
+    ],
+    0,
+    "hufflepuff",
+  );
+
+  assert.ok(card);
+
+  const markup = renderTimelineCardMarkup(card, createPalette());
+
+  assert.match(markup, /Welcome back!/);
+  assert.match(markup, /Hufflepuff Badger is standing by/);
+  assert.match(markup, /▐██▛◦█ █◦▜██▌/);
+  assert.match(markup, /Highlight sample/);
+  assert.doesNotMatch(markup, /Enter send/);
 });
 
 test("timeline layout accounts for wrapped visual lines when a wrapWidth is provided", () => {

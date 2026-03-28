@@ -30,7 +30,7 @@ const createItem = (overrides: Partial<TimelineItem>): TimelineItem => {
   return item;
 };
 
-test("welcome card builds paragraph blocks with welcome label", () => {
+test("welcome card builds a themed welcome block with the welcome label", () => {
   const timeline = [
     createItem({
       id: "welcome-1",
@@ -51,15 +51,14 @@ test("welcome card builds paragraph blocks with welcome label", () => {
   assert.equal(card.selected, true);
   assert.equal(card.collapsed, false);
   assert.equal(card.blocks.length, 1);
-  const paragraphBlock = card.blocks[0];
-  assert.ok(paragraphBlock);
-  assert.equal(paragraphBlock.kind, "paragraph");
-  assert.deepEqual(paragraphBlock.tokens, [
-    { kind: "default", text: "Line one\nLine two" },
-  ]);
+  const welcomeBlock = card.blocks[0];
+  assert.ok(welcomeBlock);
+  assert.equal(welcomeBlock.kind, "theme_welcome");
+  assert.equal(welcomeBlock.title, "Welcome back!");
+  assert.equal(welcomeBlock.subtitle, "Hufflepuff Badger is standing by");
 });
 
-test("welcome card keeps markdown-like syntax as paragraph text", () => {
+test("welcome card ignores generic body text and renders theme-owned welcome content", () => {
   const timeline = [
     createItem({
       id: "welcome-2",
@@ -74,12 +73,35 @@ test("welcome card keeps markdown-like syntax as paragraph text", () => {
   const card = cards[0];
   assert.ok(card);
   assert.equal(card.blocks.length, 1);
-  const paragraphBlock = card.blocks[0];
-  assert.ok(paragraphBlock);
-  assert.equal(paragraphBlock.kind, "paragraph");
-  assert.deepEqual(paragraphBlock.tokens, [
-    { kind: "default", text: "- alpha\n- beta" },
-  ]);
+  const welcomeBlock = card.blocks[0];
+  assert.ok(welcomeBlock);
+  assert.equal(welcomeBlock.kind, "theme_welcome");
+  assert.equal(welcomeBlock.tipTitle, "Tips for getting started");
+  assert.equal(welcomeBlock.highlightTokens[0]?.text, "/theme");
+});
+
+test("welcome card resolves the active theme welcome asset instead of generic transcript text", () => {
+  const timeline = [
+    createItem({
+      id: "welcome-themed",
+      kind: "welcome",
+      summary: "placeholder",
+      body: "Enter send\n/help commands",
+      collapsed: false,
+    }),
+  ];
+
+  const cards = buildTimelineCards(timeline, 0, "hufflepuff");
+  const card = cards[0];
+  assert.ok(card);
+  assert.equal(card.blocks.length, 1);
+
+  const welcomeBlock = card.blocks[0];
+  assert.ok(welcomeBlock);
+  assert.equal(welcomeBlock.kind, "theme_welcome");
+  assert.equal(welcomeBlock.title, "Welcome back!");
+  assert.equal(welcomeBlock.subtitle, "Hufflepuff Badger is standing by");
+  assert.equal(welcomeBlock.highlightTokens[0]?.text, "/theme");
 });
 
 test("user card presents prompt text through a paragraph block", () => {
@@ -245,7 +267,7 @@ test("expanded execution card does not render transcript content from summary al
   assert.equal(card.blocks.length, 0);
 });
 
-test('empty-string body falls back to summary for welcome/user/system paragraph cards', () => {
+test('empty-string body falls back to summary for user/system paragraph cards while welcome stays theme-owned', () => {
   const kinds: Array<TimelineItem["kind"]> = ["welcome", "user", "system"];
 
   for (const kind of kinds) {
@@ -263,10 +285,16 @@ test('empty-string body falls back to summary for welcome/user/system paragraph 
     const card = cards[0];
     assert.ok(card);
     assert.equal(card.blocks.length, 1);
-    const paragraphBlock = card.blocks[0];
-    assert.ok(paragraphBlock);
-    assert.equal(paragraphBlock.kind, "paragraph");
-    assert.deepEqual(paragraphBlock.tokens, [
+    const block = card.blocks[0];
+    assert.ok(block);
+
+    if (kind === "welcome") {
+      assert.equal(block.kind, "theme_welcome");
+      continue;
+    }
+
+    assert.equal(block.kind, "paragraph");
+    assert.deepEqual(block.tokens, [
       { kind: "default", text: "use summary text" },
     ]);
   }
@@ -292,7 +320,7 @@ test("assistant card falls back to summary when body is empty string", () => {
   assert.equal(listBlock.items.length, 2);
 });
 
-test("cards render no blocks when both body and summary are effectively empty", () => {
+test("cards render no blocks when both body and summary are effectively empty, except the theme-owned welcome card", () => {
   const timeline = [
     createItem({
       id: "welcome-empty",
@@ -310,7 +338,7 @@ test("cards render no blocks when both body and summary are effectively empty", 
 
   const cards = buildTimelineCards(timeline, 0);
   assert.equal(cards.length, 2);
-  assert.equal(cards[0]?.blocks.length, 0);
+  assert.equal(cards[0]?.blocks[0]?.kind, "theme_welcome");
   assert.equal(cards[1]?.blocks.length, 0);
 });
 

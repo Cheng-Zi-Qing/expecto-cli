@@ -2,6 +2,9 @@ import blessed from "neo-blessed";
 
 import type { TextToken } from "../block-model/text-tokens.ts";
 import type { CommandMenuState, TuiFocus } from "../tui-types.ts";
+import { getDefaultThemeId, getThemeDefinition } from "../theme/theme-registry.ts";
+import type { ThemeGlyphColorRole, ThemeId } from "../theme/theme-types.ts";
+import { getVisibleComposerLines } from "./composer-layout.ts";
 
 export type RendererPalette = {
   timeline: {
@@ -70,6 +73,7 @@ export type RendererPalette = {
         fg: string;
       };
     };
+    glyph: Record<ThemeGlyphColorRole, string>;
     executionGuide: string;
     selectedMarker: string;
     selectedText: string;
@@ -107,12 +111,14 @@ export type RendererPalette = {
 type CreateRendererPaletteInput = {
   focus: TuiFocus;
   inputLocked: boolean;
+  themeId?: ThemeId;
 };
 
 type RenderComposerMarkupInput = {
   draft: string;
   inputLocked: boolean;
   palette: RendererPalette;
+  maxLineWidth?: number;
 };
 
 type RenderCommandMenuMarkupInput = CommandMenuState & {
@@ -230,103 +236,106 @@ export function renderInlineTextTokens(
 export function createRendererPalette(
   input: CreateRendererPaletteInput,
 ): RendererPalette {
+  const theme = getThemeDefinition(input.themeId ?? getDefaultThemeId());
+
   return {
     timeline: {
-      text: "#111827",
-      body: "#1F2937",
-      muted: "#6B7280",
-      guide: "#4B5563",
-      hint: "#374151",
+      text: theme.palette.text.heading,
+      body: theme.palette.text.body,
+      muted: theme.palette.text.muted,
+      guide: theme.palette.text.muted,
+      hint: theme.palette.text.body,
       bg: "#F8FAFC",
-      border: input.focus === "timeline" ? "#D9A93D" : "#4B5563",
-      label: "#F6C760",
+      border: input.focus === "timeline" ? theme.palette.chrome.selection : theme.palette.text.muted,
+      label: theme.palette.chrome.utility,
       card: {
         welcome: {
-          border: "#D4AF37",
-          label: "#B7791F",
-          summary: "#111827",
-          body: "#1F2937",
+          border: theme.palette.chrome.utility,
+          label: theme.palette.chrome.utility,
+          summary: theme.palette.text.heading,
+          body: theme.palette.text.body,
         },
         system: {
-          border: "#D4AF37",
-          label: "#B7791F",
-          summary: "#111827",
-          body: "#1F2937",
+          border: theme.palette.chrome.utility,
+          label: theme.palette.chrome.utility,
+          summary: theme.palette.text.heading,
+          body: theme.palette.text.body,
         },
         user: {
-          border: "#4FAF7C",
-          label: "#4FAF7C",
-          summary: "#111827",
-          body: "#1F2937",
+          border: theme.palette.chrome.user,
+          label: theme.palette.chrome.user,
+          summary: theme.palette.text.heading,
+          body: theme.palette.text.body,
         },
         assistant: {
-          border: "#CBD5E1",
-          label: "#111827",
-          summary: "#111827",
-          body: "#1F2937",
+          border: theme.palette.chrome.assistant,
+          label: theme.palette.chrome.assistant,
+          summary: theme.palette.text.heading,
+          body: theme.palette.text.body,
         },
         execution: {
-          border: "#B7791F",
-          label: "#B7791F",
-          summary: "#111827",
-          body: "#1F2937",
+          border: theme.palette.chrome.utility,
+          label: theme.palette.chrome.utility,
+          summary: theme.palette.text.heading,
+          body: theme.palette.text.body,
           transcriptBg: "#F3F4F6",
         },
       },
       token: {
         default: {
-          fg: "#1F2937",
+          fg: theme.palette.text.body,
         },
         muted: {
-          fg: "#6B7280",
+          fg: theme.palette.text.muted,
         },
         inlineCode: {
-          fg: "#F8FAFC",
-          bg: "#111827",
+          fg: theme.palette.token.inlineCodeFg,
+          bg: theme.palette.token.inlineCodeBg,
         },
         command: {
-          fg: "#2563EB",
+          fg: theme.palette.token.command,
         },
         path: {
-          fg: "#4FAF7C",
+          fg: theme.palette.token.path,
         },
         shortcut: {
-          fg: "#7C3AED",
+          fg: theme.palette.token.shortcut,
         },
         status: {
-          fg: "#B7791F",
+          fg: theme.palette.token.status,
         },
       },
-      executionGuide: "#B7791F",
-      selectedMarker: "#2563EB",
-      selectedText: "#111827",
+      glyph: theme.palette.glyph,
+      executionGuide: theme.palette.chrome.utility,
+      selectedMarker: theme.palette.chrome.selection,
+      selectedText: theme.palette.text.selected,
     },
     composer: {
-      text: "#1F2937",
-      border: input.focus === "composer" ? "#4FAF7C" : "#4B5563",
-      label: "#4FAF7C",
-      placeholder: "#6B7280",
-      cursor: input.inputLocked ? "#F6C760" : "#4FAF7C",
+      text: theme.palette.text.body,
+      border: input.focus === "composer" ? theme.palette.chrome.user : theme.palette.text.muted,
+      label: theme.palette.chrome.user,
+      placeholder: theme.palette.text.muted,
+      cursor: input.inputLocked ? theme.palette.chrome.selection : theme.palette.chrome.user,
       bg: "#F3F4F6",
     },
     commandMenu: {
-      text: "#4FAF7C",
-      description: "#4B5563",
-      muted: "#6B7280",
-      empty: "#6B7280",
-      border: "#4B5563",
-      label: "#4FAF7C",
+      text: theme.palette.chrome.user,
+      description: theme.palette.text.body,
+      muted: theme.palette.text.muted,
+      empty: theme.palette.text.muted,
+      border: theme.palette.text.muted,
+      label: theme.palette.chrome.user,
       bg: "#EEF2F7",
-      selectedMarker: "#2563EB",
-      selectedText: "#111827",
+      selectedMarker: theme.palette.chrome.selection,
+      selectedText: theme.palette.text.selected,
     },
     inspector: {
-      text: "#1F2937",
-      border: "#4B5563",
+      text: theme.palette.text.body,
+      border: theme.palette.text.muted,
       bg: "#F3F4F6",
     },
     statusBar: {
-      fg: "#111827",
+      fg: theme.palette.text.heading,
       bg: "#D8DEE9",
     },
   };
@@ -360,8 +369,10 @@ export function renderComposerMarkup(input: RenderComposerMarkupInput): string {
     return colorize(placeholder, input.palette.composer.placeholder);
   }
 
-  const lines = input.draft.split("\n");
-  const visibleLines = lines.slice(-4).map((line) =>
+  const visibleLines = getVisibleComposerLines(input.draft, {
+    maxVisibleLines: 4,
+    maxLineWidth: input.maxLineWidth,
+  }).map((line) =>
     colorize(line, input.palette.composer.text),
   );
 

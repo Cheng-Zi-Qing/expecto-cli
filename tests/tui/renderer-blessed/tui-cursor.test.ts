@@ -63,6 +63,27 @@ test("getComposerCursorPlacement uses display width for wide characters", () => 
   });
 });
 
+test("getComposerCursorPlacement follows soft-wrapped composer lines within the visible width", () => {
+  const placement = getComposerCursorPlacement({
+    focus: "composer",
+    inputLocked: false,
+    draft: "abcdefghij",
+    composerBox: {
+      xi: 0,
+      yi: 16,
+    },
+    paddingLeft: 1,
+    paddingTop: 0,
+    maxLineWidth: 4,
+  });
+
+  assert.deepEqual(placement, {
+    visible: true,
+    x: 4,
+    y: 19,
+  });
+});
+
 test("getComposerCursorPlacement hides the real cursor outside active composer editing", () => {
   assert.deepEqual(
     getComposerCursorPlacement({

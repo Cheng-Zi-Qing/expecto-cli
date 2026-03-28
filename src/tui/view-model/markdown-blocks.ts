@@ -17,6 +17,107 @@ const LIST_PATTERNS = [
 
 const trimEnding = (text: string): string => text.trimEnd();
 
+type SemanticMatch = {
+  kind: "command" | "path" | "shortcut" | "status";
+  start: number;
+  end: number;
+  text: string;
+};
+
+type SemanticPattern = {
+  kind: SemanticMatch["kind"];
+  regex: RegExp;
+};
+
+const SEMANTIC_PATTERNS: SemanticPattern[] = [
+  {
+    kind: "shortcut",
+    regex:
+      /(^|[^A-Za-z0-9+])((?:Ctrl|Alt|Shift|Cmd)\+[A-Za-z0-9]+(?:\+[A-Za-z0-9]+)*)(?=$|[^A-Za-z0-9+])/g,
+  },
+  {
+    kind: "command",
+    regex: /(^|[^A-Za-z0-9/_-])(\/[a-z][a-z0-9-]*)(?=$|[^A-Za-z0-9/_-])/g,
+  },
+  {
+    kind: "path",
+    regex:
+      /(^|[^A-Za-z0-9./_@-])((?:\.{1,2}\/)?(?=[A-Za-z0-9._/-]*[A-Za-z])[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+|(?=[A-Za-z0-9._-]*[A-Za-z])[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)(?=$|[^A-Za-z0-9./_-])/g,
+  },
+  {
+    kind: "status",
+    regex:
+      /(^|[^A-Za-z0-9_])(ready|thinking|running|success|error|interrupted)(?=$|[^A-Za-z0-9_])/g,
+  },
+];
+
+const findNextSemanticMatch = (
+  text: string,
+  startIndex: number,
+): SemanticMatch | null => {
+  let best: SemanticMatch | null = null;
+
+  for (const pattern of SEMANTIC_PATTERNS) {
+    pattern.regex.lastIndex = startIndex;
+    const match = pattern.regex.exec(text);
+    if (!match) {
+      continue;
+    }
+    const prefix = match[1] ?? "";
+    const value = match[2] ?? "";
+    if (value === "") {
+      continue;
+    }
+    const rawIndex = match.index;
+    if (rawIndex === undefined) {
+      continue;
+    }
+    const start = rawIndex + prefix.length;
+    const end = start + value.length;
+    const candidate: SemanticMatch = {
+      kind: pattern.kind,
+      start,
+      end,
+      text: value,
+    };
+
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+    if (candidate.start < best.start) {
+      best = candidate;
+      continue;
+    }
+    if (candidate.start === best.start && candidate.end > best.end) {
+      best = candidate;
+    }
+  }
+
+  return best;
+};
+
+const tokenizeSemanticText = (text: string): TextToken[] => {
+  const tokens: TextToken[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const match = findNextSemanticMatch(text, cursor);
+    if (!match) {
+      tokens.push(createTextToken("default", text.slice(cursor)));
+      break;
+    }
+
+    if (match.start > cursor) {
+      tokens.push(createTextToken("default", text.slice(cursor, match.start)));
+    }
+    tokens.push(createTextToken(match.kind, match.text));
+    cursor = match.end;
+  }
+
+  return tokens;
+};
+
 const tokenizeInline = (text: string): TextToken[] => {
   const tokens: TextToken[] = [];
   let buffer = "";
@@ -33,7 +134,7 @@ const tokenizeInline = (text: string): TextToken[] => {
 
   const flushBuffer = () => {
     if (buffer) {
-      tokens.push(createTextToken("default", buffer));
+      tokens.push(...tokenizeSemanticText(buffer));
       buffer = "";
     }
   };
@@ -41,21 +142,17 @@ const tokenizeInline = (text: string): TextToken[] => {
   while (index < text.length) {
     if (text[index] === "`") {
       const backtickCount = readBacktickRun(index);
-      if (backtickCount > 1) {
-        buffer += "`".repeat(backtickCount);
+      flushBuffer();
+      const fence = "`".repeat(backtickCount);
+      const closing = text.indexOf(fence, index + backtickCount);
+      if (closing === -1) {
+        buffer += fence;
         index += backtickCount;
         continue;
       }
-      flushBuffer();
-      const closing = text.indexOf("`", index + 1);
-      if (closing === -1) {
-        buffer += text[index];
-        index += 1;
-        continue;
-      }
-      const code = text.slice(index + 1, closing);
+      const code = text.slice(index + backtickCount, closing);
       tokens.push(createTextToken("inline_code", code));
-      index = closing + 1;
+      index = closing + backtickCount;
       continue;
     }
     buffer += text[index];

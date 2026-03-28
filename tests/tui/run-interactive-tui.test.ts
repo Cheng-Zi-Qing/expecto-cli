@@ -11,6 +11,7 @@ import { createRendererPalette } from "../../src/tui/renderer-blessed/tui-theme.
 import { runInteractiveTui } from "../../src/tui/run-interactive-tui.ts";
 import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput, TerminalTuiIo } from "../../src/tui/tui-app.ts";
 import type { TuiState } from "../../src/tui/tui-types.ts";
+import type { UserConfig, UserConfigStore } from "../../src/cli/user-config.ts";
 
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "beta-agent-tui-"));
@@ -41,6 +42,8 @@ class FakeInteractiveTuiApp implements InteractiveTuiApp {
   readonly renderedTimelineLayouts: RenderedTimelineLayout[] = [];
   private readonly handlers: InteractiveTuiAppFactoryInput["handlers"];
   closed = false;
+  pagerSuspended = 0;
+  pagerResumed = 0;
 
   constructor(input: InteractiveTuiAppFactoryInput) {
     this.handlers = input.handlers;
@@ -63,6 +66,14 @@ class FakeInteractiveTuiApp implements InteractiveTuiApp {
     this.closed = true;
   }
 
+  async suspendForPager(): Promise<void> {
+    this.pagerSuspended += 1;
+  }
+
+  async resumeFromPager(): Promise<void> {
+    this.pagerResumed += 1;
+  }
+
   submit(prompt: string): void {
     this.handlers.onSubmit(prompt);
   }
@@ -73,6 +84,10 @@ class FakeInteractiveTuiApp implements InteractiveTuiApp {
 
   toggleInspector(): void {
     this.handlers.onToggleInspector();
+  }
+
+  toggleTimelineMode(): void {
+    this.handlers.onToggleTimelineMode();
   }
 
   moveSelectionUp(): void {
@@ -93,6 +108,10 @@ class FakeInteractiveTuiApp implements InteractiveTuiApp {
 
   exit(): void {
     this.handlers.onExit();
+  }
+
+  inspectExecution(executionId: string): void {
+    this.handlers.onInspectExecution?.(executionId);
   }
 
   latestState(): TuiState {
@@ -135,6 +154,29 @@ function selectedRenderedHeaderText(layout: RenderedTimelineLayout): string {
   return (lines[layout.selectedLine] ?? "").replace(/\{\/?[^{}]+\}/g, "");
 }
 
+function createUserConfigStore(config: UserConfig): UserConfigStore & {
+  saves: UserConfig[];
+} {
+  const saves: UserConfig[] = [];
+
+  return {
+    saves,
+    load: async () => config,
+    save: async (nextConfig) => {
+      saves.push(nextConfig);
+      config = nextConfig;
+    },
+  };
+}
+
+function createReturningUserConfigStore(): UserConfigStore & {
+  saves: UserConfig[];
+} {
+  return createUserConfigStore({
+    themeId: "hufflepuff",
+  });
+}
+
 test("runInteractiveTui projects prompt submission, assistant output, and inspector toggles into renderer state", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -149,6 +191,7 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -162,7 +205,9 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
 
   assert.equal(app?.latestState().timeline[0]?.kind, "welcome");
   assert.match(app?.latestState().timeline[0]?.summary ?? "", new RegExp(basename(projectRoot)));
-  assert.match(latestRenderedTimelineContent(app), /Enter send/);
+  assert.match(latestRenderedTimelineContent(app), /Welcome back!/);
+  assert.match(latestRenderedTimelineContent(app), /Hufflepuff Badger is standing by/);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /\/inspect/);
 
   app?.toggleInspector();
   assert.equal(app?.latestState().inspectorOpen, true);
@@ -218,6 +263,107 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
   assert.equal(app?.closed, true);
 });
 
+test("runInteractiveTui opens the picker on first launch and blocks prompt mode until a theme is applied", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const userConfigStore = createUserConfigStore({
+    themeId: null,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore,
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  assert.equal(app?.latestState().themePicker?.reason, "first_launch");
+  assert.equal(app?.latestState().themePicker?.selectedThemeId, "hufflepuff");
+
+  app?.submit("inspect auth flow");
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.deepEqual(app?.latestState().timeline.map((item) => item.kind), ["welcome"]);
+  assert.equal(app?.latestState().themePicker?.reason, "first_launch");
+
+  app?.toggleSelectedItem();
+
+  await waitFor(() => app?.latestState().themePicker === null, "expected picker to close");
+
+  assert.deepEqual(userConfigStore.saves, [{ themeId: "hufflepuff" }]);
+
+  app?.submit("inspect auth flow");
+
+  await waitFor(() => {
+    const state = app?.latestState();
+    return (
+      state?.timeline.length === 2 &&
+      state.timeline[0]?.kind === "user" &&
+      state.timeline[1]?.kind === "assistant"
+    );
+  }, "expected normal prompt lifecycle after applying theme");
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui reopens the picker when /theme is executed", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const userConfigStore = createUserConfigStore({
+    themeId: "hufflepuff",
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore,
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  assert.equal(app?.latestState().themePicker, null);
+
+  app?.submit("/theme");
+
+  await waitFor(() => app?.latestState().themePicker?.reason === "command", "expected /theme to reopen picker");
+
+  assert.equal(app?.latestState().themePicker?.selectedThemeId, "hufflepuff");
+
+  app?.exit();
+  await runPromise;
+});
+
 test("runInteractiveTui interrupts generation and restores the prompt draft", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -233,6 +379,7 @@ test("runInteractiveTui interrupts generation and restores the prompt draft", as
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -284,6 +431,7 @@ test("runInteractiveTui keeps input locked until request_completed arrives", asy
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -370,6 +518,7 @@ test("runInteractiveTui pre-seeds non-builtin interactive initialPrompt into for
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -436,6 +585,7 @@ test("runInteractiveTui keeps builtin interactive initialPrompt outside prompt-l
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -471,6 +621,60 @@ test("runInteractiveTui keeps builtin interactive initialPrompt outside prompt-l
   await runPromise;
 });
 
+test("runInteractiveTui keeps unknown slash initialPrompt outside prompt-ledger locking", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+      initialPrompt: "/missing",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => {
+      assert.fail("unknown slash initial prompt should not call the assistant");
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  const firstState = app?.states[0];
+  assert.ok(firstState);
+  assert.equal(firstState.inputLocked, false);
+  assert.equal(firstState.activeRequestLedger, null);
+
+  await waitFor(() => {
+    const state = app?.latestState();
+
+    return (
+      state?.timeline.length === 2 &&
+      state.timeline.every((item) => item.kind === "system") &&
+      state.timeline[0]?.summary === "Unknown command: /missing" &&
+      state.timeline[1]?.summary === "Run /help to see available commands."
+    );
+  }, "expected unknown slash initial prompt to stay in local system output");
+
+  const hasPromptLedgerState = app?.states.some((state) => {
+    return state.activeRequestLedger?.requestId.startsWith("request-turn-") ?? false;
+  }) ?? false;
+
+  assert.equal(hasPromptLedgerState, false);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /Submitted Input/);
+
+  app?.exit();
+  await runPromise;
+});
+
 test("runInteractiveTui accepts a second prompt after a tool-call continuation completes", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -486,6 +690,7 @@ test("runInteractiveTui accepts a second prompt after a tool-call continuation c
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -569,6 +774,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -585,7 +791,18 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/help", "/clear", "/status", "/branch", "/exit"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+  );
+  assert.deepEqual(
+    app?.latestState().commandMenu.items.map((item) => item.id),
+    [
+      "session.help",
+      "session.status",
+      "session.clear",
+      "session.theme",
+      "session.exit",
+      "project.branch",
+    ],
   );
 
   app?.setDraft("/st");
@@ -601,6 +818,21 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, false);
   assert.deepEqual(app?.latestState().commandMenu.items, []);
 
+  app?.setDraft("/status ");
+
+  assert.equal(app?.latestState().commandMenu.visible, false);
+  assert.deepEqual(app?.latestState().commandMenu.items, []);
+
+  app?.setDraft(" /status");
+
+  assert.equal(app?.latestState().commandMenu.visible, false);
+  assert.deepEqual(app?.latestState().commandMenu.items, []);
+
+  app?.setDraft("/ ");
+
+  assert.equal(app?.latestState().commandMenu.visible, false);
+  assert.deepEqual(app?.latestState().commandMenu.items, []);
+
   app?.setDraft("hello");
 
   assert.equal(app?.latestState().commandMenu.visible, false);
@@ -608,6 +840,164 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
 
   app?.exit();
   await runPromise;
+});
+
+test("runInteractiveTui submits the exact typed slash draft locally even when a suggestion is highlighted", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => {
+      assert.fail("unknown slash input should be handled locally, not sent to the assistant");
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.setDraft("/sta");
+
+  assert.equal(app?.latestState().commandMenu.visible, true);
+  assert.deepEqual(
+    app?.latestState().commandMenu.items.map((item) => item.name),
+    ["/status"],
+  );
+
+  app?.moveSelectionDown();
+  assert.equal(app?.latestState().commandMenu.selectedIndex, 0);
+
+  app?.submit("/sta");
+
+  await waitFor(() => {
+    const state = app?.latestState();
+
+    return (
+      state?.timeline.length === 2 &&
+      state.timeline.every((item) => item.kind === "system") &&
+      state.timeline[0]?.summary === "Unknown command: /sta" &&
+      state.timeline[1]?.summary === "Run /help to see available commands."
+    );
+  }, "expected the exact typed draft to stay local without autocomplete or prompt projection");
+
+  const hasPromptLedgerState = app?.states.some((state) => {
+    return state.activeRequestLedger?.requestId.startsWith("request-turn-") ?? false;
+  }) ?? false;
+
+  assert.equal(hasPromptLedgerState, false);
+  assert.equal(app?.latestState().activeRequestLedger, null);
+  assert.equal(app?.latestState().inputLocked, false);
+  assert.match(latestRenderedTimelineContent(app), /Unknown command: \/sta/);
+  assert.match(latestRenderedTimelineContent(app), /Run \/help to see available commands\./);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /\/status/);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /Submitted Input/);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui keeps /help local in the timeline without seeding prompt lifecycle", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => {
+      assert.fail("/help should not reach the assistant step");
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.submit("/help");
+
+  await waitFor(() => {
+    const state = app?.latestState();
+    return (
+      state !== undefined &&
+      state.timeline.length > 0 &&
+      state.timeline.every((item) => item.kind === "system") &&
+      state.timeline[0]?.summary === "Available commands"
+    );
+  }, "expected /help to render only local system output");
+
+  const hasPromptLedgerState = app?.states.some((state) => {
+    return state.activeRequestLedger?.requestId.startsWith("request-turn-") ?? false;
+  }) ?? false;
+
+  assert.equal(hasPromptLedgerState, false);
+  assert.equal(app?.latestState().activeRequestLedger, null);
+  assert.equal(app?.latestState().inputLocked, false);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /Submitted Input/);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /Assistant/);
+
+  app?.exit();
+  await runPromise;
+});
+
+test("runInteractiveTui closes /exit, bare exit, and bare quit without projecting a prompt lifecycle", async () => {
+  for (const prompt of ["/exit", "exit", "quit"]) {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+      },
+      cwd: projectRoot,
+    });
+    let app: FakeInteractiveTuiApp | undefined;
+
+    const runPromise = runInteractiveTui(context, {
+      providerLabel: "anthropic",
+      modelLabel: "claude-sonnet-4-20250514",
+      branchLabel: "main",
+      userConfigStore: createReturningUserConfigStore(),
+      createApp: (input) => {
+        app = new FakeInteractiveTuiApp(input);
+        return app;
+      },
+      assistantStep: async () => {
+        assert.fail(`${prompt} should not reach the assistant step`);
+      },
+    });
+
+    await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+    app?.submit(prompt);
+    await runPromise;
+
+    const state = app?.latestState();
+
+    assert.ok(state, "expected latest state to exist");
+    assert.deepEqual(state.timeline.map((item) => item.kind), ["welcome"]);
+    assert.equal(state.inputLocked, false);
+    assert.equal(state.activeRequestLedger, null);
+    assert.equal(app?.closed, true);
+  }
 });
 
 test("runInteractiveTui forwards terminal IO through the app factory input", async () => {
@@ -638,6 +1028,7 @@ test("runInteractiveTui forwards terminal IO through the app factory input", asy
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     terminal,
     createApp: (input) => {
       observedTerminal = input.terminal;
@@ -671,6 +1062,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;
@@ -688,7 +1080,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
 
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.equal(app?.latestState().commandMenu.selectedIndex, 2);
-  assert.equal(app?.latestState().commandMenu.items[2]?.name, "/status");
+  assert.equal(app?.latestState().commandMenu.items[2]?.name, "/clear");
   assert.equal(app?.latestState().selectedTimelineIndex, 0);
 
   app?.setDraft("hello");
@@ -740,6 +1132,58 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
   await runPromise;
 });
 
+test("runInteractiveTui intercepts /inspect locally and invokes pager handoff without touching SessionManager", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  let app: FakeInteractiveTuiApp | undefined;
+  const pagerPaths: string[] = [];
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async () => {
+      assert.fail("/inspect should never reach the assistant step");
+    },
+    executionLogStore: {
+      ensureExecutionLog: async () => "/tmp/exec_exec-1.log",
+      appendChunk: async () => "/tmp/exec_exec-1.log",
+      resolveLogPath: async (executionId) => {
+        return executionId === "exec-1" ? "/tmp/exec_exec-1.log" : null;
+      },
+      flush: async () => {},
+    },
+    openPager: async (logPath) => {
+      pagerPaths.push(logPath);
+    },
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.inspectExecution("exec-1");
+
+  await waitFor(() => pagerPaths.length === 1, "expected /inspect to invoke the pager");
+
+  assert.deepEqual(pagerPaths, ["/tmp/exec_exec-1.log"]);
+  assert.equal(app?.pagerSuspended, 1);
+  assert.equal(app?.pagerResumed, 1);
+  assert.equal(app?.latestState().timeline.length, 1);
+  assert.equal(app?.latestState().timeline[0]?.kind, "welcome");
+
+  app?.exit();
+  await runPromise;
+});
+
 test("runInteractiveTui projects /branch execution output into a real execution timeline item", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -754,6 +1198,7 @@ test("runInteractiveTui projects /branch execution output into a real execution 
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
     branchLabel: "main",
+    userConfigStore: createReturningUserConfigStore(),
     createApp: (input) => {
       app = new FakeInteractiveTuiApp(input);
       return app;

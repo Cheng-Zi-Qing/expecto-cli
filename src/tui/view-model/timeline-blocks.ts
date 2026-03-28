@@ -1,6 +1,12 @@
 import type { MarkdownBlock } from "../block-model/block-types.ts";
 import { createTextToken } from "../block-model/text-tokens.ts";
 import type { TimelineItem, TimelineItemKind } from "../tui-types.ts";
+import { getDefaultThemeId, getThemeDefinition } from "../theme/theme-registry.ts";
+import type {
+  ThemeGlyphRow,
+  ThemeId,
+  ThemeSampleToken,
+} from "../theme/theme-types.ts";
 import { parseMarkdownBlocks } from "./markdown-blocks.ts";
 
 export type BadgeRowBlock = {
@@ -13,7 +19,22 @@ export type TranscriptBlock = {
   lines: string[];
 };
 
-export type TimelineCardBlock = MarkdownBlock | BadgeRowBlock | TranscriptBlock;
+export type ThemeWelcomeBlock = {
+  kind: "theme_welcome";
+  title: string;
+  subtitle: string;
+  glyphRows: ThemeGlyphRow[];
+  tipTitle: string;
+  tipText: string;
+  highlightTitle: string;
+  highlightTokens: ThemeSampleToken[];
+};
+
+export type TimelineCardBlock =
+  | MarkdownBlock
+  | BadgeRowBlock
+  | TranscriptBlock
+  | ThemeWelcomeBlock;
 
 export type TimelineCard = {
   id: string;
@@ -77,6 +98,21 @@ const buildParagraphBlock = (source: string): MarkdownBlock[] => {
   ];
 };
 
+const buildThemeWelcomeBlock = (activeThemeId: ThemeId): ThemeWelcomeBlock => {
+  const theme = getThemeDefinition(activeThemeId);
+
+  return {
+    kind: "theme_welcome",
+    title: theme.welcome.title,
+    subtitle: theme.welcome.subtitle,
+    glyphRows: theme.welcome.glyphRows,
+    tipTitle: theme.sample.tipTitle,
+    tipText: theme.sample.tipText,
+    highlightTitle: theme.sample.highlightTitle,
+    highlightTokens: theme.sample.highlightTokens,
+  };
+};
+
 const buildTranscriptBlock = (body: string): TranscriptBlock => {
   const normalized = body.replaceAll("\r\n", "\n");
   const lines = normalized.split("\n").map((line) => {
@@ -123,12 +159,16 @@ function buildTranscriptLinesFromBuffer(item: TimelineItem): string[] {
   return committedLines;
 }
 
-const buildBlocks = (item: TimelineItem, collapsed: boolean): TimelineCardBlock[] => {
-  if (
-    item.kind === "welcome" ||
-    item.kind === "user" ||
-    item.kind === "system"
-  ) {
+const buildBlocks = (
+  item: TimelineItem,
+  collapsed: boolean,
+  activeThemeId: ThemeId,
+): TimelineCardBlock[] => {
+  if (item.kind === "welcome") {
+    return [buildThemeWelcomeBlock(activeThemeId)];
+  }
+
+  if (item.kind === "user" || item.kind === "system") {
     return buildParagraphBlock(selectCardText(item));
   }
 
@@ -165,6 +205,7 @@ const buildBlocks = (item: TimelineItem, collapsed: boolean): TimelineCardBlock[
 export const buildTimelineCards = (
   timeline: TimelineItem[],
   selectedIndex: number,
+  activeThemeId: ThemeId = getDefaultThemeId(),
 ): TimelineCard[] => {
   return timeline.map((item, index) => {
     const collapsed = item.collapsed ?? false;
@@ -176,7 +217,7 @@ export const buildTimelineCards = (
       headerLabel: getHeaderLabel(item.kind),
       selected: index === selectedIndex,
       collapsed,
-      blocks: buildBlocks(item, collapsed),
+      blocks: buildBlocks(item, collapsed, activeThemeId),
     };
   });
 };

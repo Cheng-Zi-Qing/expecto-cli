@@ -39,6 +39,7 @@ export function createRuntimeSession(
     ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
     ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
     ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
+    ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
     ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
     ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
     ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),

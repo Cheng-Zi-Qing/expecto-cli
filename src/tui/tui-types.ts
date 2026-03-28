@@ -1,11 +1,14 @@
 import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
+import type { CommandId } from "../commands/command-types.ts";
 import type { ForegroundRequestLedger } from "./request-ledger.ts";
 import type { ExecutionTranscriptBuffer } from "./execution-transcript-buffer.ts";
+import type { ThemeId } from "./theme/theme-types.ts";
 
 export type TuiFocus = "composer" | "timeline";
+export type TuiTimelineMode = "scroll" | "select";
 
 export type CommandMenuItem = {
-  id: string;
+  id: CommandId;
   name: `/${string}`;
   aliases: `/${string}`[];
   description: string;
@@ -53,9 +56,19 @@ export type ContextMetrics = {
   docs: number;
 };
 
+export type ThemePickerReason = "first_launch" | "command";
+
+export type ThemePickerState = {
+  reason: ThemePickerReason;
+  selectedThemeId: ThemeId;
+  themeIds: ThemeId[];
+};
+
 export type TuiState = {
   sessionId: string;
+  activeThemeId: ThemeId;
   focus: TuiFocus;
+  timelineMode: TuiTimelineMode;
   inspectorOpen: boolean;
   runtimeState: TuiRuntimeState;
   activeRequestLedger: ForegroundRequestLedger | null;
@@ -69,6 +82,7 @@ export type TuiState = {
   providerLabel: string;
   modelLabel: string;
   contextMetrics: ContextMetrics;
+  themePicker: ThemePickerState | null;
 };
 
 export type CreateInitialTuiStateInput = {
@@ -78,10 +92,12 @@ export type CreateInitialTuiStateInput = {
   providerLabel: string;
   modelLabel: string;
   contextMetrics: ContextMetrics;
+  savedThemeId?: ThemeId | null;
 };
 
 export type TuiAction =
   | { type: "toggle_inspector" }
+  | { type: "toggle_timeline_mode" }
   | { type: "focus_timeline" }
   | { type: "focus_composer" }
   | { type: "move_selection_up" }
@@ -102,4 +118,5 @@ export type TuiAction =
   | { type: "set_draft"; draft: string }
   | { type: "set_input_locked"; locked: boolean }
   | { type: "set_runtime_state"; state: TuiRuntimeState }
-  | { type: "set_context_metrics"; contextMetrics: ContextMetrics };
+  | { type: "set_context_metrics"; contextMetrics: ContextMetrics }
+  | { type: "open_theme_picker"; reason: ThemePickerReason; selectedThemeId?: ThemeId };
