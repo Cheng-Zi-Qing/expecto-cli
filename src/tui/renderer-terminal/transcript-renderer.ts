@@ -532,6 +532,17 @@ function renderCard(
     return [header, ...bodyLines];
   }
 
+  if (card.kind === "assistant") {
+    const header = styleText(
+      padOrTrimToWidth(`${card.headerLabel}:`, width),
+      chromeStyleFor(card, view),
+    );
+    const contentWidth = Math.max(1, width - 2);
+    const bodyLines = renderCardBodyLines(card, contentWidth, view);
+
+    return [header, ...bodyLines.map((line) => renderRailBodyLine(card, line, view))];
+  }
+
   const header = styleText(
     padOrTrimToWidth(`${card.headerLabel}: ${card.summary}`, width),
     chromeStyleFor(card, view),

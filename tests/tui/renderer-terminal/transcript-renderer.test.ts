@@ -149,8 +149,8 @@ test("renderTranscript keeps the selected card visible when the viewport is shor
   const output = renderTranscript(view.transcript, { width: 80, height: 3 });
 
   const plainOutput = stripAnsi(output.join("\n"));
-  assert.match(plainOutput, /First card/);
-  assert.doesNotMatch(plainOutput, /Third card/);
+  assert.match(plainOutput, /first body/);
+  assert.doesNotMatch(plainOutput, /third body/);
 });
 
 test("renderTranscript renders the Hufflepuff welcome using the active theme assets", () => {
@@ -209,8 +209,8 @@ test("renderTranscriptLines returns the full transcript without viewport clippin
   const lines = renderTranscriptLines(view.transcript, 80);
   const output = stripAnsi(lines.join("\n"));
 
-  assert.match(output, /First card/);
-  assert.match(output, /Third card/);
+  assert.match(output, /first body/);
+  assert.match(output, /third body/);
 });
 
 test("diffTranscriptLines reports append-only updates separately from replay-required updates", () => {
@@ -272,6 +272,26 @@ test("renderTranscript keeps submitted input framed while assistant content stay
   assert.match(output, /^│ assistant body line.*$/m);
   assert.doesNotMatch(output, /╭ Assistant:/);
   assert.doesNotMatch(output, /^│ assistant body line.* │$/m);
+});
+
+test("renderTranscript does not repeat assistant body text in the header", () => {
+  const view = buildTuiViewModel(
+    createSampleTuiState({
+      timeline: [
+        {
+          id: "assistant-1",
+          kind: "assistant",
+          summary: "hello there",
+          body: "hello there",
+        },
+      ],
+    }),
+  );
+
+  const output = stripAnsi(renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n"));
+
+  assert.match(output, /^Assistant:\s*$/m);
+  assert.equal((output.match(/hello there/g) ?? []).length, 1);
 });
 
 test("renderTranscript renders system and execution entries as plain transcript lines instead of utility rails", () => {
@@ -359,7 +379,7 @@ test("renderTranscript applies ANSI chrome to submitted input and assistant head
   const output = renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n");
 
   assert.match(output, /\u001b\[[0-9;]*m╭ Submitted Input/);
-  assert.match(output, /\u001b\[[0-9;]*mAssistant: reply/);
+  assert.match(output, /\u001b\[[0-9;]*mAssistant:\s*\u001b\[0m/);
 });
 
 test("renderTranscript highlights semantic token kinds in assistant output", () => {
