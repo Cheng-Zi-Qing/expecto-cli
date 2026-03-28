@@ -17,6 +17,12 @@ function createWriter(calls: string[]) {
     restoreCursor: () => {
       calls.push("cursor:restore");
     },
+    disableLineWrap: () => {
+      calls.push("wrap:disable");
+    },
+    enableLineWrap: () => {
+      calls.push("wrap:enable");
+    },
     moveCursor: () => {},
     clearLine: () => {},
     clearScreen: () => {

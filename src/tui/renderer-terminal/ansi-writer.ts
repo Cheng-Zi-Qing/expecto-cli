@@ -3,6 +3,8 @@ export type AnsiWriter = {
   showCursor: () => void;
   saveCursor: () => void;
   restoreCursor: () => void;
+  disableLineWrap: () => void;
+  enableLineWrap: () => void;
   moveCursor: (column: number, row: number) => void;
   clearLine: () => void;
   clearScreen: () => void;
@@ -23,6 +25,12 @@ export function createAnsiWriter(write: (chunk: string) => void): AnsiWriter {
     },
     restoreCursor: () => {
       write("\u001b8");
+    },
+    disableLineWrap: () => {
+      write("\u001b[?7l");
+    },
+    enableLineWrap: () => {
+      write("\u001b[?7h");
     },
     moveCursor: (column, row) => {
       write(`\u001b[${row};${column}H`);

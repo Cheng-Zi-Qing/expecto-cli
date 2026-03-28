@@ -44,6 +44,12 @@ function createWriterCalls() {
       resetScrollRegion: () => {
         calls.push("region:reset");
       },
+      disableLineWrap: () => {
+        calls.push("wrap:disable");
+      },
+      enableLineWrap: () => {
+        calls.push("wrap:enable");
+      },
     },
   };
 }
@@ -147,6 +153,14 @@ test("screen writer redraws sticky footer using framed composer and status lines
   );
   assert.equal(calls.filter((entry) => entry === "cursor:save").length, 1);
   assert.equal(calls.filter((entry) => entry === "cursor:restore").length, 1);
+  assert.ok(
+    calls.includes("wrap:disable"),
+    "expected sticky footer redraw to disable terminal autowrap",
+  );
+  assert.ok(
+    calls.includes("wrap:enable"),
+    "expected sticky footer redraw to restore terminal autowrap",
+  );
 });
 
 test("screen writer places the composer cursor using terminal cell width for full-width text", () => {
@@ -218,7 +232,9 @@ test("screen writer writes timeline chunks through the scroll region while prese
   assert.deepEqual(calls, [
     "cursor:save",
     "cursor:move:16,1",
+    "wrap:disable",
     `write:${JSON.stringify("alpha\nbeta\n")}`,
+    "wrap:enable",
     "cursor:restore",
   ]);
 });

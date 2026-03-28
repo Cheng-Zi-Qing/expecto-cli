@@ -195,14 +195,18 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
     );
 
     options.writer.saveCursor();
+    options.writer.disableLineWrap();
 
-    for (let index = 0; index < footer.lines.length; index += 1) {
-      options.writer.moveCursor(1, layout.footerTopRow + index);
-      options.writer.clearLine();
-      options.write(footer.lines[index] ?? "");
+    try {
+      for (let index = 0; index < footer.lines.length; index += 1) {
+        options.writer.moveCursor(1, layout.footerTopRow + index);
+        options.writer.clearLine();
+        options.write(footer.lines[index] ?? "");
+      }
+    } finally {
+      options.writer.enableLineWrap();
+      options.writer.restoreCursor();
     }
-
-    options.writer.restoreCursor();
 
     if (composerSnapshot.locked) {
       options.writer.hideCursor();
@@ -273,8 +277,13 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
       ) {
         options.writer.saveCursor();
         options.writer.moveCursor(1, layout.scrollBottom);
-        options.write(text);
-        options.writer.restoreCursor();
+        options.writer.disableLineWrap();
+        try {
+          options.write(text);
+        } finally {
+          options.writer.enableLineWrap();
+          options.writer.restoreCursor();
+        }
         return;
       }
 
@@ -290,13 +299,18 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
         layout !== null
       ) {
         options.writer.saveCursor();
-        for (let row = 1; row <= layout.scrollBottom; row += 1) {
-          options.writer.moveCursor(1, row);
-          options.writer.clearLine();
+        options.writer.disableLineWrap();
+        try {
+          for (let row = 1; row <= layout.scrollBottom; row += 1) {
+            options.writer.moveCursor(1, row);
+            options.writer.clearLine();
+          }
+          options.writer.moveCursor(1, 1);
+          options.write(text);
+        } finally {
+          options.writer.enableLineWrap();
+          options.writer.restoreCursor();
         }
-        options.writer.moveCursor(1, 1);
-        options.write(text);
-        options.writer.restoreCursor();
         return;
       }
 

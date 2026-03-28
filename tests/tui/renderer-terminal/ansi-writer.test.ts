@@ -35,3 +35,13 @@ test("createAnsiWriter emits save and restore cursor sequences", () => {
 
   assert.deepEqual(writes, ["\u001b7", "\u001b8"]);
 });
+
+test("createAnsiWriter emits autowrap control sequences", () => {
+  const writes: string[] = [];
+  const writer = createAnsiWriter((chunk) => writes.push(chunk));
+
+  writer.disableLineWrap();
+  writer.enableLineWrap();
+
+  assert.deepEqual(writes, ["\u001b[?7l", "\u001b[?7h"]);
+});
