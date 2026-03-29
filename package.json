@@ -14,6 +14,8 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "dev": "node --experimental-strip-types src/cli/entry.ts",
+    "dev:init": "BETA_FORCE_THEME_PICKER=1 node --experimental-strip-types src/cli/entry.ts",
+    "dev:watch:init": "BETA_FORCE_THEME_PICKER=1 node --watch-path=src --watch-path=package.json --watch-path=tsconfig.json --experimental-strip-types src/cli/entry.ts",
     "install:local": "bash ./scripts/install-local-beta.sh",
     "test": "node --experimental-strip-types --test $(find tests -name '*.test.ts' -print)"
   },

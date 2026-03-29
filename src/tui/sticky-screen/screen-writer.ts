@@ -7,8 +7,10 @@ export type ComposerSnapshot = {
   text: string;
   cursorOffset: number;
   locked: boolean;
+  hidden: boolean;
   placeholder: string;
   statusLabel: string;
+  theme?: TuiFooterView["theme"];
   themePicker?: TuiFooterView["themePicker"];
 };
 
@@ -49,6 +51,7 @@ export type ScreenWriter = {
   exitStickyMode: () => void;
   writeTimelineChunk: (text: string) => void;
   replaceTimeline: (text: string) => void;
+  replaceFixedTimeline: (lines: string[], previousLines?: string[]) => void;
   setActiveStatus: (snapshot: ActiveStatusSnapshot) => void;
   clearActiveStatus: () => void;
   renderComposer: (snapshot: ComposerSnapshot) => void;
@@ -150,6 +153,7 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
     text: "",
     cursorOffset: 0,
     locked: false,
+    hidden: false,
     placeholder: "",
     statusLabel: "Done",
   };
@@ -179,6 +183,7 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
       composerSnapshot.text.length > 0 ? composerSnapshot.text : composerSnapshot.placeholder;
     const footer = renderFooter(
       {
+        ...(composerSnapshot.theme ? { theme: composerSnapshot.theme } : {}),
         composer: {
           value: composerValue,
           locked: composerSnapshot.locked,
@@ -197,18 +202,28 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
     options.writer.saveCursor();
     options.writer.disableLineWrap();
 
+    let footerHidden = false;
+
     try {
-      for (let index = 0; index < footer.lines.length; index += 1) {
-        options.writer.moveCursor(1, layout.footerTopRow + index);
-        options.writer.clearLine();
-        options.write(footer.lines[index] ?? "");
+      if (composerSnapshot.hidden) {
+        footerHidden = true;
+        for (let row = layout.footerTopRow; row <= layout.rows; row += 1) {
+          options.writer.moveCursor(1, row);
+          options.writer.clearLine();
+        }
+      } else {
+        for (let index = 0; index < footer.lines.length; index += 1) {
+          options.writer.moveCursor(1, layout.footerTopRow + index);
+          options.writer.clearLine();
+          options.write(footer.lines[index] ?? "");
+        }
       }
     } finally {
       options.writer.enableLineWrap();
       options.writer.restoreCursor();
     }
 
-    if (composerSnapshot.locked) {
+    if (footerHidden || composerSnapshot.locked) {
       options.writer.hideCursor();
       return;
     }
@@ -315,6 +330,49 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
       }
 
       options.write(text);
+    },
+    replaceFixedTimeline: (lines: string[], previousLines: string[] = []) => {
+      const { isDegradedMode, layout } = resolveLayout();
+
+      if (
+        stickyActive &&
+        !pagerSuspended &&
+        !isDegradedMode &&
+        layout !== null
+      ) {
+        options.writer.resetScrollRegion();
+        options.writer.saveCursor();
+        options.writer.disableLineWrap();
+        try {
+          const maxRows = Math.min(
+            layout.scrollBottom,
+            Math.max(lines.length, previousLines.length),
+          );
+
+          for (let row = 1; row <= maxRows; row += 1) {
+            const nextLine = lines[row - 1] ?? null;
+            const previousLine = previousLines[row - 1] ?? null;
+
+            if (nextLine === previousLine) {
+              continue;
+            }
+
+            options.writer.moveCursor(1, row);
+            options.writer.clearLine();
+
+            if (nextLine !== null) {
+              options.write(nextLine);
+            }
+          }
+        } finally {
+          options.writer.enableLineWrap();
+          options.writer.restoreCursor();
+          options.writer.setScrollRegion(1, layout.scrollBottom);
+        }
+        return;
+      }
+
+      options.write(lines.join("\n"));
     },
     setActiveStatus: (snapshot) => {
       activeStatusSnapshot = snapshot;

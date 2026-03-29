@@ -55,6 +55,10 @@ export type TuiTranscriptView = {
 };
 
 export type TuiFooterView = {
+  theme?: {
+    id: ThemeId;
+    palette: ThemePalette;
+  };
   composer: {
     value: string;
     locked: boolean;

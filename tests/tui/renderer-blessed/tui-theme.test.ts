@@ -23,7 +23,7 @@ test("renderer palette keeps text readable while differentiating panel chrome", 
   assert.equal(palette.timeline.body, "#3A3128");
   assert.equal(palette.timeline.hint, "#3A3128");
   assert.equal(palette.timeline.guide, "#7A746C");
-  assert.equal(palette.timeline.executionGuide, "#B8892C");
+  assert.equal(palette.timeline.executionGuide, "#A98022");
   assert.equal(palette.timeline.bg, "#F8FAFC");
   assert.equal(palette.timeline.card.user.border, "#D6A93D");
   assert.equal(palette.timeline.card.execution.transcriptBg, "#F3F4F6");

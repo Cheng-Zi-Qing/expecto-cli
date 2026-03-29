@@ -1,5 +1,6 @@
 import type { MarkdownBlock } from "../block-model/block-types.ts";
 import type { TextToken } from "../block-model/text-tokens.ts";
+import { getThemeDefinition } from "../theme/theme-registry.ts";
 import type {
   TuiTranscriptBlock,
   TuiTranscriptContentBlock,
@@ -122,9 +123,13 @@ function chromeStyleFor(card: TuiTranscriptBlock, view: TuiTranscriptView): Ansi
         fg: hexToRgb(view.theme.palette.chrome.assistant),
         bold: true,
       };
+    case "execution":
+      return {
+        fg: hexToRgb(view.theme.palette.chrome.execution),
+        bold: true,
+      };
     case "welcome":
     case "system":
-    case "execution":
       return {
         fg: hexToRgb(view.theme.palette.chrome.utility),
         bold: true,
@@ -173,6 +178,25 @@ function renderStyledTokens(tokens: TextToken[], view: TuiTranscriptView): strin
     const style = tokenStyleFor(token, view);
     return style ? styleText(token.text, style) : token.text;
   }).join("");
+}
+
+function renderThemePickerHouseLabel(
+  entry: TuiThemePickerOverlayView["entries"][number],
+  compactLabels: boolean,
+): string {
+  const theme = getThemeDefinition(entry.id);
+  const accentStyle: AnsiStyle = {
+    fg: hexToRgb(theme.palette.chrome.user),
+    ...(entry.selected ? { bold: true } : {}),
+  };
+  const coloredName = styleText(entry.displayName, accentStyle);
+
+  if (compactLabels) {
+    return coloredName;
+  }
+
+  const plannedLabel = entry.availability === "planned" ? " · planned" : "";
+  return `${coloredName} · ${entry.animal} · ${entry.paletteLabel}${plannedLabel}`;
 }
 
 function splitTokenLines(tokens: TextToken[]): TextToken[][] {
@@ -460,6 +484,100 @@ function renderFramedBodyLine(content: string, width: number): string {
   return `│ ${padOrTrimToWidth(content, contentWidth)} │`;
 }
 
+function renderStyledFrameLine(
+  width: number,
+  leftCorner: string,
+  rightCorner: string,
+  label: string,
+  borderStyle: AnsiStyle,
+  innerStyle: AnsiStyle,
+): string {
+  if (width <= 0) {
+    return "";
+  }
+
+  if (width === 1) {
+    return styleText(leftCorner, borderStyle);
+  }
+
+  const innerWidth = Math.max(0, width - 2);
+  const visibleLabel = label.slice(0, innerWidth);
+  const fillerWidth = Math.max(0, innerWidth - visibleLabel.length);
+  const inner = `${visibleLabel}${"─".repeat(fillerWidth)}`;
+
+  return `${styleText(leftCorner, borderStyle)}${styleText(inner, innerStyle)}${styleText(rightCorner, borderStyle)}`;
+}
+
+function renderFilledBodyLine(
+  content: string,
+  width: number,
+  borderStyle: AnsiStyle,
+  contentStyle: AnsiStyle,
+): string {
+  if (width < FRAME_SIDE_WIDTH) {
+    return styleText(padOrTrimToWidth(content, width), contentStyle);
+  }
+
+  const contentWidth = Math.max(1, width - FRAME_SIDE_WIDTH);
+  const paddedContent = padOrTrimToWidth(content, contentWidth);
+
+  return `${styleText("│ ", borderStyle)}${styleText(paddedContent, contentStyle)}${styleText(" │", borderStyle)}`;
+}
+
+function stripAnsiCodes(value: string): string {
+  return value.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function renderPrestyledBodyLine(
+  content: string,
+  width: number,
+  borderStyle: AnsiStyle,
+): string {
+  if (width < FRAME_SIDE_WIDTH) {
+    return content;
+  }
+
+  const contentWidth = Math.max(1, width - FRAME_SIDE_WIDTH);
+  const visibleWidth = textDisplayWidth(stripAnsiCodes(content));
+  const paddingWidth = Math.max(0, contentWidth - visibleWidth);
+
+  return `${styleText("│ ", borderStyle)}${content}${" ".repeat(paddingWidth)}${styleText(" │", borderStyle)}`;
+}
+
+function renderOverlayPanel(
+  lines: string[],
+  width: number,
+  borderStyle: AnsiStyle,
+  label = "",
+): string[] {
+  if (width <= 0) {
+    return [];
+  }
+
+  return [
+    renderStyledFrameLine(width, "╭", "╮", label, borderStyle, borderStyle),
+    ...lines.map((line) => renderPrestyledBodyLine(line, width, borderStyle)),
+    renderStyledFrameLine(width, "╰", "╯", "", borderStyle, borderStyle),
+  ];
+}
+
+function padStyledContent(content: string, width: number): string {
+  const visibleWidth = textDisplayWidth(stripAnsiCodes(content));
+  return `${content}${" ".repeat(Math.max(0, width - visibleWidth))}`;
+}
+
+function buildThemePickerGuidanceLine(overlay: TuiThemePickerOverlayView): string {
+  const selectedEntry = overlay.entries.find((entry) => entry.selected) ?? null;
+  const applyLabel = selectedEntry?.availability === "planned"
+    ? "Preview only · not yet available"
+    : "Enter apply";
+  const availabilityLabel = overlay.reason === "first_launch"
+    ? "Required before entering"
+    : "Press /theme any time";
+
+  return `${applyLabel} · ${availabilityLabel}`;
+}
+
 function renderRailBodyLine(
   card: TuiTranscriptBlock,
   content: string,
@@ -492,6 +610,13 @@ function renderCardBodyLines(
   return lines;
 }
 
+function executionBodyStyleFor(view: TuiTranscriptView): AnsiStyle {
+  return {
+    fg: hexToRgb(view.theme.palette.text.muted),
+    dim: true,
+  };
+}
+
 function renderCard(
   card: TuiTranscriptBlock,
   width: number,
@@ -504,11 +629,22 @@ function renderCard(
   if (card.kind === "user") {
     const contentWidth = width < FRAME_SIDE_WIDTH ? width : Math.max(1, width - FRAME_SIDE_WIDTH);
     const bodyLines = renderCardBodyLines(card, contentWidth, view);
+    const borderStyle = chromeStyleFor(card, view);
+    const emphasisBackground = hexToRgb(view.theme.palette.surface.emphasisBg);
+    const frameInnerStyle: AnsiStyle = {
+      fg: hexToRgb(view.theme.palette.chrome.user),
+      bg: emphasisBackground,
+      bold: true,
+    };
+    const contentStyle: AnsiStyle = {
+      fg: hexToRgb(view.theme.palette.text.body),
+      bg: emphasisBackground,
+    };
 
     return [
-      styleText(renderLabeledFrameLine(width, "╭", "╮", ` ${USER_HEADER_LABEL} `), chromeStyleFor(card, view)),
-      ...bodyLines.map((line) => styleText(renderFramedBodyLine(line, width), chromeStyleFor(card, view))),
-      styleText(renderLabeledFrameLine(width, "╰", "╯", ""), chromeStyleFor(card, view)),
+      renderStyledFrameLine(width, "╭", "╮", ` ${USER_HEADER_LABEL} `, borderStyle, frameInnerStyle),
+      ...bodyLines.map((line) => renderFilledBodyLine(line, width, borderStyle, contentStyle)),
+      renderStyledFrameLine(width, "╰", "╯", "", borderStyle, frameInnerStyle),
     ];
   }
 
@@ -529,7 +665,7 @@ function renderCard(
     );
     const bodyLines = renderCardBodyLines(card, width, view);
 
-    return [header, ...bodyLines];
+    return [header, ...bodyLines.map((line) => styleText(line, executionBodyStyleFor(view)))];
   }
 
   if (card.kind === "assistant") {
@@ -644,67 +780,107 @@ export function renderThemePickerOverlay(
   width: number,
 ): string[] {
   const normalizedWidth = Number.isFinite(width) && width > 0 ? Math.floor(width) : 1;
+  const stackedLayout = normalizedWidth < 96;
   const compactLabels = normalizedWidth <= 96;
-  const leftWidth = compactLabels
-    ? Math.max(14, Math.min(18, Math.floor(normalizedWidth * 0.22)))
-    : Math.max(24, Math.min(36, Math.floor(normalizedWidth * 0.38)));
+  const outerBorderStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.chrome.execution),
+    bold: true,
+  };
+  const dividerStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.chrome.execution),
+    dim: true,
+  };
+  const guidanceStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.chrome.utility),
+  };
+  const bodyWidth = normalizedWidth < FRAME_SIDE_WIDTH ? normalizedWidth : Math.max(1, normalizedWidth - FRAME_SIDE_WIDTH);
   const separator = "  ";
-  const rightWidth = Math.max(20, normalizedWidth - leftWidth - separator.length);
-  const leftLines = overlay.entries.map((entry) => {
-    const plannedLabel = entry.availability === "planned" && !compactLabels ? " · planned" : "";
-    const labelText = compactLabels
-      ? entry.displayName
-      : `${entry.displayName} · ${entry.animal} · ${entry.paletteLabel}${plannedLabel}`;
-    const label = padOrTrimToWidth(
-      labelText,
-      Math.max(1, leftWidth - 2),
-    );
-    const marker = entry.selected
-      ? styleText(">", {
-          fg: hexToRgb(overlay.sampleTheme.palette.chrome.selection),
-          bold: true,
-        })
-      : " ";
+  const houseLines = overlay.entries.map((entry) => {
+      const entryTheme = getThemeDefinition(entry.id);
+      const label = renderThemePickerHouseLabel(entry, compactLabels);
+      const marker = entry.selected
+        ? styleText(">", {
+            fg: hexToRgb(entryTheme.palette.chrome.user),
+            bold: true,
+          })
+        : " ";
 
-    if (!entry.selected) {
       return `${marker} ${label}`;
-    }
+    });
+  const guidanceLine = styleText(buildThemePickerGuidanceLine(overlay), guidanceStyle);
+  const dividerLine = styleText("─".repeat(bodyWidth), dividerStyle);
+  let bodyLines: string[];
 
-    return `${marker} ${styleText(label, {
-      fg: hexToRgb(overlay.sampleTheme.palette.text.selected),
-      bold: true,
-    })}`;
-  });
-  const rightLines = renderThemeWelcomeBlock(
-    {
-      kind: "theme_welcome",
-      title: overlay.sampleTheme.welcome.title,
-      subtitle: overlay.sampleTheme.welcome.subtitle,
-      glyphRows: overlay.sampleTheme.welcome.glyphRows,
-      tipTitle: overlay.sampleTheme.sample.tipTitle,
-      tipText: overlay.sampleTheme.sample.tipText,
-      highlightTitle: overlay.sampleTheme.sample.highlightTitle,
-      highlightTokens: overlay.sampleTheme.sample.highlightTokens,
-    },
-    rightWidth,
-    {
-      theme: {
-        id: overlay.sampleTheme.id,
-        palette: overlay.sampleTheme.palette,
+  if (stackedLayout) {
+    const welcomeLines = renderThemeWelcomeBlock(
+      {
+        kind: "theme_welcome",
+        title: overlay.sampleTheme.welcome.title,
+        subtitle: overlay.sampleTheme.welcome.subtitle,
+        glyphRows: overlay.sampleTheme.welcome.glyphRows,
+        tipTitle: overlay.sampleTheme.sample.tipTitle,
+        tipText: overlay.sampleTheme.sample.tipText,
+        highlightTitle: overlay.sampleTheme.sample.highlightTitle,
+        highlightTokens: overlay.sampleTheme.sample.highlightTokens,
       },
-      blocks: [],
-    },
-    {
-      centerGlyph: compactLabels,
-    },
-  );
+      bodyWidth,
+      {
+        theme: {
+          id: overlay.sampleTheme.id,
+          palette: overlay.sampleTheme.palette,
+        },
+        blocks: [],
+      },
+      {
+        centerGlyph: false,
+      },
+    );
 
-  const lineCount = Math.max(leftLines.length, rightLines.length);
+    bodyLines = [
+      ...houseLines,
+      "",
+      ...welcomeLines,
+      "",
+      dividerLine,
+      guidanceLine,
+    ];
+  } else {
+    const leftColumnWidth = compactLabels
+      ? 18
+      : Math.max(24, Math.min(32, Math.floor(bodyWidth * 0.28)));
+    const rightColumnWidth = Math.max(20, bodyWidth - leftColumnWidth - separator.length);
+    const welcomeLines = renderThemeWelcomeBlock(
+      {
+        kind: "theme_welcome",
+        title: overlay.sampleTheme.welcome.title,
+        subtitle: overlay.sampleTheme.welcome.subtitle,
+        glyphRows: overlay.sampleTheme.welcome.glyphRows,
+        tipTitle: overlay.sampleTheme.sample.tipTitle,
+        tipText: overlay.sampleTheme.sample.tipText,
+        highlightTitle: overlay.sampleTheme.sample.highlightTitle,
+        highlightTokens: overlay.sampleTheme.sample.highlightTokens,
+      },
+      rightColumnWidth,
+      {
+        theme: {
+          id: overlay.sampleTheme.id,
+          palette: overlay.sampleTheme.palette,
+        },
+        blocks: [],
+      },
+      {
+        centerGlyph: compactLabels,
+      },
+    );
+    const upperLineCount = Math.max(houseLines.length, welcomeLines.length);
+    bodyLines = Array.from({ length: upperLineCount }, (_value, index) => {
+      const left = padStyledContent(houseLines[index] ?? "", leftColumnWidth);
+      const right = padStyledContent(welcomeLines[index] ?? "", rightColumnWidth);
 
-  return Array.from({ length: lineCount }, (_value, index) => {
-    const left = leftLines[index] ?? " ".repeat(leftWidth);
-    const right = rightLines[index] ?? "";
+      return `${left}${separator}${right}`.trimEnd();
+    });
+    bodyLines.push("", dividerLine, guidanceLine);
+  }
 
-    return `${left}${separator}${right}`.trimEnd();
-  });
+  return renderOverlayPanel(bodyLines, normalizedWidth, outerBorderStyle, " Sorting Hat ");
 }

@@ -29,10 +29,14 @@ function createPlannedTheme(
       },
       chrome: {
         user: accent,
-        assistant: "#64748B",
+        assistant: "#8A928F",
         utility: accent,
+        execution: "#756C60",
         footer: accent,
         selection: "#F6E8B3",
+      },
+      surface: {
+        emphasisBg: "#F3EAD0",
       },
       token: {
         command: accent,

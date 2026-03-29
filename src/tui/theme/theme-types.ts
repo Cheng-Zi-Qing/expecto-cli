@@ -60,8 +60,12 @@ export type ThemePalette = {
     user: string;
     assistant: string;
     utility: string;
+    execution: string;
     footer: string;
     selection: string;
+  };
+  surface: {
+    emphasisBg: string;
   };
   token: {
     command: string;

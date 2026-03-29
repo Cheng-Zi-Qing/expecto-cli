@@ -29,6 +29,8 @@ test("runCli defaults to the sticky terminal renderer for fullscreen TTY session
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRenderer = "";
+  const shutdownController = new AbortController();
+  let observedShutdownSignal: AbortSignal | undefined;
 
   await runCli(["--tui"], {
     cwd: projectRoot,
@@ -36,12 +38,15 @@ test("runCli defaults to the sticky terminal renderer for fullscreen TTY session
     homeDir,
     stdinIsTTY: true,
     stdoutIsTTY: true,
+    shutdownSignal: shutdownController.signal,
     runInteractiveTui: async (input) => {
       observedRenderer = input.tuiRenderer;
+      observedShutdownSignal = input.shutdownSignal;
     },
   });
 
   assert.equal(observedRenderer, "terminal");
+  assert.equal(observedShutdownSignal, shutdownController.signal);
 });
 
 test("BETA_TUI_RENDERER=terminal stays warning-only after the terminal renderer becomes default", async () => {

@@ -29,6 +29,7 @@ export type InteractiveTuiRunnerInput = {
   branchLabel: string;
   tuiRenderer: TuiRenderer;
   providerRunner?: ProviderRunner;
+  shutdownSignal?: AbortSignal;
 };
 
 export type InteractiveTuiRunner = (
@@ -50,6 +51,7 @@ export type RunCliOptions = {
   stdinStream?: Readable;
   runInteractiveTui?: InteractiveTuiRunner;
   runNativeSession?: (input: RunNativeSessionInput) => Promise<void>;
+  shutdownSignal?: AbortSignal;
 };
 
 const PROVIDER_ENV_KEYS = [
@@ -195,6 +197,7 @@ async function runDefaultInteractiveTui(
     providerLabel: input.providerLabel,
     modelLabel: input.modelLabel,
     branchLabel: input.branchLabel,
+    ...(input.shutdownSignal ? { shutdownSignal: input.shutdownSignal } : {}),
     ...(input.providerRunner ? { providerRunner: input.providerRunner } : {}),
   });
 }
@@ -327,6 +330,7 @@ async function runCliCommand(
       modelLabel,
       branchLabel,
       tuiRenderer: "terminal",
+      ...(options.shutdownSignal ? { shutdownSignal: options.shutdownSignal } : {}),
       ...(providerRunner ? { providerRunner } : {}),
     });
     return;
@@ -370,12 +374,33 @@ export function isDirectExecution(
   }
 }
 
+function installProcessShutdownHandlers(controller: AbortController): () => void {
+  const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+  const listeners = signals.map((signal) => {
+    const listener = (): void => {
+      controller.abort();
+    };
+    process.on(signal, listener);
+    return { signal, listener };
+  });
+
+  return () => {
+    for (const { signal, listener } of listeners) {
+      process.off(signal, listener);
+    }
+  };
+}
+
 async function main(): Promise<void> {
+  const shutdownController = new AbortController();
+  const removeShutdownHandlers = installProcessShutdownHandlers(shutdownController);
+
   try {
     const parsed = parseCliArgs(process.argv.slice(2));
     await runCliCommand(parsed, {
       stdinIsTTY: Boolean(process.stdin.isTTY),
       stdoutIsTTY: Boolean(process.stdout.isTTY),
+      shutdownSignal: shutdownController.signal,
     });
   } catch (error) {
     if (
@@ -390,6 +415,8 @@ async function main(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     process.exitCode = 1;
+  } finally {
+    removeShutdownHandlers();
   }
 }
 

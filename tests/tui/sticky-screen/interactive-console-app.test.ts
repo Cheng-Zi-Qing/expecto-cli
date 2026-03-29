@@ -25,6 +25,7 @@ type FakeScreenWriter = ScreenWriter & {
   calls: string[];
   timelineChunks: string[];
   timelineReplacements: string[];
+  fixedTimelineReplacements: string[];
 };
 
 type FakeTerminalSession = TerminalSession & {
@@ -61,11 +62,13 @@ function createFakeScreenWriter(): FakeScreenWriter {
   const calls: string[] = [];
   const timelineChunks: string[] = [];
   const timelineReplacements: string[] = [];
+  const fixedTimelineReplacements: string[] = [];
 
   return {
     calls,
     timelineChunks,
     timelineReplacements,
+    fixedTimelineReplacements,
     enterStickyMode: () => {
       calls.push("enter");
     },
@@ -79,6 +82,10 @@ function createFakeScreenWriter(): FakeScreenWriter {
     replaceTimeline: (text: string) => {
       calls.push(`timeline:replace:${JSON.stringify(text)}`);
       timelineReplacements.push(text);
+    },
+    replaceFixedTimeline: (lines: string[], _previousLines?: string[]) => {
+      calls.push(`timeline:replace-fixed:${JSON.stringify(lines)}`);
+      fixedTimelineReplacements.push(lines.join("\n"));
     },
     setActiveStatus: (snapshot) => {
       calls.push(`status:${snapshot?.text ?? ""}`);
@@ -116,6 +123,10 @@ function createFakeTerminalSession(): FakeTerminalSession {
       calls.push("exit");
     },
   };
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, "");
 }
 
 function createState(overrides: Partial<TuiState> = {}): TuiState {
@@ -203,7 +214,10 @@ test("interactive console app appends transcript into scrollback and keeps compo
   await app.start();
 
   assert.deepEqual(terminalSession.calls, ["enter"]);
-  assert.equal(screenWriter.calls[0], "enter");
+  assert.ok(
+    screenWriter.calls.includes("enter"),
+    "expected sticky mode to be entered after priming the initial footer snapshot",
+  );
   assert.ok(
     screenWriter.calls.includes("status:clear"),
     "expected an idle state to clear the transient active status",
@@ -536,6 +550,7 @@ test("interactive console app routes picker navigation keys locally while theme 
   const initialOverlayOutput = [
     ...screenWriter.timelineChunks,
     ...screenWriter.timelineReplacements,
+    ...screenWriter.fixedTimelineReplacements,
   ].join("");
 
   assert.match(initialOverlayOutput, /Hufflepuff/);
@@ -563,8 +578,8 @@ test("interactive console app routes picker navigation keys locally while theme 
     },
   }));
 
-  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /Gryffindor/);
-  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /preview/i);
+  assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /Gryffindor/);
+  assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /preview/i);
 
   await app.close();
 });
@@ -620,7 +635,7 @@ test("interactive console app restores the prior transcript after closing the th
     },
   }));
 
-  assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /Hufflepuff/);
+  assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /Hufflepuff/);
 
   app.update(createState({
     timeline,
@@ -629,6 +644,86 @@ test("interactive console app restores the prior transcript after closing the th
 
   assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /hello/);
   assert.match(screenWriter.timelineReplacements.at(-1) ?? "", /assistant: hi/);
+
+  await app.close();
+});
+
+test("interactive console app keeps the theme picker as a single overlay without a separate footer frame", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout();
+  const terminalSession = createFakeTerminalSession();
+
+  const app = createInteractiveConsoleApp(
+    {
+      initialState: createState({
+        themePicker: {
+          reason: "first_launch",
+          selectedThemeId: "hufflepuff",
+          themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+        },
+      }),
+      handlers: createHandlers(),
+      terminal: { stdin, stdout },
+    },
+    {
+      terminalSession,
+    },
+  );
+
+  await app.start();
+
+  const output = stripAnsi(stdout.writes.join(""));
+
+  assert.match(output, /Sorting Hat/);
+  assert.doesNotMatch(output, /╭ Composer/);
+  assert.doesNotMatch(output, /Theme Picker/);
+
+  await app.close();
+});
+
+test("interactive console app replaces the theme picker overlay without a trailing newline scroll tick", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout();
+  const screenWriter = createFakeScreenWriter();
+  const terminalSession = createFakeTerminalSession();
+
+  const app = createInteractiveConsoleApp(
+    {
+      initialState: createState({
+        themePicker: {
+          reason: "first_launch",
+          selectedThemeId: "hufflepuff",
+          themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+        },
+      }),
+      handlers: createHandlers(),
+      terminal: { stdin, stdout },
+    },
+    {
+      screenWriter,
+      terminalSession,
+    },
+  );
+
+  await app.start();
+
+  assert.ok(
+    !(screenWriter.fixedTimelineReplacements.at(-1) ?? "").endsWith("\n"),
+    "expected overlay repaint payloads to avoid a trailing newline that would scroll the sticky region",
+  );
+
+  app.update(createState({
+    themePicker: {
+      reason: "first_launch",
+      selectedThemeId: "slytherin",
+      themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+    },
+  }));
+
+  assert.ok(
+    !(screenWriter.fixedTimelineReplacements.at(-1) ?? "").endsWith("\n"),
+    "expected subsequent overlay replacements to avoid trailing newline scroll ticks",
+  );
 
   await app.close();
 });

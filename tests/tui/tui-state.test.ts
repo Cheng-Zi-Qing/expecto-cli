@@ -57,6 +57,31 @@ test("createInitialTuiState opens the theme picker when no saved theme exists", 
   });
 });
 
+test("createInitialTuiState can force the first-launch picker for local testing", () => {
+  const state = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: "hufflepuff",
+    forceThemePicker: true,
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  assert.equal(state.activeThemeId, "hufflepuff");
+  assert.deepEqual(state.themePicker, {
+    reason: "first_launch",
+    selectedThemeId: "hufflepuff",
+    themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+  });
+});
+
 test("reduceTuiState applies the selected theme and closes the picker", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",

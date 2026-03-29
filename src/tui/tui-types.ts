@@ -93,6 +93,7 @@ export type CreateInitialTuiStateInput = {
   modelLabel: string;
   contextMetrics: ContextMetrics;
   savedThemeId?: ThemeId | null;
+  forceThemePicker?: boolean;
 };
 
 export type TuiAction =

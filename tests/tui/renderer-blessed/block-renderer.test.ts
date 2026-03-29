@@ -141,7 +141,7 @@ test("assistant cards render markdown paragraph, list, quote, and code blocks fr
   assert.match(markup, /quoted line/);
   assert.match(markup, /ts/);
   assert.match(markup, /const status = 'ok';/);
-  assert.match(markup, /#B8892C-fg/);
+  assert.match(markup, /#A98022-fg/);
 });
 
 test("execution cards keep collapsed hints compact and render expanded transcripts with separate styling", () => {
@@ -180,7 +180,7 @@ test("execution cards keep collapsed hints compact and render expanded transcrip
   assert.match(expanded, /Enter collapse/);
   assert.match(expanded, /rg --files src/);
   assert.match(expanded, /sed -n '1,40p' src\/main\.ts/);
-  assert.match(expanded, /#B8892C-fg/);
+  assert.match(expanded, /#A98022-fg/);
   assert.match(expanded, /#F3F4F6-bg/);
 });
 
@@ -275,7 +275,10 @@ test("welcome cards render the themed mascot block instead of the legacy placeho
 
   assert.match(markup, /Welcome back!/);
   assert.match(markup, /Hufflepuff Badger is standing by/);
+  assert.match(markup, /▗▛██▖ ▗██▜▖/);
+  assert.match(markup, /▐██▙▜█ █▛▟██▌/);
   assert.match(markup, /▐██▛◦█ █◦▜██▌/);
+  assert.match(markup, /▝▜██▇▇██▛▘/);
   assert.match(markup, /Highlight sample/);
   assert.doesNotMatch(markup, /Enter send/);
 });

@@ -395,3 +395,74 @@ test("createTerminalTuiApp exits on a second idle Ctrl+C", async () => {
 
   await app.close();
 });
+
+test("createTerminalTuiApp replays the current transcript when terminal width changes", async () => {
+  const stdin = createFakeStdin();
+  const stdout = createFakeStdout(20, 12);
+  let nextTimerId = 1;
+  const timers = new Map<number, () => void>();
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+
+  globalThis.setTimeout = ((callback: (...args: unknown[]) => void) => {
+    const timerId = nextTimerId;
+    nextTimerId += 1;
+    timers.set(timerId, () => callback());
+    return timerId as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    timers.delete(handle as unknown as number);
+  }) as typeof clearTimeout;
+
+  try {
+    const app = createTerminalTuiApp({
+      initialState: createState({
+        timeline: [
+          {
+            id: "assistant-1",
+            kind: "assistant",
+            summary: "wrap test",
+            body: "abcdefghijklmno",
+            collapsed: false,
+          },
+        ],
+      }),
+      handlers: {
+        onDraftChange() {},
+        onSubmit() {},
+        onInterrupt() {},
+        onToggleInspector() {},
+        onToggleTimelineMode() {},
+        onFocusTimeline() {},
+        onFocusComposer() {},
+        onMoveSelectionUp() {},
+        onMoveSelectionDown() {},
+        onToggleSelectedItem() {},
+        onInspectExecution() {},
+        onExit() {},
+      },
+      terminal: {
+        stdin,
+        stdout,
+      },
+    });
+
+    await app.start();
+    stdout.writes.length = 0;
+
+    stdout.columns = 12;
+    stdout.emit("resize");
+
+    const [timerCallback] = timers.values();
+    assert.ok(timerCallback, "expected a debounced resize callback");
+    timerCallback();
+
+    const output = stripAnsi(stdout.writes.join(""));
+    assert.match(output, /klmno/);
+
+    await app.close();
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
+});

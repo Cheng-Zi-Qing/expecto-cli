@@ -15,10 +15,14 @@ export const hufflepuffTheme: ThemeDefinition = {
     },
     chrome: {
       user: "#D6A93D",
-      assistant: "#64748B",
-      utility: "#B8892C",
+      assistant: "#8A928F",
+      utility: "#A98022",
+      execution: "#756C60",
       footer: "#D6A93D",
       selection: "#F2D16B",
+    },
+    surface: {
+      emphasisBg: "#F3EAD0",
     },
     token: {
       command: "#D6A93D",
@@ -29,10 +33,10 @@ export const hufflepuffTheme: ThemeDefinition = {
       inlineCodeBg: "#2C2620",
     },
     glyph: {
-      mist_light: "#D8D1C8",
-      mist_mid: "#A8A198",
-      mist_dark: "#726B63",
-      shadow: "#2A2724",
+      mist_light: "#E4DFD8",
+      mist_mid: "#C4BCB3",
+      mist_dark: "#9F968D",
+      shadow: "#635D57",
       chin: "#D6A93D",
       highlight: "#F2D16B",
       mystic: "#7AA9D9",

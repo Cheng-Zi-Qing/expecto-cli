@@ -174,7 +174,10 @@ test("renderTranscript renders the Hufflepuff welcome using the active theme ass
 
   assert.match(plainOutput, /Welcome back!/);
   assert.match(plainOutput, /Hufflepuff Badger is standing by/);
+  assert.match(plainOutput, /▗▛██▖ ▗██▜▖/);
+  assert.match(plainOutput, /▐██▙▜█ █▛▟██▌/);
   assert.match(plainOutput, /▐██▛◦█ █◦▜██▌/);
+  assert.match(plainOutput, /▝▜██▇▇██▛▘/);
   assert.match(plainOutput, /Highlight sample/);
   assert.match(plainOutput, /\/theme/);
   assert.doesNotMatch(plainOutput, /Enter send/);
@@ -378,8 +381,44 @@ test("renderTranscript applies ANSI chrome to submitted input and assistant head
 
   const output = renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n");
 
-  assert.match(output, /\u001b\[[0-9;]*m╭ Submitted Input/);
+  assert.match(output, /\u001b\[[0-9;]*m╭\u001b\[0m\u001b\[[0-9;]*m Submitted Input /);
   assert.match(output, /\u001b\[[0-9;]*mAssistant:\s*\u001b\[0m/);
+});
+
+test("renderTranscript uses the Hufflepuff emphasis fill and muted secondary chrome", () => {
+  const view = buildTuiViewModel(
+    createSampleTuiState({
+      activeThemeId: "hufflepuff",
+      timeline: [
+        {
+          id: "user-1",
+          kind: "user",
+          summary: "hello",
+          body: "hello",
+        },
+        {
+          id: "assistant-1",
+          kind: "assistant",
+          summary: "reply",
+          body: "assistant body line",
+        },
+        {
+          id: "execution-1",
+          kind: "execution",
+          summary: "Read git branch",
+          body: "ignored",
+          collapsed: true,
+        },
+      ],
+    }),
+  );
+
+  const output = renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n");
+
+  assert.match(output, /\u001b\[[0-9;]*48;2;243;234;208mhello\s+\u001b\[0m/);
+  assert.match(output, /\u001b\[1;38;2;138;146;143mAssistant:\s*\u001b\[0m/);
+  assert.match(output, /\u001b\[1;38;2;117;108;96mExecution: Read git branch/);
+  assert.match(output, /\u001b\[2;38;2;122;116;108mDetails hidden\u001b\[0m/);
 });
 
 test("renderTranscript highlights semantic token kinds in assistant output", () => {
@@ -450,13 +489,67 @@ test("renderTranscript wraps themed highlight tokens without leaking ANSI fragme
   assert.match(plainOutput, /\/theme · README\.md · Ctrl\+C · ready/);
 });
 
-test("renderThemePickerOverlay uses compact house labels on narrow terminals", () => {
+test("renderThemePickerOverlay stacks the sample below compact house labels on narrow terminals", () => {
   const plainOutput = stripAnsi(renderThemePickerOverlay(createThemePickerOverlay(), 80).join("\n"));
 
-  assert.match(plainOutput, /^> Hufflepuff\s+Welcome back!$/m);
-  assert.match(plainOutput, /^  Gryffindor\s+Hufflepuff Badger is standing by$/m);
-  assert.match(plainOutput, /^  Ravenclaw$/m);
-  assert.match(plainOutput, /^  Slytherin\s+░ · ░  · ░$/m);
+  assert.match(plainOutput, /^╭ Sorting Hat .*╮$/m);
+  assert.match(plainOutput, /^│ > Hufflepuff .*│$/m);
+  assert.match(plainOutput, /^│   Gryffindor .*│$/m);
+  assert.match(plainOutput, /^│   Ravenclaw .*│$/m);
+  assert.match(plainOutput, /^│   Slytherin .*│$/m);
+  assert.match(plainOutput, /^│ Welcome back!.*│$/m);
+  assert.match(plainOutput, /^│ Hufflepuff Badger is standing by.*│$/m);
+  assert.match(plainOutput, /^│  ░▒ ▗▛██▖ ▗██▜▖ ~▒░.*│$/m);
+  assert.match(plainOutput, /^│ ─+ │$/m);
+  assert.match(plainOutput, /^│ Enter apply · Required before entering.*│$/m);
+  assert.match(plainOutput, /^╰─+╯$/m);
   assert.doesNotMatch(plainOutput, /Badger · yellow/);
   assert.doesNotMatch(plainOutput, /\u001b\[/);
+});
+
+test("renderThemePickerOverlay colors each house label with its own house accent", () => {
+  const output = renderThemePickerOverlay(createThemePickerOverlay(), 80).join("\n");
+
+  assert.match(output, /\u001b\[[0-9;]*38;2;214;169;61mHufflepuff\u001b\[0m/);
+  assert.match(output, /\u001b\[[0-9;]*38;2;163;54;47mGryffindor\u001b\[0m/);
+  assert.match(output, /\u001b\[[0-9;]*38;2;44;90;138mRavenclaw\u001b\[0m/);
+  assert.match(output, /\u001b\[[0-9;]*38;2;46;107;69mSlytherin\u001b\[0m/);
+});
+
+test("renderThemePickerOverlay colors the selected marker with the selected house accent", () => {
+  const output = renderThemePickerOverlay(createThemePickerOverlay("hufflepuff"), 80).join("\n");
+  const baseOverlay = createThemePickerOverlay("hufflepuff");
+  const slytherinOutput = renderThemePickerOverlay({
+    ...baseOverlay,
+    entries: createThemePickerOverlay("hufflepuff").entries.map((entry) => ({
+      ...entry,
+      selected: entry.id === "slytherin",
+    })),
+    sampleTheme: getThemeDefinition("slytherin"),
+  }, 80).join("\n");
+
+  assert.match(output, /\u001b\[[0-9;]*38;2;214;169;61m>\u001b\[0m \u001b\[[0-9;]*38;2;214;169;61mHufflepuff/);
+  assert.match(slytherinOutput, /\u001b\[[0-9;]*38;2;46;107;69m>\u001b\[0m \u001b\[[0-9;]*38;2;46;107;69mSlytherin/);
+});
+
+test("renderThemePickerOverlay keeps 95-column terminals stacked to protect the badge width", () => {
+  const plainOutput = stripAnsi(renderThemePickerOverlay(createThemePickerOverlay(), 95).join("\n"));
+
+  assert.match(plainOutput, /^╭ Sorting Hat .*╮$/m);
+  assert.match(plainOutput, /^│ > Hufflepuff .*│$/m);
+  assert.match(plainOutput, /^│ Welcome back!.*│$/m);
+  assert.match(plainOutput, /^│  ░▒ ▗▛██▖ ▗██▜▖ ~▒░.*│$/m);
+  assert.match(plainOutput, /^│ Enter apply · Required before entering.*│$/m);
+  assert.doesNotMatch(plainOutput, /^╭ Sorting Hat .*╮  ╭/m);
+});
+
+test("renderThemePickerOverlay allows the framed split layout once the terminal reaches 96 columns", () => {
+  const plainOutput = stripAnsi(renderThemePickerOverlay(createThemePickerOverlay(), 96).join("\n"));
+
+  assert.match(plainOutput, /^╭ Sorting Hat .*╮$/m);
+  assert.match(plainOutput, /^│ > Hufflepuff .*Welcome back!.*│$/m);
+  assert.match(plainOutput, /^│   Gryffindor .*Hufflepuff Badger is standing by.*│$/m);
+  assert.match(plainOutput, /^│   Slytherin .*░ · ░  · ░.*│$/m);
+  assert.match(plainOutput, /^│ +░▒ ▗▛██▖ ▗██▜▖ ~▒░ +│$/m);
+  assert.match(plainOutput, /^│ Enter apply · Required before entering.*│$/m);
 });

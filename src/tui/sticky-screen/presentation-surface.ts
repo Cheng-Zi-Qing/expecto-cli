@@ -45,19 +45,21 @@ function createActiveStatusText(runtimeState: TuiRuntimeState): ActiveStatusSnap
 
 function createComposerSnapshot(state: TuiState): ComposerSnapshot {
   const footerView = buildTuiFooterView(state);
+  const themePickerActive = state.themePicker !== null;
 
   return {
     text: state.draft,
     cursorOffset: Array.from(state.draft).length,
-    locked: state.inputLocked || footerView.themePicker !== undefined,
+    locked: state.inputLocked || themePickerActive,
+    hidden: themePickerActive,
     placeholder:
-      footerView.themePicker !== undefined
+      themePickerActive
         ? ""
         : state.inputLocked
           ? "Waiting for response..."
           : "Write a prompt",
     statusLabel: footerView.status.runtimeLabel,
-    themePicker: footerView.themePicker,
+    theme: footerView.theme,
   };
 }
 

@@ -487,7 +487,7 @@ function projectInteractionEventIntoRequestLedger(
 export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiState {
   const activeThemeId = input.savedThemeId ?? getDefaultThemeId();
   const themePicker =
-    input.savedThemeId === null
+    input.forceThemePicker || input.savedThemeId === null
       ? createThemePickerState("first_launch", activeThemeId)
       : null;
 

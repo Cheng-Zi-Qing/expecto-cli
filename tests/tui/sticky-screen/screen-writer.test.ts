@@ -58,6 +58,7 @@ const composerSnapshot: ComposerSnapshot = {
   text: "draft",
   cursorOffset: 5,
   locked: false,
+  hidden: false,
   placeholder: "Type a prompt",
   statusLabel: "Done",
 };
@@ -181,6 +182,7 @@ test("screen writer places the composer cursor using terminal cell width for ful
     text: "你好",
     cursorOffset: 2,
     locked: false,
+    hidden: false,
     placeholder: "Type a prompt",
     statusLabel: "Done",
   });
@@ -188,6 +190,42 @@ test("screen writer places the composer cursor using terminal cell width for ful
   assert.ok(
     calls.includes("cursor:move:18,7"),
     "expected the cursor to advance by 4 terminal cells after two full-width characters",
+  );
+});
+
+test("screen writer clears the reserved footer rows when the composer is hidden", () => {
+  const { calls, writer } = createWriterCalls();
+  const screenWriter = createScreenWriter({
+    writer,
+    write: (chunk) => {
+      calls.push(`write:${JSON.stringify(chunk)}`);
+    },
+    getTerminalSize: () => ({ rows: 20, cols: 80 }),
+    reservedHeight: 4,
+  });
+
+  screenWriter.enterStickyMode();
+  calls.length = 0;
+
+  screenWriter.renderComposer({
+    ...composerSnapshot,
+    hidden: true,
+    locked: true,
+  });
+
+  assert.equal(
+    calls.filter((entry) => entry.startsWith("write:")).length,
+    0,
+    "expected hidden footer redraws to clear rows without drawing composer chrome",
+  );
+  assert.equal(
+    calls.filter((entry) => entry === "line:clear").length,
+    4,
+    "expected every reserved footer row to be cleared",
+  );
+  assert.ok(
+    calls.includes("cursor:hide"),
+    "expected the cursor to stay hidden while the footer is suppressed",
   );
 });
 
@@ -237,6 +275,96 @@ test("screen writer writes timeline chunks through the scroll region while prese
     "wrap:enable",
     "cursor:restore",
   ]);
+});
+
+test("screen writer replaces a fixed timeline surface without newline-driven scrolling", () => {
+  const { calls, writer } = createWriterCalls();
+  const screenWriter = createScreenWriter({
+    writer,
+    write: (chunk) => {
+      calls.push(`write:${JSON.stringify(chunk)}`);
+    },
+    getTerminalSize: () => ({ rows: 20, cols: 80 }),
+    reservedHeight: 4,
+  });
+
+  screenWriter.enterStickyMode();
+  calls.length = 0;
+
+  screenWriter.replaceFixedTimeline(["alpha", "beta"]);
+
+  const writePayloads = calls
+    .filter((entry) => entry.startsWith("write:"))
+    .map((entry) => JSON.parse(entry.slice("write:".length)));
+
+  assert.deepEqual(writePayloads, ["alpha", "beta"]);
+  assert.ok(
+    !writePayloads.some((entry) => typeof entry === "string" && entry.includes("\n")),
+    "expected fixed-surface repaints to avoid newline-driven terminal scrolling",
+  );
+  assert.ok(
+    calls.includes("cursor:move:1,1") && calls.includes("cursor:move:2,1"),
+    "expected fixed-surface repaint to address rows explicitly",
+  );
+});
+
+test("screen writer only redraws changed rows for a fixed timeline surface", () => {
+  const { calls, writer } = createWriterCalls();
+  const screenWriter = createScreenWriter({
+    writer,
+    write: (chunk) => {
+      calls.push(`write:${JSON.stringify(chunk)}`);
+    },
+    getTerminalSize: () => ({ rows: 20, cols: 80 }),
+    reservedHeight: 4,
+  });
+
+  screenWriter.enterStickyMode();
+  screenWriter.replaceFixedTimeline(["top", "alpha", "omega"]);
+  calls.length = 0;
+
+  screenWriter.replaceFixedTimeline(
+    ["top", "beta", "omega"],
+    ["top", "alpha", "omega"],
+  );
+
+  const writePayloads = calls
+    .filter((entry) => entry.startsWith("write:"))
+    .map((entry) => JSON.parse(entry.slice("write:".length)));
+
+  assert.deepEqual(writePayloads, ["beta"]);
+  assert.ok(
+    !calls.includes("cursor:move:1,1"),
+    "expected unchanged top rows to be left alone during fixed-surface repaints",
+  );
+  assert.ok(
+    calls.includes("cursor:move:2,1"),
+    "expected the changed row to be addressed directly",
+  );
+});
+
+test("screen writer suspends the scroll region while redrawing a fixed timeline surface", () => {
+  const { calls, writer } = createWriterCalls();
+  const screenWriter = createScreenWriter({
+    writer,
+    write: (chunk) => {
+      calls.push(`write:${JSON.stringify(chunk)}`);
+    },
+    getTerminalSize: () => ({ rows: 20, cols: 80 }),
+    reservedHeight: 4,
+  });
+
+  screenWriter.enterStickyMode();
+  calls.length = 0;
+
+  screenWriter.replaceFixedTimeline(["alpha"]);
+
+  const resetIndex = calls.indexOf("region:reset");
+  const restoreIndex = calls.indexOf("region:set:1-16");
+
+  assert.ok(resetIndex !== -1, "expected fixed-surface redraw to suspend DECSTBM first");
+  assert.ok(restoreIndex !== -1, "expected fixed-surface redraw to restore DECSTBM after repaint");
+  assert.ok(resetIndex < restoreIndex, "expected scroll-region suspension before restoration");
 });
 
 test("screen writer resets the scroll region before pager handoff and re-enters sticky mode on resume", () => {

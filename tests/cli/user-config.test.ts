@@ -64,7 +64,15 @@ test("theme registry returns the Hufflepuff theme and stable house metadata", ()
   assert.equal(hufflepuff.paletteLabel, "yellow / gray");
   assert.equal(hufflepuff.welcome.title, "Welcome back!");
   assert.match(hufflepuff.welcome.subtitle, /Hufflepuff Badger/i);
+  assert.equal(hufflepuff.palette.glyph.mist_light, "#E4DFD8");
+  assert.equal(hufflepuff.palette.glyph.mist_mid, "#C4BCB3");
+  assert.equal(hufflepuff.palette.glyph.mist_dark, "#9F968D");
+  assert.equal(hufflepuff.palette.glyph.shadow, "#635D57");
   assert.ok(hufflepuff.welcome.glyphRows.length > 0);
+  assert.equal(hufflepuff.welcome.glyphRows[1]?.[1]?.text, "▗▛██▖ ▗██▜▖");
+  assert.equal(hufflepuff.welcome.glyphRows[2]?.[1]?.text, "▐██▙▜█ █▛▟██▌");
+  assert.equal(hufflepuff.welcome.glyphRows[3]?.[1]?.text, "▐██▛◦█ █◦▜██▌");
+  assert.equal(hufflepuff.welcome.glyphRows[4]?.[1]?.text, "▝▜██▇▇██▛▘");
   assert.ok(hufflepuff.sample.highlightTokens.length > 0);
 
   assert.deepEqual(

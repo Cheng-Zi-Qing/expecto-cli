@@ -323,6 +323,88 @@ test("runInteractiveTui opens the picker on first launch and blocks prompt mode 
   await runPromise;
 });
 
+test("runInteractiveTui can force the first-launch picker for local testing even with a saved theme", async () => {
+  const previousForceThemePicker = process.env.BETA_FORCE_THEME_PICKER;
+  process.env.BETA_FORCE_THEME_PICKER = "1";
+
+  try {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+      },
+      cwd: projectRoot,
+    });
+    const userConfigStore = createUserConfigStore({
+      themeId: "hufflepuff",
+    });
+    let app: FakeInteractiveTuiApp | undefined;
+
+    const runPromise = runInteractiveTui(context, {
+      providerLabel: "anthropic",
+      modelLabel: "claude-sonnet-4-20250514",
+      branchLabel: "main",
+      userConfigStore,
+      createApp: (input) => {
+        app = new FakeInteractiveTuiApp(input);
+        return app;
+      },
+      assistantStep: async (input) => ({
+        output: `assistant: ${input.prompt}`,
+      }),
+    });
+
+    await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+    assert.equal(app?.latestState().activeThemeId, "hufflepuff");
+    assert.equal(app?.latestState().themePicker?.reason, "first_launch");
+    assert.equal(app?.latestState().themePicker?.selectedThemeId, "hufflepuff");
+
+    app?.exit();
+    await runPromise;
+  } finally {
+    if (previousForceThemePicker === undefined) {
+      delete process.env.BETA_FORCE_THEME_PICKER;
+    } else {
+      process.env.BETA_FORCE_THEME_PICKER = previousForceThemePicker;
+    }
+  }
+});
+
+test("runInteractiveTui closes cleanly when a shutdown signal is triggered while idle", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const shutdownController = new AbortController();
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    shutdownSignal: shutdownController.signal,
+    userConfigStore: createReturningUserConfigStore(),
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  shutdownController.abort();
+  await runPromise;
+
+  assert.equal(app?.closed, true);
+});
+
 test("runInteractiveTui reopens the picker when /theme is executed", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({

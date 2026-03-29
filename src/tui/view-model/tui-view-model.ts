@@ -26,9 +26,15 @@ function displayRuntimeState(runtimeState: TuiRuntimeState): string {
 }
 
 export function buildTuiFooterView(
-  state: Pick<TuiState, "draft" | "inputLocked" | "runtimeState" | "themePicker">,
+  state: Pick<TuiState, "draft" | "inputLocked" | "runtimeState" | "themePicker" | "activeThemeId">,
 ): TuiFooterView {
+  const previewThemeId = state.themePicker?.selectedThemeId ?? state.activeThemeId;
+  const theme = getThemeDefinition(previewThemeId);
   const footer: TuiFooterView = {
+    theme: {
+      id: theme.id,
+      palette: theme.palette,
+    },
     composer: {
       value: state.draft,
       locked: state.inputLocked || state.themePicker !== null,

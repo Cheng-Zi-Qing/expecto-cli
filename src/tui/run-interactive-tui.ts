@@ -31,9 +31,15 @@ export type RunInteractiveTuiOptions = {
   executionLogStore?: ExecutionLogStore;
   openPager?: (logPath: string) => Promise<void>;
   userConfigStore?: UserConfigStore;
+  shutdownSignal?: AbortSignal;
 };
 
 function noopWrite(): void {}
+
+function shouldForceThemePickerForTesting(): boolean {
+  const value = process.env.BETA_FORCE_THEME_PICKER?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
 
 async function defaultOpenPager(logPath: string): Promise<void> {
   const pager = process.env.PAGER?.trim() || "less";
@@ -119,6 +125,7 @@ export async function runInteractiveTui(
     providerLabel: options.providerLabel,
     modelLabel: options.modelLabel,
     savedThemeId: userConfig.themeId,
+    forceThemePicker: shouldForceThemePickerForTesting(),
     contextMetrics: createContextMetrics(
       context,
       options.providerLabel,
@@ -329,6 +336,23 @@ export async function runInteractiveTui(
     ...(options.terminal ? { terminal: options.terminal } : {}),
   });
 
+  const requestShutdown = (): void => {
+    interruptController.interruptCurrentTurn();
+    queuedInput.close();
+  };
+  const shutdownSignal = options.shutdownSignal;
+  const handleShutdown = (): void => {
+    requestShutdown();
+  };
+
+  if (shutdownSignal) {
+    if (shutdownSignal.aborted) {
+      handleShutdown();
+    } else {
+      shutdownSignal.addEventListener("abort", handleShutdown, { once: true });
+    }
+  }
+
   await app.start();
 
   const manager = new SessionManager({
@@ -450,6 +474,7 @@ export async function runInteractiveTui(
 
     return result;
   } finally {
+    shutdownSignal?.removeEventListener("abort", handleShutdown);
     await app.close();
   }
 }

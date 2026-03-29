@@ -112,6 +112,7 @@ export function createInteractiveConsoleApp(
       return;
     }
 
+    flushTranscriptProjection(true);
     renderStickyRegion();
   };
 
@@ -127,6 +128,18 @@ export function createInteractiveConsoleApp(
   });
 
   const renderStickyRegion = (): void => {
+    const projection = projectStickyScreenState(state, normalizeColumns(stdout));
+
+    if (projection.activeStatus === null) {
+      screenWriter.clearActiveStatus();
+    } else {
+      screenWriter.setActiveStatus(projection.activeStatus);
+    }
+
+    screenWriter.renderComposer(projection.composer);
+  };
+
+  const primeStickyProjection = (): void => {
     const projection = projectStickyScreenState(state, normalizeColumns(stdout));
 
     if (projection.activeStatus === null) {
@@ -160,13 +173,13 @@ export function createInteractiveConsoleApp(
     input.handlers.onSubmit(prompt);
   };
 
-  const flushTranscriptProjection = (): void => {
+  const flushTranscriptProjection = (forceReplay = false): void => {
     const projection = projectStickyScreenState(state, normalizeColumns(stdout));
     const nextLines = projection.transcriptLines;
 
     if (renderedTranscriptLines.length === 0) {
       if (state.themePicker !== null) {
-        screenWriter.replaceTimeline(`${nextLines.join("\n")}\n`);
+        screenWriter.replaceFixedTimeline(nextLines, renderedTranscriptLines);
         transcriptSurfaceWasReplaced = true;
       } else {
         appendTimelineLines(screenWriter, nextLines);
@@ -188,8 +201,26 @@ export function createInteractiveConsoleApp(
       return;
     }
 
+    if (forceReplay) {
+      if (state.themePicker !== null) {
+        screenWriter.replaceFixedTimeline(nextLines, renderedTranscriptLines);
+      } else {
+        screenWriter.replaceTimeline(nextLines.join("\n"));
+      }
+      renderedTranscriptLines = nextLines;
+      transcriptSurfaceWasReplaced = state.themePicker !== null;
+      if (!(state.timeline.length === 1 && state.timeline[0]?.kind === "welcome")) {
+        startedWithWelcomeOnly = false;
+      }
+      return;
+    }
+
     if (state.themePicker !== null || transcriptSurfaceWasReplaced) {
-      screenWriter.replaceTimeline(`${nextLines.join("\n")}\n`);
+      if (state.themePicker !== null) {
+        screenWriter.replaceFixedTimeline(nextLines, renderedTranscriptLines);
+      } else {
+        screenWriter.replaceTimeline(nextLines.join("\n"));
+      }
       renderedTranscriptLines = nextLines;
       transcriptSurfaceWasReplaced = state.themePicker !== null;
       if (!(state.timeline.length === 1 && state.timeline[0]?.kind === "welcome")) {
@@ -270,6 +301,7 @@ export function createInteractiveConsoleApp(
       }
 
       started = true;
+      primeStickyProjection();
       terminalSession.enter();
       screenWriter.enterStickyMode();
       flushTranscriptProjection();
