@@ -649,6 +649,43 @@ test("session manager keeps built-in slash commands out of prompt and assistant 
   assert.ok(systemLines.some((line) => line.includes("branch: no-git")));
 });
 
+test("session manager keeps /help and unknown slash commands out of prompt and assistant streams", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const userPrompts: string[] = [];
+  const assistantOutputs: string[] = [];
+  const systemLines: string[] = [];
+  const inputs = ["/help", "/missing", "hello", "/exit"];
+  const manager = new SessionManager({
+    write: () => {},
+    readLine: () => Promise.resolve(inputs.shift() ?? null),
+    assistantStep: async (input) => assistantOutputResult(`assistant: ${input.prompt}`),
+    onUserPrompt: (prompt) => {
+      userPrompts.push(prompt);
+    },
+    onAssistantOutput: (output) => {
+      assistantOutputs.push(output);
+    },
+    onSystemLine: (line) => {
+      systemLines.push(line);
+    },
+  });
+
+  await manager.run(context);
+
+  assert.deepEqual(userPrompts, ["hello"]);
+  assert.deepEqual(assistantOutputs, ["assistant: hello"]);
+  assert.ok(systemLines.includes("Available commands"));
+  assert.ok(systemLines.some((line) => line.includes("/status")));
+  assert.ok(systemLines.includes("Unknown command: /missing"));
+  assert.ok(systemLines.includes("Run /help to see available commands."));
+});
+
 test("session manager emits a renderer-neutral execution item for /branch without entering the user/assistant streams", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
@@ -768,6 +805,39 @@ test("session manager routes interactive initialPrompt slash commands through bu
   assert.equal(executionItems.length, 1);
   assert.equal(executionItems[0]?.summary, "Read git branch");
   assert.match(executionItems[0]?.body ?? "", /no-git/);
+});
+
+test("session manager normalizes bare interactive initialPrompt exit aliases before processing", async () => {
+  for (const initialPrompt of ["exit", "quit"]) {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+        initialPrompt,
+      },
+      cwd: projectRoot,
+    });
+    const userPrompts: string[] = [];
+    const assistantOutputs: string[] = [];
+    const manager = new SessionManager({
+      write: () => {},
+      assistantStep: async () => {
+        throw new Error("assistantStep should not be called for bare exit aliases");
+      },
+      onUserPrompt: (prompt) => {
+        userPrompts.push(prompt);
+      },
+      onAssistantOutput: (output) => {
+        assistantOutputs.push(output);
+      },
+    });
+
+    const result = await manager.run(context);
+
+    assert.equal(result.turnCount, 0);
+    assert.deepEqual(userPrompts, []);
+    assert.deepEqual(assistantOutputs, []);
+  }
 });
 
 test("session manager routes print-mode slash commands through built-in command effects", async () => {

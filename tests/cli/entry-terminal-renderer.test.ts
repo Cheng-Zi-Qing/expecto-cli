@@ -25,10 +25,12 @@ async function makeHomeDirWithSessionEnv(contents: string): Promise<string> {
   return homeDir;
 }
 
-test("runCli defaults to the blessed renderer for fullscreen TTY sessions", async () => {
+test("runCli defaults to the sticky terminal renderer for fullscreen TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRenderer = "";
+  const shutdownController = new AbortController();
+  let observedShutdownSignal: AbortSignal | undefined;
 
   await runCli(["--tui"], {
     cwd: projectRoot,
@@ -36,15 +38,18 @@ test("runCli defaults to the blessed renderer for fullscreen TTY sessions", asyn
     homeDir,
     stdinIsTTY: true,
     stdoutIsTTY: true,
+    shutdownSignal: shutdownController.signal,
     runInteractiveTui: async (input) => {
       observedRenderer = input.tuiRenderer;
+      observedShutdownSignal = input.shutdownSignal;
     },
   });
 
-  assert.equal(observedRenderer, "blessed");
+  assert.equal(observedRenderer, "terminal");
+  assert.equal(observedShutdownSignal, shutdownController.signal);
 });
 
-test("BETA_TUI_RENDERER=terminal is warning-only and does not switch renderers", async () => {
+test("BETA_TUI_RENDERER=terminal stays warning-only after the terminal renderer becomes default", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv("BETA_TUI_RENDERER=blessed\n");
   let observedRenderer = "";
@@ -66,6 +71,6 @@ test("BETA_TUI_RENDERER=terminal is warning-only and does not switch renderers",
     },
   });
 
-  assert.equal(observedRenderer, "blessed");
+  assert.equal(observedRenderer, "terminal");
   assert.match(stderr, /BETA_TUI_RENDERER=terminal is deprecated/i);
 });

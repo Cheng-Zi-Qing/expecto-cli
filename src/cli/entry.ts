@@ -20,7 +20,7 @@ import {
 } from "./run-native-session.ts";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-type TuiRenderer = "blessed";
+type TuiRenderer = "terminal";
 
 export type InteractiveTuiRunnerInput = {
   context: BootstrapContext;
@@ -29,6 +29,7 @@ export type InteractiveTuiRunnerInput = {
   branchLabel: string;
   tuiRenderer: TuiRenderer;
   providerRunner?: ProviderRunner;
+  shutdownSignal?: AbortSignal;
 };
 
 export type InteractiveTuiRunner = (
@@ -50,6 +51,7 @@ export type RunCliOptions = {
   stdinStream?: Readable;
   runInteractiveTui?: InteractiveTuiRunner;
   runNativeSession?: (input: RunNativeSessionInput) => Promise<void>;
+  shutdownSignal?: AbortSignal;
 };
 
 const PROVIDER_ENV_KEYS = [
@@ -188,13 +190,14 @@ async function runDefaultInteractiveTui(
   input: InteractiveTuiRunnerInput,
 ): Promise<void> {
   const { runInteractiveTui } = await import("../tui/run-interactive-tui.ts");
-  const { createBlessedTuiApp } = await import("../tui/renderer-blessed/tui-app.ts");
+  const { createTerminalTuiApp } = await import("../tui/renderer-terminal/tui-app.ts");
 
   await runInteractiveTui(input.context, {
-    createApp: createBlessedTuiApp,
+    createApp: createTerminalTuiApp,
     providerLabel: input.providerLabel,
     modelLabel: input.modelLabel,
     branchLabel: input.branchLabel,
+    ...(input.shutdownSignal ? { shutdownSignal: input.shutdownSignal } : {}),
     ...(input.providerRunner ? { providerRunner: input.providerRunner } : {}),
   });
 }
@@ -326,7 +329,8 @@ async function runCliCommand(
       providerLabel,
       modelLabel,
       branchLabel,
-      tuiRenderer: "blessed",
+      tuiRenderer: "terminal",
+      ...(options.shutdownSignal ? { shutdownSignal: options.shutdownSignal } : {}),
       ...(providerRunner ? { providerRunner } : {}),
     });
     return;
@@ -370,12 +374,33 @@ export function isDirectExecution(
   }
 }
 
+function installProcessShutdownHandlers(controller: AbortController): () => void {
+  const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+  const listeners = signals.map((signal) => {
+    const listener = (): void => {
+      controller.abort();
+    };
+    process.on(signal, listener);
+    return { signal, listener };
+  });
+
+  return () => {
+    for (const { signal, listener } of listeners) {
+      process.off(signal, listener);
+    }
+  };
+}
+
 async function main(): Promise<void> {
+  const shutdownController = new AbortController();
+  const removeShutdownHandlers = installProcessShutdownHandlers(shutdownController);
+
   try {
     const parsed = parseCliArgs(process.argv.slice(2));
     await runCliCommand(parsed, {
       stdinIsTTY: Boolean(process.stdin.isTTY),
       stdoutIsTTY: Boolean(process.stdout.isTTY),
+      shutdownSignal: shutdownController.signal,
     });
   } catch (error) {
     if (
@@ -390,6 +415,8 @@ async function main(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     process.exitCode = 1;
+  } finally {
+    removeShutdownHandlers();
   }
 }
 

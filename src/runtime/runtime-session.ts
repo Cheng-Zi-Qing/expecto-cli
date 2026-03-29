@@ -79,6 +79,7 @@ export type RuntimeSessionHooks = {
   onUserPrompt?: (prompt: string) => void;
   onAssistantOutput?: (output: string) => void;
   onExecutionItem?: (item: { summary: string; body?: string }) => void;
+  onOpenThemePicker?: () => void;
   onInteractionEvent?: (event: InteractionEvent) => void;
   onRuntimeStateChange?: (state: RuntimeSessionState) => void;
   onConversationCleared?: () => void;
@@ -317,6 +318,7 @@ export class RuntimeSession {
       ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
       ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
       ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
+      ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
       ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
       ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),
@@ -370,7 +372,14 @@ export class RuntimeSession {
           this.renderEntryDetails();
 
           if (this.context.entry.initialPrompt) {
-            const shouldExit = await this.processInput(this.context.entry.initialPrompt);
+            const initialPrompt = normalizeInteractiveCommandInput(
+              this.context.entry.initialPrompt,
+            ).trim();
+
+            const shouldExit =
+              initialPrompt.length > 0
+                ? await this.processInput(initialPrompt)
+                : false;
 
             if (shouldExit) {
               break;
@@ -489,7 +498,7 @@ export class RuntimeSession {
         break;
       }
 
-      const command = line.trim();
+      const command = normalizeInteractiveCommandInput(line).trim();
 
       if (command.length === 0) {
         continue;
@@ -1047,6 +1056,9 @@ export class RuntimeSession {
           this.conversation.length = 0;
           this.hooks.onConversationCleared?.();
           break;
+        case "open_theme_picker":
+          this.hooks.onOpenThemePicker?.();
+          break;
         case "exit_session":
           shouldExit = true;
           break;
@@ -1089,4 +1101,14 @@ function buildTurnPayloadForPrompt(
     entryKind,
     prompt,
   };
+}
+
+function normalizeInteractiveCommandInput(input: string): string {
+  const trimmed = input.trim().toLowerCase();
+
+  if (trimmed === "exit" || trimmed === "quit") {
+    return "/exit";
+  }
+
+  return input;
 }

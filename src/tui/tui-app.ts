@@ -5,11 +5,13 @@ export type InteractiveTuiHandlers = {
   onSubmit: (prompt: string) => void;
   onInterrupt: () => void;
   onToggleInspector: () => void;
+  onToggleTimelineMode: () => void;
   onFocusTimeline: () => void;
   onFocusComposer: () => void;
   onMoveSelectionUp: () => void;
   onMoveSelectionDown: () => void;
   onToggleSelectedItem: () => void;
+  onInspectExecution?: (executionId: string) => void;
   onExit: () => void;
 };
 
@@ -19,6 +21,7 @@ export type TerminalTuiInput = {
   on: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
   off?: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
   removeListener?: (event: "data", listener: (chunk: TerminalTuiInputChunk) => void) => unknown;
+  pause?: () => void;
   setRawMode?: (enabled: boolean) => void;
   isTTY?: boolean;
 };
@@ -47,6 +50,8 @@ export type InteractiveTuiAppFactoryInput = {
 export type InteractiveTuiApp = {
   update: (state: TuiState) => void;
   start: () => Promise<void> | void;
+  suspendForPager?: () => Promise<void> | void;
+  resumeFromPager?: () => Promise<void> | void;
   close: () => Promise<void> | void;
 };
 

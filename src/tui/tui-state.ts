@@ -1,9 +1,10 @@
 import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
-import { listBuiltinCommands } from "../commands/builtin-commands.ts";
+import { listImplementedCommands } from "../commands/command-registry.ts";
 import {
   appendTranscriptChunk,
   createExecutionTranscriptBuffer,
 } from "./execution-transcript-buffer.ts";
+import { getDefaultThemeId, getThemeDefinition, listThemeDefinitions } from "./theme/theme-registry.ts";
 import {
   createForegroundRequestLedger,
   isComposerLocked,
@@ -18,6 +19,7 @@ import type {
   TuiAction,
   TuiState,
 } from "./tui-types.ts";
+import type { ThemeId, ThemeAvailability } from "./theme/theme-types.ts";
 
 function createTimelineItemId(state: TuiState, kind: TimelineItem["kind"]): string {
   const nextIndex = state.timeline.filter((item) => item.kind === kind).length + 1;
@@ -34,30 +36,61 @@ function createEmptyCommandMenu(): CommandMenuState {
   };
 }
 
-function deriveSlashQuery(draft: string): string | null {
-  const trimmed = draft.trim();
+function getVisibleThemeIds(): ThemeId[] {
+  return listThemeDefinitions().map((theme) => theme.id);
+}
 
-  if (!trimmed.startsWith("/")) {
+function createThemePickerState(
+  reason: CreateInitialTuiStateInput["savedThemeId"] extends never ? never : "first_launch" | "command",
+  selectedThemeId: ThemeId,
+): TuiState["themePicker"] {
+  return {
+    reason,
+    selectedThemeId,
+    themeIds: getVisibleThemeIds(),
+  };
+}
+
+function moveThemeSelection(
+  picker: NonNullable<TuiState["themePicker"]>,
+  offset: number,
+): NonNullable<TuiState["themePicker"]> {
+  const currentIndex = Math.max(0, picker.themeIds.indexOf(picker.selectedThemeId));
+  const nextIndex = Math.max(
+    0,
+    Math.min(picker.themeIds.length - 1, currentIndex + offset),
+  );
+
+  return {
+    ...picker,
+    selectedThemeId: picker.themeIds[nextIndex] ?? picker.selectedThemeId,
+  };
+}
+
+function resolveThemeAvailability(themeId: ThemeId): ThemeAvailability {
+  return getThemeDefinition(themeId).availability;
+}
+
+function deriveSlashQuery(draft: string): string | null {
+  if (!draft.startsWith("/")) {
     return null;
   }
 
-  if (trimmed === "/") {
+  if (draft === "/") {
     return "";
   }
 
-  const firstWhitespaceIndex = trimmed.search(/\s/);
-
-  if (firstWhitespaceIndex !== -1) {
+  if (/\s/.test(draft)) {
     return null;
   }
 
-  return trimmed.slice(1);
+  return draft.slice(1);
 }
 
 function resolveCommandMenuItems(query: string): CommandMenuItem[] {
   const commandPrefix = `/${query}`;
 
-  return listBuiltinCommands().filter(
+  return listImplementedCommands().filter(
     (command) =>
       command.name.startsWith(commandPrefix) ||
       command.aliases.some((alias) => alias.startsWith(commandPrefix)),
@@ -121,9 +154,10 @@ function createWelcomeCard(input: CreateInitialTuiStateInput): TimelineItem {
     summary: `beta is ready in ${input.projectLabel} on ${input.branchLabel}.`,
     body: [
       "Enter send",
+      "Alt+Enter newline",
       "Ctrl+C interrupt",
       "Ctrl+J newline",
-      "Tab toggle Context Inspector",
+      "/help commands",
     ].join("\n"),
     collapsed: false,
   };
@@ -451,9 +485,17 @@ function projectInteractionEventIntoRequestLedger(
 }
 
 export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiState {
+  const activeThemeId = input.savedThemeId ?? getDefaultThemeId();
+  const themePicker =
+    input.forceThemePicker || input.savedThemeId === null
+      ? createThemePickerState("first_launch", activeThemeId)
+      : null;
+
   return {
     sessionId: input.sessionId,
+    activeThemeId,
     focus: "composer",
+    timelineMode: "scroll",
     inspectorOpen: false,
     runtimeState: "ready",
     activeRequestLedger: null,
@@ -467,6 +509,7 @@ export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiSta
     providerLabel: input.providerLabel,
     modelLabel: input.modelLabel,
     contextMetrics: input.contextMetrics,
+    themePicker,
   };
 }
 
@@ -476,6 +519,11 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
       return {
         ...state,
         inspectorOpen: !state.inspectorOpen,
+      };
+    case "toggle_timeline_mode":
+      return {
+        ...state,
+        timelineMode: state.timelineMode === "select" ? "scroll" : "select",
       };
     case "focus_timeline":
       return {
@@ -488,6 +536,13 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         focus: "composer",
       };
     case "move_selection_up":
+      if (state.themePicker !== null) {
+        return {
+          ...state,
+          themePicker: moveThemeSelection(state.themePicker, -1),
+        };
+      }
+
       if (state.focus === "composer" && state.commandMenu.visible) {
         return {
           ...state,
@@ -503,6 +558,13 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         selectedTimelineIndex: Math.max(0, state.selectedTimelineIndex - 1),
       };
     case "move_selection_down":
+      if (state.themePicker !== null) {
+        return {
+          ...state,
+          themePicker: moveThemeSelection(state.themePicker, 1),
+        };
+      }
+
       if (state.focus === "composer" && state.commandMenu.visible) {
         return {
           ...state,
@@ -601,6 +663,18 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
       );
     }
     case "toggle_selected_item": {
+      if (state.themePicker !== null) {
+        if (resolveThemeAvailability(state.themePicker.selectedThemeId) !== "available") {
+          return state;
+        }
+
+        return {
+          ...state,
+          activeThemeId: state.themePicker.selectedThemeId,
+          themePicker: null,
+        };
+      }
+
       const item = state.timeline[state.selectedTimelineIndex];
 
       if (item === undefined) {
@@ -653,6 +727,14 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
       return {
         ...state,
         contextMetrics: action.contextMetrics,
+      };
+    case "open_theme_picker":
+      return {
+        ...state,
+        themePicker: createThemePickerState(
+          action.reason,
+          action.selectedThemeId ?? state.activeThemeId,
+        ),
       };
     default:
       return state;

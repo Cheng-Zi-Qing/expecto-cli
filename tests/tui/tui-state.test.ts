@@ -22,14 +22,91 @@ test("createInitialTuiState starts with a welcome card and composer focus", () =
     },
   });
 
+  assert.equal(state.activeThemeId, "hufflepuff");
+  assert.equal(state.themePicker, null);
   assert.equal(state.focus, "composer");
   assert.equal(state.inspectorOpen, false);
+  assert.equal(state.timelineMode, "scroll");
   assert.equal(state.timeline.length, 1);
   assert.equal(state.timeline[0]?.kind, "welcome");
   assert.match(state.timeline[0]?.summary ?? "", /beta/i);
+  assert.doesNotMatch(state.timeline[0]?.body ?? "", /\/inspect/);
 });
 
-test("reduceTuiState toggles inspector and switches focus modes", () => {
+test("createInitialTuiState opens the theme picker when no saved theme exists", () => {
+  const state = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: null,
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  assert.equal(state.activeThemeId, "hufflepuff");
+  assert.deepEqual(state.themePicker, {
+    reason: "first_launch",
+    selectedThemeId: "hufflepuff",
+    themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+  });
+});
+
+test("createInitialTuiState can force the first-launch picker for local testing", () => {
+  const state = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: "hufflepuff",
+    forceThemePicker: true,
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  assert.equal(state.activeThemeId, "hufflepuff");
+  assert.deepEqual(state.themePicker, {
+    reason: "first_launch",
+    selectedThemeId: "hufflepuff",
+    themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
+  });
+});
+
+test("reduceTuiState applies the selected theme and closes the picker", () => {
+  const initial = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: null,
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  const applied = reduceTuiState(initial, {
+    type: "toggle_selected_item",
+  });
+
+  assert.equal(applied.activeThemeId, "hufflepuff");
+  assert.equal(applied.themePicker, null);
+});
+
+test("reduceTuiState toggles inspector, timeline mode, and switches focus modes", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
     projectLabel: "beta-agent",
@@ -47,6 +124,9 @@ test("reduceTuiState toggles inspector and switches focus modes", () => {
   const withInspector = reduceTuiState(initial, {
     type: "toggle_inspector",
   });
+  const withSelectMode = reduceTuiState(withInspector, {
+    type: "toggle_timeline_mode",
+  });
   const timelineFocused = reduceTuiState(withInspector, {
     type: "focus_timeline",
   });
@@ -55,6 +135,7 @@ test("reduceTuiState toggles inspector and switches focus modes", () => {
   });
 
   assert.equal(withInspector.inspectorOpen, true);
+  assert.equal(withSelectMode.timelineMode, "select");
   assert.equal(timelineFocused.focus, "timeline");
   assert.equal(composerFocused.focus, "composer");
 });
@@ -140,6 +221,107 @@ test("reduceTuiState toggles the selected execution card", () => {
 
   assert.equal(withExecution.timeline[0]?.collapsed, true);
   assert.equal(toggled.timeline[0]?.collapsed, false);
+});
+
+test("reduceTuiState derives slash suggestions from visible implemented commands in registry order", () => {
+  const initial = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  const withSlashDraft = reduceTuiState(initial, {
+    type: "set_draft",
+    draft: "/",
+  });
+
+  assert.equal(withSlashDraft.commandMenu.visible, true);
+  assert.deepEqual(
+    withSlashDraft.commandMenu.items.map((item) => item.id),
+    [
+      "session.help",
+      "session.status",
+      "session.clear",
+      "session.theme",
+      "session.exit",
+      "project.branch",
+    ],
+  );
+  assert.deepEqual(
+    withSlashDraft.commandMenu.items.map((item) => item.name),
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+  );
+});
+
+test("reduceTuiState keeps prefix-only slash filtering and hides the menu once whitespace appears", () => {
+  const initial = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "beta-agent",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  const withStatusPrefix = reduceTuiState(initial, {
+    type: "set_draft",
+    draft: "/st",
+  });
+
+  assert.equal(withStatusPrefix.commandMenu.visible, true);
+  assert.deepEqual(
+    withStatusPrefix.commandMenu.items.map((item) => item.name),
+    ["/status"],
+  );
+  assert.doesNotMatch(
+    withStatusPrefix.commandMenu.items.map((item) => item.name).join(" "),
+    /\/inspect/,
+  );
+
+  const withWhitespace = reduceTuiState(withStatusPrefix, {
+    type: "set_draft",
+    draft: "/status details",
+  });
+
+  assert.equal(withWhitespace.commandMenu.visible, false);
+  assert.deepEqual(withWhitespace.commandMenu.items, []);
+
+  const withTrailingWhitespace = reduceTuiState(withStatusPrefix, {
+    type: "set_draft",
+    draft: "/status ",
+  });
+
+  assert.equal(withTrailingWhitespace.commandMenu.visible, false);
+  assert.deepEqual(withTrailingWhitespace.commandMenu.items, []);
+
+  const withLeadingWhitespace = reduceTuiState(withStatusPrefix, {
+    type: "set_draft",
+    draft: " /status",
+  });
+
+  assert.equal(withLeadingWhitespace.commandMenu.visible, false);
+  assert.deepEqual(withLeadingWhitespace.commandMenu.items, []);
+
+  const withSlashSpace = reduceTuiState(withStatusPrefix, {
+    type: "set_draft",
+    draft: "/ ",
+  });
+
+  assert.equal(withSlashSpace.commandMenu.visible, false);
+  assert.deepEqual(withSlashSpace.commandMenu.items, []);
 });
 
 test("reduceTuiState moves the selected timeline item within bounds", () => {

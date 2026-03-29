@@ -22,6 +22,7 @@ export type SessionManagerOptions = {
   onUserPrompt?: RuntimeSessionHooks["onUserPrompt"];
   onAssistantOutput?: RuntimeSessionHooks["onAssistantOutput"];
   onExecutionItem?: RuntimeSessionHooks["onExecutionItem"];
+  onOpenThemePicker?: RuntimeSessionHooks["onOpenThemePicker"];
   onInteractionEvent?: RuntimeSessionHooks["onInteractionEvent"];
   onRuntimeStateChange?: RuntimeSessionHooks["onRuntimeStateChange"];
   onConversationCleared?: RuntimeSessionHooks["onConversationCleared"];
@@ -55,6 +56,7 @@ export class SessionManager {
       ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
       ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
       ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
+      ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
       ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
       ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),

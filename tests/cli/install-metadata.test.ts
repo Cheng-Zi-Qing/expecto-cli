@@ -16,6 +16,10 @@ test("package metadata exposes the built beta bin and local install scripts", as
 
   assert.equal(packageJson.bin?.beta, "./dist/src/cli/entry.js");
   assert.equal(packageJson.scripts?.dev, "node --experimental-strip-types src/cli/entry.ts");
+  assert.equal(
+    packageJson.scripts?.["dev:watch:init"],
+    "BETA_FORCE_THEME_PICKER=1 node --watch-path=src --watch-path=package.json --watch-path=tsconfig.json --experimental-strip-types src/cli/entry.ts",
+  );
   assert.equal(packageJson.scripts?.["install:local"], "bash ./scripts/install-local-beta.sh");
 });
 

@@ -98,7 +98,7 @@ test("beta -p routes to one-shot native execution and emits a deprecation warnin
   assert.match(stderr, /-p\/--print alias is deprecated/i);
 });
 
-test("beta with no args uses the fullscreen TUI runner only in full TTY sessions", async () => {
+test("beta with no args uses the sticky main-screen TUI runner only in full TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -126,7 +126,7 @@ test("beta with no args uses the fullscreen TUI runner only in full TTY sessions
   assert.equal(interactiveRuns, 1);
   assert.equal(nativeRuns, 0);
   assert.equal(observedEntryKind, "interactive");
-  assert.equal(observedRenderer, "blessed");
+  assert.equal(observedRenderer, "terminal");
 });
 
 test("beta with a positional prompt does not use fullscreen TUI even in full TTY sessions", async () => {
@@ -184,7 +184,7 @@ test("beta --tui uses the fullscreen TUI runner in full TTY sessions", async () 
 
   assert.equal(interactiveRuns, 1);
   assert.equal(observedKind, "interactive");
-  assert.equal(observedRenderer, "blessed");
+  assert.equal(observedRenderer, "terminal");
 });
 
 test("beta --native with no prompt uses the native REPL route in full TTY sessions", async () => {
