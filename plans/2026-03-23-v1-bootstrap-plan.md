@@ -1,8 +1,8 @@
-# beta-agent V1 Bootstrap Plan
+# Expecto Cli V1 Bootstrap Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Establish the initial `beta-agent` repository with frozen contracts, a markdown-driven artifact workspace, and a minimal Claude-like CLI entrypoint.
+**Goal:** Establish the initial `expecto-cli` repository with frozen contracts, a markdown-driven artifact workspace, and a minimal Claude-like CLI entrypoint.
 
 **Architecture:** Build the project from contracts inward. Define stable schemas first, then implement the artifact/document layer, then add the CLI/runtime skeleton that consumes those contracts. Delay heavier workflow and observer behavior until the base path is testable.
 
@@ -51,16 +51,16 @@
 
 **Files:**
 
-- Create: `.beta-agent/docs/00-requirements.md`
-- Create: `.beta-agent/docs/01-plan.md`
-- Create: `.beta-agent/docs/tasks/`
-- Create: `.beta-agent/docs/summaries/`
-- Create: `.beta-agent/memory/INDEX.md`
+- Create: `.expecto-cli/docs/00-requirements.md`
+- Create: `.expecto-cli/docs/01-plan.md`
+- Create: `.expecto-cli/docs/tasks/`
+- Create: `.expecto-cli/docs/summaries/`
+- Create: `.expecto-cli/memory/INDEX.md`
 - Create: `src/core/artifact-store.ts`
 - Create: `src/core/active-artifact-resolver.ts`
 - Test: `tests/core/artifact-store.test.ts`
 
-- [x] **Step 1: Create the `.beta-agent` workspace templates**
+- [x] **Step 1: Create the `.expecto-cli` workspace templates**
 - [x] **Step 2: Implement artifact-store read/write/list APIs**
 - [x] **Step 3: Implement active-artifact-resolver**
 - [x] **Step 4: Add tests for active artifact selection**
@@ -78,9 +78,9 @@
 - Create: `src/runtime/bootstrap-context.ts`
 - Test: `tests/cli/entry.test.ts`
 
-- [x] **Step 1: Implement `beta` with no args as interactive entry**
-- [x] **Step 2: Implement `beta \"<prompt>\"` as interactive-with-initial-message**
-- [x] **Step 3: Implement `beta -p \"<prompt>\"` as one-shot mode**
+- [x] **Step 1: Implement `expecto` with no args as interactive entry**
+- [x] **Step 2: Implement `expecto \"<prompt>\"` as interactive-with-initial-message**
+- [x] **Step 3: Implement `expecto -p \"<prompt>\"` as one-shot mode**
 - [x] **Step 4: Add tests for the public CLI surface**
 - [x] **Step 5: Run the CLI tests**
 
@@ -96,7 +96,7 @@
 - Test: `tests/runtime/bootstrap-context.test.ts`
 
 - [x] **Step 1: Load `AGENTS.md` when present**
-- [x] **Step 2: Load `.beta-agent/memory/INDEX.md` when present**
+- [x] **Step 2: Load `.expecto-cli/memory/INDEX.md` when present**
 - [x] **Step 3: Resolve active docs from the artifact workspace**
 - [x] **Step 4: Build the minimal bootstrap context**
 - [x] **Step 5: Add tests for context selection and bootstrap**

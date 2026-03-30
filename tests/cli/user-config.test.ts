@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,13 +15,15 @@ import {
 } from "../../src/tui/theme/theme-registry.ts";
 
 async function makeHomeDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-user-config-"));
+  return mkdtemp(join(tmpdir(), "expecto-cli-user-config-"));
 }
+
+const legacyWorkspaceDir = [".beta", "agent"].join("-");
 
 test("loadUserConfig returns null themeId when no config file exists", async () => {
   const homeDir = await makeHomeDir();
 
-  assert.equal(resolveUserConfigPath(homeDir), join(homeDir, ".beta-agent", "config.json"));
+  assert.equal(resolveUserConfigPath(homeDir), join(homeDir, ".expecto-cli", "config.json"));
   assert.deepEqual(await loadUserConfig({ homeDir }), {
     themeId: null,
   });
@@ -49,7 +51,29 @@ test("saveUserConfig persists a themeId and loadUserConfig reads it back", async
   assert.equal(saved.themeId, "hufflepuff");
 });
 
-test("theme registry returns the Hufflepuff theme and stable house metadata", () => {
+test("loadUserConfig ignores the removed legacy config path once expecto config is absent", async () => {
+  const homeDir = await makeHomeDir();
+  const legacyDir = join(homeDir, legacyWorkspaceDir);
+
+  await mkdir(legacyDir, { recursive: true });
+  await writeFile(
+    join(legacyDir, "config.json"),
+    `${JSON.stringify({ themeId: "ravenclaw" }, null, 2)}\n`,
+    "utf8",
+  );
+
+  assert.deepEqual(await loadUserConfig({ homeDir }), {
+    themeId: null,
+  });
+});
+
+function rawGlyphRows(themeId: "hufflepuff" | "gryffindor" | "ravenclaw" | "slytherin"): string[] {
+  return getThemeDefinition(themeId).welcome.glyphRows.map((row) =>
+    row.map((segment) => segment.text).join("")
+  );
+}
+
+test("theme registry returns four available house themes with stable assets", () => {
   const themes = listThemeDefinitions();
 
   assert.deepEqual(
@@ -73,17 +97,64 @@ test("theme registry returns the Hufflepuff theme and stable house metadata", ()
   assert.equal(hufflepuff.welcome.glyphRows[2]?.[1]?.text, "▐██▙▜█ █▛▟██▌");
   assert.equal(hufflepuff.welcome.glyphRows[3]?.[1]?.text, "▐██▛◦█ █◦▜██▌");
   assert.equal(hufflepuff.welcome.glyphRows[4]?.[1]?.text, "▝▜██▇▇██▛▘");
+  assert.equal(hufflepuff.sample.tipTitle, "Tips");
+  assert.equal(hufflepuff.sample.highlightTitle, "Highlights");
   assert.ok(hufflepuff.sample.highlightTokens.length > 0);
 
   assert.deepEqual(
-    themes.slice(1).map((theme) => ({
+    themes.map((theme) => ({
       id: theme.id,
       availability: theme.availability,
     })),
     [
-      { id: "gryffindor", availability: "planned" },
-      { id: "ravenclaw", availability: "planned" },
-      { id: "slytherin", availability: "planned" },
+      { id: "hufflepuff", availability: "available" },
+      { id: "gryffindor", availability: "available" },
+      { id: "ravenclaw", availability: "available" },
+      { id: "slytherin", availability: "available" },
     ],
   );
+
+  const gryffindor = getThemeDefinition("gryffindor");
+  assert.equal(gryffindor.displayName, "Gryffindor");
+  assert.equal(gryffindor.animal, "Lion");
+  assert.equal(gryffindor.sample.tipTitle, "Tips");
+  assert.equal(gryffindor.sample.highlightTitle, "Highlights");
+  assert.deepEqual(rawGlyphRows("gryffindor"), [
+    "   ░ · ░  · ░",
+    " ░▒ ▗▞▓████▓▚▖ ~▒░",
+    "  ░ ▐▓██▛▀▜██▓▌ ░",
+    " ░▒ ▐▓██▌▼▐██▓▌·▒░",
+    "   ░▒ ▝▀████▀▘ ›_",
+  ]);
+
+  const ravenclaw = getThemeDefinition("ravenclaw");
+  assert.equal(ravenclaw.displayName, "Ravenclaw");
+  assert.equal(ravenclaw.animal, "Eagle");
+  assert.equal(ravenclaw.sample.tipTitle, "Tips");
+  assert.equal(ravenclaw.sample.highlightTitle, "Highlights");
+  assert.deepEqual(rawGlyphRows("ravenclaw"), [
+    "       ░ · ░  · ░",
+    "     ░▒  ▗▄████▄  ~▒░",
+    "      ░ ▗████▛▀▜▖  ░",
+    "     ░▒ ▐████▌◉ ◥▖·▒░",
+    "       ░▒ ▝▀███▀  ›_",
+  ]);
+
+  const slytherin = getThemeDefinition("slytherin");
+  assert.equal(slytherin.displayName, "Slytherin");
+  assert.equal(slytherin.animal, "Serpent");
+  assert.equal(slytherin.sample.tipTitle, "Tips");
+  assert.equal(slytherin.sample.highlightTitle, "Highlights");
+  assert.equal(slytherin.palette.chrome.user, "#2F7A38");
+  assert.equal(slytherin.palette.glyph.shadow, "#165517");
+  assert.equal(slytherin.palette.glyph.chin, "#2F7A38");
+  assert.equal(slytherin.palette.glyph.highlight, "#FFFFFF");
+  assert.equal(slytherin.palette.glyph.mystic, "#98A3AE");
+  assert.deepEqual(rawGlyphRows("slytherin"), [
+    "       ░ · ░  · ░",
+    "     ░▒ ▗▄▓████▓▄▖ ~▒░",
+    "      ░ ▐▓█▚▀▀▞█▓▌ ░",
+    "     ░▒ ▐▓▌◥██◤▐▓▌ ·▒░",
+    "       ░▒ ▝▀▓▼▼▓▀▘  ›_",
+  ]);
 });

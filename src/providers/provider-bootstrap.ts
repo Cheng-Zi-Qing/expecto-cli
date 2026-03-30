@@ -26,7 +26,7 @@ function requireEnv(
 function selectProvider(
   env: Record<string, string | undefined>,
 ): "openai" | "anthropic" | "openai-compatible" | "neo" | null {
-  const requested = readFirst(env, ["BETA_PROVIDER", "MODEL_PROVIDER", "model_provider"]);
+  const requested = readFirst(env, ["EXPECTO_PROVIDER", "MODEL_PROVIDER", "model_provider"]);
 
   if (
     requested === "openai" ||
@@ -84,21 +84,21 @@ export function createProviderRunnerFromEnv(
     const providerId = selectedProvider;
     const model =
       selectedProvider === "neo"
-        ? readFirst(env, ["BETA_MODEL", "MODEL", "model"]) ?? "gpt-5.4"
-        : readFirst(env, ["BETA_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5";
+        ? readFirst(env, ["EXPECTO_MODEL", "MODEL", "model"]) ?? "gpt-5.4"
+        : readFirst(env, ["EXPECTO_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5";
     const apiKey = requireEnv(
       selectedProvider === "neo"
-        ? readFirst(env, ["BETA_API_KEY", "NEO_KEY"])
-        : readFirst(env, ["BETA_API_KEY", "OPENAI_API_KEY"]),
+        ? readFirst(env, ["EXPECTO_API_KEY", "NEO_KEY"])
+        : readFirst(env, ["EXPECTO_API_KEY", "OPENAI_API_KEY"]),
       selectedProvider === "neo"
-        ? "BETA_API_KEY or NEO_KEY"
-        : "BETA_API_KEY or OPENAI_API_KEY",
+        ? "EXPECTO_API_KEY or NEO_KEY"
+        : "EXPECTO_API_KEY or OPENAI_API_KEY",
       providerId,
     );
     const baseURL =
       selectedProvider === "neo"
-        ? readFirst(env, ["BETA_BASE_URL", "NEO_BASE_URL"]) ?? "https://crs.us.bestony.com/openai"
-        : readFirst(env, ["BETA_BASE_URL", "OPENAI_BASE_URL"]);
+        ? readFirst(env, ["EXPECTO_BASE_URL", "NEO_BASE_URL"]) ?? "https://crs.us.bestony.com/openai"
+        : readFirst(env, ["EXPECTO_BASE_URL", "OPENAI_BASE_URL"]);
 
     registry.register(
       createOpenAIProvider({
@@ -117,13 +117,13 @@ export function createProviderRunnerFromEnv(
     });
   }
 
-  const model = readFirst(env, ["BETA_MODEL", "ANTHROPIC_MODEL"]) ?? "claude-sonnet-4-20250514";
+  const model = readFirst(env, ["EXPECTO_MODEL", "ANTHROPIC_MODEL"]) ?? "claude-sonnet-4-20250514";
   const apiKey = requireEnv(
-    readFirst(env, ["BETA_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]),
-    "BETA_API_KEY or ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN",
+    readFirst(env, ["EXPECTO_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]),
+    "EXPECTO_API_KEY or ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN",
     "anthropic",
   );
-  const baseURL = readFirst(env, ["BETA_BASE_URL", "ANTHROPIC_BASE_URL"]);
+  const baseURL = readFirst(env, ["EXPECTO_BASE_URL", "ANTHROPIC_BASE_URL"]);
 
   registry.register(
     createAnthropicProvider({

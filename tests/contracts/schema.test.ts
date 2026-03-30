@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import {
   activeArtifactSetSchema,
   artifactKindSchema,
@@ -24,7 +25,7 @@ test("artifact reference rejects unknown kinds", () => {
       artifactRefSchema.parse({
         id: "a1",
         kind: "unknown",
-        path: ".beta-agent/docs/tasks/T-001.md",
+        path: currentAppPath("docs", "tasks", "T-001.md"),
         title: "Task 1",
       }),
     /Invalid enum value/,
@@ -34,7 +35,7 @@ test("artifact reference rejects unknown kinds", () => {
 test("artifact write input accepts markdown content and metadata", () => {
   const parsed = artifactWriteInputSchema.parse({
     kind: "summary",
-    path: ".beta-agent/docs/summaries/T-001-2026-03-23.md",
+    path: currentAppPath("docs", "summaries", "T-001-2026-03-23.md"),
     title: "Task 1 Summary",
     content: "# Summary",
     metadata: {
@@ -48,9 +49,9 @@ test("artifact write input accepts markdown content and metadata", () => {
 
 test("artifact reference accepts lifecycle metadata for workspace orchestration", () => {
   const parsed = artifactRefSchema.parse({
-    id: ".beta-agent/docs/tasks/T-001-auth.md",
+    id: currentAppPath("docs", "tasks", "T-001-auth.md"),
     kind: "task",
-    path: ".beta-agent/docs/tasks/T-001-auth.md",
+    path: currentAppPath("docs", "tasks", "T-001-auth.md"),
     title: "T-001-auth",
     status: "in_progress",
     metadata: {
@@ -70,7 +71,7 @@ test("active artifact set supports required, optional, and on-demand groups", ()
       {
         id: "requirements",
         kind: "requirements",
-        path: ".beta-agent/docs/00-requirements.md",
+        path: currentAppPath("docs", "00-requirements.md"),
         title: "Requirements",
       },
     ],
@@ -149,7 +150,7 @@ test("session snapshot accepts active artifacts and session state", () => {
       {
         id: "plan",
         kind: "plan",
-        path: ".beta-agent/docs/01-plan.md",
+        path: currentAppPath("docs", "01-plan.md"),
         title: "Plan",
       },
     ],

@@ -2,7 +2,7 @@
 
 ## Provider Strategy
 
-`beta-agent` should not be designed around hard-coded model names.
+`Expecto Cli` should not be designed around hard-coded model names.
 
 It should be designed around:
 

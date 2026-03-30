@@ -4,10 +4,11 @@ import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { ArtifactWorkspace } from "../../src/core/artifact-workspace.ts";
 
 async function makeProjectRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-workspace-"));
+  return mkdtemp(join(tmpdir(), "expecto-workspace-"));
 }
 
 test("artifact workspace initializes the standard docs skeleton", async () => {
@@ -17,15 +18,15 @@ test("artifact workspace initializes the standard docs skeleton", async () => {
   await workspace.ensureInitialized();
 
   const requirements = await readFile(
-    join(projectRoot, ".beta-agent", "docs", "00-requirements.md"),
+    join(projectRoot, currentAppPath("docs", "00-requirements.md")),
     "utf8",
   );
   const plan = await readFile(
-    join(projectRoot, ".beta-agent", "docs", "01-plan.md"),
+    join(projectRoot, currentAppPath("docs", "01-plan.md")),
     "utf8",
   );
-  const tasks = await stat(join(projectRoot, ".beta-agent", "docs", "tasks"));
-  const summaries = await stat(join(projectRoot, ".beta-agent", "docs", "summaries"));
+  const tasks = await stat(join(projectRoot, currentAppPath("docs", "tasks")));
+  const summaries = await stat(join(projectRoot, currentAppPath("docs", "summaries")));
 
   assert.match(requirements, /^# Requirements\b/m);
   assert.match(plan, /^# Plan\b/m);
@@ -36,7 +37,7 @@ test("artifact workspace initializes the standard docs skeleton", async () => {
 test("artifact workspace does not overwrite existing baseline docs", async () => {
   const projectRoot = await makeProjectRoot();
   const workspace = new ArtifactWorkspace(projectRoot);
-  const docsRoot = join(projectRoot, ".beta-agent", "docs");
+  const docsRoot = join(projectRoot, currentAppPath("docs"));
   const customRequirements = "# Requirements\n\nCustom scope.\n";
 
   await mkdir(docsRoot, { recursive: true });
@@ -44,7 +45,7 @@ test("artifact workspace does not overwrite existing baseline docs", async () =>
   await workspace.ensureInitialized();
 
   const requirements = await readFile(
-    join(projectRoot, ".beta-agent", "docs", "00-requirements.md"),
+    join(projectRoot, currentAppPath("docs", "00-requirements.md")),
     "utf8",
   );
 

@@ -10,7 +10,7 @@ import { deriveContextMetrics } from "../../src/tui/context-metrics.ts";
 test("createInitialTuiState starts with a welcome card and composer focus", () => {
   const state = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -29,14 +29,14 @@ test("createInitialTuiState starts with a welcome card and composer focus", () =
   assert.equal(state.timelineMode, "scroll");
   assert.equal(state.timeline.length, 1);
   assert.equal(state.timeline[0]?.kind, "welcome");
-  assert.match(state.timeline[0]?.summary ?? "", /beta/i);
+  assert.match(state.timeline[0]?.summary ?? "", /expecto/i);
   assert.doesNotMatch(state.timeline[0]?.body ?? "", /\/inspect/);
 });
 
 test("createInitialTuiState opens the theme picker when no saved theme exists", () => {
   const state = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -60,7 +60,7 @@ test("createInitialTuiState opens the theme picker when no saved theme exists", 
 test("createInitialTuiState can force the first-launch picker for local testing", () => {
   const state = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -85,7 +85,7 @@ test("createInitialTuiState can force the first-launch picker for local testing"
 test("reduceTuiState applies the selected theme and closes the picker", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -106,10 +106,45 @@ test("reduceTuiState applies the selected theme and closes the picker", () => {
   assert.equal(applied.themePicker, null);
 });
 
+test("reduceTuiState moves theme picker selection on a 2x2 grid", () => {
+  const initial = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "expecto-cli",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: null,
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  const movedRight = reduceTuiState(initial, {
+    type: "move_selection_right",
+  });
+  const movedDown = reduceTuiState(movedRight, {
+    type: "move_selection_down",
+  });
+  const movedLeft = reduceTuiState(movedDown, {
+    type: "move_selection_left",
+  });
+  const movedUp = reduceTuiState(movedLeft, {
+    type: "move_selection_up",
+  });
+
+  assert.equal(movedRight.themePicker?.selectedThemeId, "gryffindor");
+  assert.equal(movedDown.themePicker?.selectedThemeId, "slytherin");
+  assert.equal(movedLeft.themePicker?.selectedThemeId, "ravenclaw");
+  assert.equal(movedUp.themePicker?.selectedThemeId, "hufflepuff");
+});
+
 test("reduceTuiState toggles inspector, timeline mode, and switches focus modes", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -168,7 +203,7 @@ test("deriveContextMetrics approximates context usage and reports visible counte
 test("reduceTuiState replaces the welcome card with real timeline items", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -199,7 +234,7 @@ test("reduceTuiState replaces the welcome card with real timeline items", () => 
 test("reduceTuiState toggles the selected execution card", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -226,7 +261,7 @@ test("reduceTuiState toggles the selected execution card", () => {
 test("reduceTuiState derives slash suggestions from visible implemented commands in registry order", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -264,7 +299,7 @@ test("reduceTuiState derives slash suggestions from visible implemented commands
 test("reduceTuiState keeps prefix-only slash filtering and hides the menu once whitespace appears", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -327,7 +362,7 @@ test("reduceTuiState keeps prefix-only slash filtering and hides the menu once w
 test("reduceTuiState moves the selected timeline item within bounds", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -382,7 +417,7 @@ test("reduceTuiState moves the selected timeline item within bounds", () => {
 test("reduceTuiState clears execution unread lines when a collapsed execution card is expanded", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -485,7 +520,7 @@ test("reduceTuiState clears execution unread lines when a collapsed execution ca
 test("reduceTuiState gates prompt lifecycle projections but still projects builtin command execution events", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -658,7 +693,7 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
 test("reduceTuiState marks interrupt intent on an active request and unlocks only on terminal completion", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",
@@ -706,7 +741,7 @@ test("reduceTuiState marks interrupt intent on an active request and unlocks onl
 test("reduceTuiState keeps assistant and execution cards request-scoped when ids repeat across requests", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude-sonnet-4-20250514",

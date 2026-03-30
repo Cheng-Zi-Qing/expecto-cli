@@ -4,11 +4,12 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { createSessionId } from "../../src/runtime/session-id.ts";
 import { EventLogStore } from "../../src/runtime/event-log-store.ts";
 
 async function makeProjectRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-events-"));
+  return mkdtemp(join(tmpdir(), "expecto-events-"));
 }
 
 test("createSessionId returns a session-prefixed identifier", () => {
@@ -40,7 +41,7 @@ test("event log store appends and lists runtime events for a session", async () 
 
   const events = await store.list("session-1");
   const persisted = await readFile(
-    join(projectRoot, ".beta-agent", "state", "events", "session-1.jsonl"),
+    join(projectRoot, currentAppPath("state", "events", "session-1.jsonl")),
     "utf8",
   );
 

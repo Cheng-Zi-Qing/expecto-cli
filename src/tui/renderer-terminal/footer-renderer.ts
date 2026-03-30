@@ -165,25 +165,25 @@ function renderStyledBodyLine(
 export function renderFooter(view: TuiFooterView, options: FooterRenderOptions): RenderedFooter {
   const width = normalizePositiveInteger(options.width, 1);
   const composerHeight = normalizePositiveInteger(options.composerHeight, 1);
-  const emphasisBackground = view.theme === undefined ? null : hexToRgb(view.theme.palette.surface.emphasisBg);
+  const composerBackground = view.theme === undefined ? null : hexToRgb(view.theme.palette.surface.composerBg);
   const borderStyle = view.theme === undefined
     ? null
     : {
         fg: hexToRgb(view.theme.palette.chrome.footer),
         bold: true,
       } satisfies AnsiStyle;
-  const frameInnerStyle = view.theme === undefined || emphasisBackground === null
+  const frameInnerStyle = view.theme === undefined || composerBackground === null
     ? null
     : {
         fg: hexToRgb(view.theme.palette.chrome.footer),
-        bg: emphasisBackground,
+        bg: composerBackground,
         bold: true,
       } satisfies AnsiStyle;
-  const composerBodyStyle = view.theme === undefined || emphasisBackground === null
+  const composerBodyStyle = view.theme === undefined || composerBackground === null
     ? null
     : {
         fg: hexToRgb(view.theme.palette.text.muted),
-        bg: emphasisBackground,
+        bg: composerBackground,
       } satisfies AnsiStyle;
   const pickerEntry = view.themePicker?.entries.find((entry) => entry.selected)
     ?? view.themePicker?.entries.find((entry) => entry.id === view.themePicker?.selectedThemeId)
@@ -198,7 +198,9 @@ export function renderFooter(view: TuiFooterView, options: FooterRenderOptions):
         pickerEntry?.availability === "planned"
           ? "Preview only · not yet available"
           : "Enter apply",
-        view.themePicker.required ? "Required before entering" : "Press /theme any time",
+        view.themePicker.required
+          ? "Required before entering the Room of Requirement"
+          : "Press /theme any time",
       ];
   const composerText = pickerLines
     ? pickerLines.join("\n")

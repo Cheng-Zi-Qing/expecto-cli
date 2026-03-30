@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { PRIMARY_CLI_BINARY_NAME, currentAppPath } from "../../src/core/brand.ts";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 import {
   interactionEventSchema,
@@ -28,10 +29,10 @@ function assistantOutputResult(output: string, responseId = "response-1") {
 }
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-session-"));
-  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
-  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
+  const root = await mkdtemp(join(tmpdir(), "expecto-session-"));
+  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
+  await writeFile(join(root, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(root, currentAppPath("docs", "01-plan.md")), "# Plan\n");
   return root;
 }
 
@@ -61,7 +62,7 @@ test("session manager runs an interactive session and persists lifecycle events"
     ["session:start", "turn:start", "turn:end", "session:stop"],
   );
   assert.equal(events[1]?.payload.prompt, "fix auth regression");
-  assert.match(output, /beta interactive session/);
+  assert.match(output, new RegExp(`${PRIMARY_CLI_BINARY_NAME} interactive session`));
   assert.match(output, new RegExp(`session: ${result.sessionId}`));
 });
 
@@ -87,7 +88,7 @@ test("session manager runs a one-shot session and records the prompt in turn pay
   assert.equal(events[1]?.type, "turn:start");
   assert.equal(events[1]?.payload.prompt, "summarize the plan");
   assert.equal(events[2]?.type, "turn:end");
-  assert.match(output, /beta one-shot session/);
+  assert.match(output, new RegExp(`${PRIMARY_CLI_BINARY_NAME} one-shot session`));
   assert.match(output, /prompt: summarize the plan/);
 });
 

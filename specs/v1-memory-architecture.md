@@ -31,7 +31,7 @@ Stored as markdown.
 
 Includes:
 
-- `.beta-agent/memory/INDEX.md`
+- `.expecto-cli/memory/INDEX.md`
 - topic files under:
   - `conventions/`
   - `workflows/`
@@ -54,7 +54,7 @@ Defer heavier semantic retrieval or local RAG until later.
 Always load:
 
 - `AGENTS.md`
-- `.beta-agent/memory/INDEX.md`
+- `.expecto-cli/memory/INDEX.md`
 
 Usually load:
 

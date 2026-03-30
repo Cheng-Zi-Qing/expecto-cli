@@ -146,7 +146,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
     selectedTimelineIndex: 0,
     draft: "",
     inputLocked: false,
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude",
@@ -495,7 +495,7 @@ test("interactive console app routes picker navigation keys locally while theme 
       {
         id: "welcome",
         kind: "welcome",
-        summary: "beta is ready",
+        summary: "expecto is ready",
         body: "Enter send",
         collapsed: false,
       },
@@ -579,7 +579,7 @@ test("interactive console app routes picker navigation keys locally while theme 
   }));
 
   assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /Gryffindor/);
-  assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /preview/i);
+  assert.match(screenWriter.fixedTimelineReplacements.at(-1) ?? "", /Gryffindor Lion is standing by/);
 
   await app.close();
 });
@@ -675,6 +675,7 @@ test("interactive console app keeps the theme picker as a single overlay without
   const output = stripAnsi(stdout.writes.join(""));
 
   assert.match(output, /Sorting Hat/);
+  assert.match(output, /House Selection/);
   assert.doesNotMatch(output, /╭ Composer/);
   assert.doesNotMatch(output, /Theme Picker/);
 

@@ -14,13 +14,14 @@ import {
   type ArtifactRef,
   type ArtifactWriteInput,
 } from "../contracts/artifact-schema.ts";
+import { currentAppPath } from "./brand.ts";
 
 const artifactPatterns: Partial<Record<ArtifactKind, string[]>> = {
-  requirements: [".beta-agent/docs/00-requirements.md"],
-  plan: [".beta-agent/docs/01-plan.md"],
-  task: [".beta-agent/docs/tasks/*.md"],
-  summary: [".beta-agent/docs/summaries/*.md"],
-  finding: [".beta-agent/docs/findings.md"],
+  requirements: [currentAppPath("docs", "00-requirements.md")],
+  plan: [currentAppPath("docs", "01-plan.md")],
+  task: [currentAppPath("docs", "tasks", "*.md")],
+  summary: [currentAppPath("docs", "summaries", "*.md")],
+  finding: [currentAppPath("docs", "findings.md")],
 };
 
 const knownKinds: ArtifactKind[] = [
@@ -78,24 +79,31 @@ function serializeArtifactFile(input: {
 
 function classifyArtifactPath(path: string): ArtifactKind | null {
   const normalizedPath = normalizeRelativePath(path);
+  const currentDocsRoot = currentAppPath("docs");
 
-  if (normalizedPath === ".beta-agent/docs/00-requirements.md") {
+  if (normalizedPath === `${currentDocsRoot}/00-requirements.md`) {
     return "requirements";
   }
 
-  if (normalizedPath === ".beta-agent/docs/01-plan.md") {
+  if (normalizedPath === `${currentDocsRoot}/01-plan.md`) {
     return "plan";
   }
 
-  if (normalizedPath === ".beta-agent/docs/findings.md") {
+  if (normalizedPath === `${currentDocsRoot}/findings.md`) {
     return "finding";
   }
 
-  if (normalizedPath.startsWith(".beta-agent/docs/tasks/") && normalizedPath.endsWith(".md")) {
+  if (
+    normalizedPath.startsWith(`${currentDocsRoot}/tasks/`) &&
+    normalizedPath.endsWith(".md")
+  ) {
     return "task";
   }
 
-  if (normalizedPath.startsWith(".beta-agent/docs/summaries/") && normalizedPath.endsWith(".md")) {
+  if (
+    normalizedPath.startsWith(`${currentDocsRoot}/summaries/`) &&
+    normalizedPath.endsWith(".md")
+  ) {
     return "summary";
   }
 

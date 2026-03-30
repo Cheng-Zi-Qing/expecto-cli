@@ -12,7 +12,7 @@
 
 ## Preconditions
 
-- The current directory `/Users/clement/Workspace/beta-agent` is **not a git repository**. A true feature branch/worktree cannot be created until `.git` is restored or `git init` is explicitly approved.
+- The current directory `/Users/clement/Workspace/expecto-cli` is **not a git repository**. A true feature branch/worktree cannot be created until `.git` is restored or `git init` is explicitly approved.
 - Until that is resolved, implementation can only proceed:
   - in-place in this directory, or
   - in a manually copied experimental directory.

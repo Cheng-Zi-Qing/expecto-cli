@@ -55,12 +55,12 @@ export type RunCliOptions = {
 };
 
 const PROVIDER_ENV_KEYS = [
-  "BETA_PROVIDER",
+  "EXPECTO_PROVIDER",
+  "EXPECTO_API_KEY",
+  "EXPECTO_BASE_URL",
+  "EXPECTO_MODEL",
   "MODEL_PROVIDER",
   "model_provider",
-  "BETA_API_KEY",
-  "BETA_BASE_URL",
-  "BETA_MODEL",
   "OPENAI_API_KEY",
   "OPENAI_BASE_URL",
   "OPENAI_MODEL",
@@ -110,7 +110,7 @@ function readFirst(
 function selectProviderLabel(
   env: Record<string, string | undefined>,
 ): "openai" | "anthropic" | "openai-compatible" | "neo" | null {
-  const requested = readFirst(env, ["BETA_PROVIDER", "MODEL_PROVIDER", "model_provider"]);
+  const requested = readFirst(env, ["EXPECTO_PROVIDER", "MODEL_PROVIDER", "model_provider"]);
 
   if (
     requested === "openai" ||
@@ -145,22 +145,22 @@ function resolveProviderPresentation(
     case "openai":
       return {
         providerLabel,
-        modelLabel: readFirst(env, ["BETA_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5",
+        modelLabel: readFirst(env, ["EXPECTO_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5",
       };
     case "openai-compatible":
       return {
         providerLabel,
-        modelLabel: readFirst(env, ["BETA_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5",
+        modelLabel: readFirst(env, ["EXPECTO_MODEL", "OPENAI_MODEL", "MODEL", "model"]) ?? "gpt-5",
       };
     case "neo":
       return {
         providerLabel,
-        modelLabel: readFirst(env, ["BETA_MODEL", "MODEL", "model"]) ?? "gpt-5.4",
+        modelLabel: readFirst(env, ["EXPECTO_MODEL", "MODEL", "model"]) ?? "gpt-5.4",
       };
     case "anthropic":
       return {
         providerLabel,
-        modelLabel: readFirst(env, ["BETA_MODEL", "ANTHROPIC_MODEL"]) ?? "claude-sonnet-4-20250514",
+        modelLabel: readFirst(env, ["EXPECTO_MODEL", "ANTHROPIC_MODEL"]) ?? "claude-sonnet-4-20250514",
       };
     default:
       return {
@@ -272,7 +272,7 @@ async function runCliCommand(
     stdinIsTTY,
     stdoutIsTTY,
     hasStdinPayload: stdinText.length > 0,
-    deprecatedTerminalRendererEnv: presentationEnv.BETA_TUI_RENDERER === "terminal",
+    deprecatedTerminalRendererEnv: false,
   });
 
   for (const warning of route.warnings) {

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 import { SessionManager } from "../../src/runtime/session-manager.ts";
 
@@ -17,10 +18,10 @@ function assistantOutputResult(output: string, responseId = "response-1") {
 }
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-interactive-"));
-  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
-  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
+  const root = await mkdtemp(join(tmpdir(), "expecto-interactive-"));
+  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
+  await writeFile(join(root, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(root, currentAppPath("docs", "01-plan.md")), "# Plan\n");
   return root;
 }
 

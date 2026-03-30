@@ -196,7 +196,7 @@ test("getCommandMenuLayout only reserves space when the slash palette is visible
   });
 });
 
-test("interpretKeypress routes up/down/enter to the theme picker before normal composer behavior", () => {
+test("interpretKeypress routes arrow keys and enter to the theme picker before normal composer behavior", () => {
   const moveUp = interpretKeypress(
     {
       focus: "composer",
@@ -221,6 +221,30 @@ test("interpretKeypress routes up/down/enter to the theme picker before normal c
       name: "down",
     },
   );
+  const moveLeft = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+      themePickerActive: true,
+    },
+    undefined,
+    {
+      name: "left",
+    },
+  );
+  const moveRight = interpretKeypress(
+    {
+      focus: "composer",
+      inputLocked: false,
+      draft: "draft",
+      themePickerActive: true,
+    },
+    undefined,
+    {
+      name: "right",
+    },
+  );
   const apply = interpretKeypress(
     {
       focus: "composer",
@@ -237,6 +261,8 @@ test("interpretKeypress routes up/down/enter to the theme picker before normal c
   assert.deepEqual(moveUp.actions, ["move_selection_up"]);
   assert.equal(moveUp.nextDraft, undefined);
   assert.deepEqual(moveDown.actions, ["move_selection_down"]);
+  assert.deepEqual(moveLeft.actions, ["move_selection_left"]);
+  assert.deepEqual(moveRight.actions, ["move_selection_right"]);
   assert.deepEqual(apply.actions, ["toggle_selected_item"]);
   assert.equal(apply.submitPrompt, undefined);
 });

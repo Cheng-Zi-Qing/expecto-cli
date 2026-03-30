@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { DEFAULT_ASSISTANT_IDENTITY } from "../../src/core/brand.ts";
 import { createAnthropicProvider } from "../../src/providers/anthropic-provider.ts";
 import { createOpenAIProvider } from "../../src/providers/openai-provider.ts";
 import { createProviderRunnerFromEnv } from "../../src/providers/provider-bootstrap.ts";
@@ -67,7 +68,7 @@ test("openai provider calls the responses api and returns output_text", async ()
   assert.equal(calls[0]?.url, "https://api.openai.test/v1/responses");
   assert.equal(readHeader(calls[0]?.init, "Authorization"), "Bearer test-openai-key");
   const requestBody = JSON.parse(String(calls[0]?.init?.body));
-  assert.equal(requestBody.instructions, "You are beta, a CLI-first coding assistant. Follow the user request directly.");
+  assert.equal(requestBody.instructions, DEFAULT_ASSISTANT_IDENTITY);
   assert.equal(result.outputText, "hello from openai");
   assert.equal(result.model, "gpt-5");
 });
@@ -256,7 +257,7 @@ test("anthropic provider calls the messages api and flattens text blocks", async
   const requestBody = JSON.parse(String(calls[0]?.init?.body));
   assert.equal(
     requestBody.system,
-    "You are beta, a CLI-first coding assistant. Follow the user request directly.",
+    DEFAULT_ASSISTANT_IDENTITY,
   );
   assert.equal(result.outputText, "hello from anthropic");
   assert.equal(result.model, "claude-sonnet-4-20250514");
@@ -358,7 +359,7 @@ test("anthropic provider forwards AbortSignal to fetch", async () => {
 test("provider bootstrap creates an openai runner from environment variables", async () => {
   const runner = createProviderRunnerFromEnv({
     env: {
-      BETA_PROVIDER: "openai",
+      EXPECTO_PROVIDER: "openai",
       OPENAI_API_KEY: "test-openai-key",
       OPENAI_MODEL: "gpt-5",
       OPENAI_BASE_URL: "https://api.openai.test/v1",
@@ -396,7 +397,7 @@ test("provider bootstrap creates an openai runner from environment variables", a
 test("provider bootstrap accepts anthropic auth token aliases and custom base urls", async () => {
   const runner = createProviderRunnerFromEnv({
     env: {
-      BETA_PROVIDER: "anthropic",
+      EXPECTO_PROVIDER: "anthropic",
       ANTHROPIC_AUTH_TOKEN: "test-anthropic-token",
       ANTHROPIC_MODEL: "claude-sonnet-4-20250514",
       ANTHROPIC_BASE_URL: "https://code.newcli.com/claude",
@@ -440,13 +441,13 @@ test("provider bootstrap accepts anthropic auth token aliases and custom base ur
   assert.equal(result?.outputText, "bootstrapped anthropic");
 });
 
-test("provider bootstrap supports unified beta env vars for openai-compatible gateways", async () => {
+test("provider bootstrap supports unified EXPECTO env vars for openai-compatible gateways", async () => {
   const runner = createProviderRunnerFromEnv({
     env: {
-      BETA_PROVIDER: "openai-compatible",
-      BETA_API_KEY: "gateway-key",
-      BETA_MODEL: "gpt-4.1-mini",
-      BETA_BASE_URL: "https://gateway.example.com/openai/v1/",
+      EXPECTO_PROVIDER: "openai-compatible",
+      EXPECTO_API_KEY: "gateway-key",
+      EXPECTO_MODEL: "gpt-4.1-mini",
+      EXPECTO_BASE_URL: "https://gateway.example.com/openai/v1/",
     },
     fetch: async (url, init) => {
       assert.equal(String(url), "https://gateway.example.com/openai/v1/responses");
@@ -454,7 +455,7 @@ test("provider bootstrap supports unified beta env vars for openai-compatible ga
       const requestBody = JSON.parse(String(init?.body));
       assert.equal(
         requestBody.instructions,
-        "You are beta, a CLI-first coding assistant. Follow the user request directly.",
+        DEFAULT_ASSISTANT_IDENTITY,
       );
 
       return new Response(
@@ -485,6 +486,18 @@ test("provider bootstrap supports unified beta env vars for openai-compatible ga
   });
 
   assert.equal(result?.outputText, "gateway response");
+});
+
+test("provider bootstrap ignores removed BETA env vars for openai-compatible gateways", async () => {
+  const runner = createProviderRunnerFromEnv({
+    env: {
+      BETA_PROVIDER: "openai-compatible",
+      BETA_API_KEY: "gateway-key",
+      BETA_MODEL: "gpt-4.1-mini",
+      BETA_BASE_URL: "https://gateway.example.com/openai/v1/",
+    },
+  });
+  assert.equal(runner, null);
 });
 
 test("provider bootstrap supports neo-style aliases for model, provider, and key", async () => {

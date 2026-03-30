@@ -4,26 +4,30 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 
-async function makeProjectRoot(options: { includeAgents?: boolean; includeMemoryIndex?: boolean } = {}): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-runtime-"));
-  await mkdir(join(root, ".beta-agent", "docs", "tasks"), { recursive: true });
-  await mkdir(join(root, ".beta-agent", "docs", "summaries"), { recursive: true });
-  await mkdir(join(root, ".beta-agent", "memory"), { recursive: true });
+const docsRoot = currentAppPath("docs");
+const memoryRoot = currentAppPath("memory");
 
-  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
-  await writeFile(join(root, ".beta-agent", "docs", "tasks", "T-001-auth.md"), "# Task\n");
-  await writeFile(join(root, ".beta-agent", "docs", "summaries", "T-001-2026-03-23.md"), "# Summary\n");
-  await writeFile(join(root, ".beta-agent", "docs", "findings.md"), "# Findings\n");
+async function makeProjectRoot(options: { includeAgents?: boolean; includeMemoryIndex?: boolean } = {}): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "expecto-runtime-"));
+  await mkdir(join(root, docsRoot, "tasks"), { recursive: true });
+  await mkdir(join(root, docsRoot, "summaries"), { recursive: true });
+  await mkdir(join(root, memoryRoot), { recursive: true });
+
+  await writeFile(join(root, docsRoot, "00-requirements.md"), "# Requirements\n");
+  await writeFile(join(root, docsRoot, "01-plan.md"), "# Plan\n");
+  await writeFile(join(root, docsRoot, "tasks", "T-001-auth.md"), "# Task\n");
+  await writeFile(join(root, docsRoot, "summaries", "T-001-2026-03-23.md"), "# Summary\n");
+  await writeFile(join(root, docsRoot, "findings.md"), "# Findings\n");
 
   if (options.includeAgents !== false) {
     await writeFile(join(root, "AGENTS.md"), "# Project Instructions\n");
   }
 
   if (options.includeMemoryIndex !== false) {
-    await writeFile(join(root, ".beta-agent", "memory", "INDEX.md"), "# Memory Index\n");
+    await writeFile(join(root, memoryRoot, "INDEX.md"), "# Memory Index\n");
   }
 
   return root;
@@ -42,7 +46,7 @@ test("buildBootstrapContext loads project instructions, memory index, and active
   assert.match(context.instructions[0]?.content ?? "", /Project Instructions/);
 
   assert.equal(context.memory.length, 1);
-  assert.equal(context.memory[0]?.path, ".beta-agent/memory/INDEX.md");
+  assert.equal(context.memory[0]?.path, currentAppPath("memory", "INDEX.md"));
   assert.match(context.memory[0]?.content ?? "", /Memory Index/);
 
   assert.deepEqual(
@@ -59,7 +63,7 @@ test("buildBootstrapContext loads project instructions, memory index, and active
     context.instructionStack?.map((layer) => layer.kind),
     ["identity", "mode", "project_instruction", "artifact_summary", "artifact_summary", "artifact_summary"],
   );
-  assert.equal(context.instructionStack?.[0]?.title, "beta-identity");
+  assert.equal(context.instructionStack?.[0]?.title, "expecto-cli-identity");
   assert.equal(context.instructionStack?.[1]?.title, "mode-balanced");
   assert.equal(context.instructionStack?.[2]?.path, "AGENTS.md");
   assert.match(context.sessionSummary ?? "", /T-001-auth/);

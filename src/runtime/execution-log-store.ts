@@ -1,6 +1,8 @@
 import { access, appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { currentAppPath } from "../core/brand.ts";
+
 export type ExecutionLogStore = {
   ensureExecutionLog: (executionId: string) => Promise<string>;
   appendChunk: (executionId: string, output: string) => Promise<string>;
@@ -19,11 +21,11 @@ function sanitizeExecutionId(executionId: string): string {
 export function createExecutionLogStore(
   options: CreateExecutionLogStoreOptions,
 ): ExecutionLogStore {
-  const logsDir = join(options.projectRoot, ".beta-agent", "logs");
+  const logsDir = join(options.projectRoot, currentAppPath("logs"));
   const pendingWrites = new Map<string, Promise<void>>();
 
-  const pathFor = (executionId: string): string => {
-    return join(logsDir, `exec_${sanitizeExecutionId(executionId)}.log`);
+  const pathFor = (directory: string, executionId: string): string => {
+    return join(directory, `exec_${sanitizeExecutionId(executionId)}.log`);
   };
 
   const queueWrite = (executionId: string, action: () => Promise<void>): Promise<string> => {
@@ -42,29 +44,33 @@ export function createExecutionLogStore(
       }),
     );
 
-    return next.then(() => pathFor(executionId));
+    return next.then(() => pathFor(logsDir, executionId));
   };
 
   return {
     ensureExecutionLog: async (executionId) => {
       return queueWrite(executionId, async () => {
-        await writeFile(pathFor(executionId), "", { flag: "a" });
+        await writeFile(pathFor(logsDir, executionId), "", { flag: "a" });
       });
     },
     appendChunk: async (executionId, output) => {
       return queueWrite(executionId, async () => {
-        await appendFile(pathFor(executionId), output, "utf8");
+        await appendFile(pathFor(logsDir, executionId), output, "utf8");
       });
     },
     resolveLogPath: async (executionId) => {
-      const logPath = pathFor(executionId);
+      const logPath = pathFor(logsDir, executionId);
 
       try {
         await access(logPath);
         return logPath;
-      } catch {
-        return null;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw error;
+        }
       }
+
+      return null;
     },
     flush: async (executionId) => {
       if (executionId !== undefined) {

@@ -58,6 +58,7 @@ test("user cards render as submitted-input cards with distinct chrome", () => {
   assert.equal((markup.match(/Inspect auth flow/g) ?? []).length, 1);
   assert.match(markup, /#D6A93D-fg/);
   assert.match(markup, /#F2D16B-fg/);
+  assert.match(markup, /#FBF6EA-bg/);
   assert.match(markup, /╭/);
   assert.match(markup, /╰/);
 });
@@ -261,7 +262,7 @@ test("welcome cards render the themed mascot block instead of the legacy placeho
       {
         id: "welcome-1",
         kind: "welcome",
-        summary: "beta is ready",
+        summary: "expecto is ready",
         body: "Enter send",
       },
     ],
@@ -279,7 +280,7 @@ test("welcome cards render the themed mascot block instead of the legacy placeho
   assert.match(markup, /▐██▙▜█ █▛▟██▌/);
   assert.match(markup, /▐██▛◦█ █◦▜██▌/);
   assert.match(markup, /▝▜██▇▇██▛▘/);
-  assert.match(markup, /Highlight sample/);
+  assert.match(markup, /Highlights/);
   assert.doesNotMatch(markup, /Enter send/);
 });
 

@@ -21,7 +21,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
     selectedTimelineIndex: 0,
     draft: "",
     inputLocked: false,
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude",

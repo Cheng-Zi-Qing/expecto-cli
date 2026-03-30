@@ -81,9 +81,9 @@ test("renderFooter renders theme picker controls instead of the normal composer 
         selectedThemeId: "hufflepuff",
         entries: [
           { id: "hufflepuff", displayName: "Hufflepuff", animal: "Badger", paletteLabel: "yellow / gray", availability: "available", selected: true },
-          { id: "gryffindor", displayName: "Gryffindor", animal: "Lion", paletteLabel: "red / gold", availability: "planned", selected: false },
-          { id: "ravenclaw", displayName: "Ravenclaw", animal: "Eagle", paletteLabel: "blue / bronze", availability: "planned", selected: false },
-          { id: "slytherin", displayName: "Slytherin", animal: "Serpent", paletteLabel: "green / silver", availability: "planned", selected: false },
+          { id: "gryffindor", displayName: "Gryffindor", animal: "Lion", paletteLabel: "crimson / gold", availability: "available", selected: false },
+          { id: "ravenclaw", displayName: "Ravenclaw", animal: "Eagle", paletteLabel: "blue / gold", availability: "available", selected: false },
+          { id: "slytherin", displayName: "Slytherin", animal: "Serpent", paletteLabel: "green / silver", availability: "available", selected: false },
         ],
         required: true,
       },
@@ -96,6 +96,7 @@ test("renderFooter renders theme picker controls instead of the normal composer 
   assert.match(output, /Theme Picker/);
   assert.match(output, /Use ↑↓ to move/);
   assert.match(output, /Enter apply/);
+  assert.match(output, /Required before entering the Room of Requirement/);
   assert.doesNotMatch(output, /Write a prompt/);
 });
 

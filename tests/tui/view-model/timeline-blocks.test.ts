@@ -35,7 +35,7 @@ test("welcome card builds a themed welcome block with the welcome label", () => 
     createItem({
       id: "welcome-1",
       kind: "welcome",
-      summary: "Welcome to beta",
+      summary: "Welcome to expecto",
       body: "Line one\nLine two",
       collapsed: false,
     }),
@@ -76,7 +76,7 @@ test("welcome card ignores generic body text and renders theme-owned welcome con
   const welcomeBlock = card.blocks[0];
   assert.ok(welcomeBlock);
   assert.equal(welcomeBlock.kind, "theme_welcome");
-  assert.equal(welcomeBlock.tipTitle, "Tips for getting started");
+  assert.equal(welcomeBlock.tipTitle, "Tips");
   assert.equal(welcomeBlock.highlightTokens[0]?.text, "/theme");
 });
 

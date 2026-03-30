@@ -23,6 +23,8 @@ export type KeypressAction =
   | "toggle_timeline_mode"
   | "focus_timeline"
   | "focus_composer"
+  | "move_selection_left"
+  | "move_selection_right"
   | "move_selection_up"
   | "move_selection_down"
   | "move_selection_page_up"
@@ -107,6 +109,18 @@ export function interpretKeypress(
   }
 
   if (snapshot.themePickerActive) {
+    if (key.name === "left") {
+      return {
+        actions: ["move_selection_left"],
+      };
+    }
+
+    if (key.name === "right") {
+      return {
+        actions: ["move_selection_right"],
+      };
+    }
+
     if (key.name === "up") {
       return {
         actions: ["move_selection_up"],

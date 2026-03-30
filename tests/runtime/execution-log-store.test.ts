@@ -7,7 +7,7 @@ import test from "node:test";
 import { createExecutionLogStore } from "../../src/runtime/execution-log-store.ts";
 
 test("execution log store appends execution chunks and returns a stable file path", async () => {
-  const projectRoot = await mkdtemp(join(tmpdir(), "beta-agent-exec-log-"));
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-exec-log-"));
   const store = createExecutionLogStore({ projectRoot });
 
   const ensuredPath = await store.ensureExecutionLog("exec:1");
@@ -20,7 +20,7 @@ test("execution log store appends execution chunks and returns a stable file pat
 
   assert.equal(ensuredPath, firstAppendPath);
   assert.equal(firstAppendPath, secondAppendPath);
-  assert.match(ensuredPath, /\.beta-agent\/logs\/exec_exec_1\.log$/);
+  assert.match(ensuredPath, /\.expecto-cli\/logs\/exec_exec_1\.log$/);
   assert.equal(content, "alpha\nbeta\n");
   assert.equal(await store.resolveLogPath("exec:1"), ensuredPath);
 });

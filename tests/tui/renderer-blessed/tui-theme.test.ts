@@ -8,6 +8,7 @@ import {
   renderInlineTextTokens,
 } from "../../../src/tui/renderer-blessed/tui-theme.ts";
 import { createTextToken } from "../../../src/tui/block-model/text-tokens.ts";
+import { getThemeDefinition } from "../../../src/tui/theme/theme-registry.ts";
 
 function stripBlessedTags(value: string): string {
   return value.replace(/\{[^}]+\}/g, "");
@@ -31,7 +32,7 @@ test("renderer palette keeps text readable while differentiating panel chrome", 
   assert.equal(palette.timeline.token.path.fg, "#7A746C");
   assert.equal(palette.composer.text, "#3A3128");
   assert.equal(palette.composer.placeholder, "#7A746C");
-  assert.equal(palette.composer.bg, "#F3F4F6");
+  assert.equal(palette.composer.bg, "#F3EAD0");
   assert.equal(palette.inspector.text, "#3A3128");
   assert.equal(palette.inspector.bg, "#F3F4F6");
   assert.notEqual(palette.composer.text, palette.composer.placeholder);
@@ -165,8 +166,9 @@ test("renderer palette consumes the active theme palette instead of hardcoded un
     inputLocked: false,
     themeId: "ravenclaw",
   });
+  const theme = getThemeDefinition("ravenclaw");
 
-  assert.equal(palette.timeline.card.welcome.border, "#2C5A8A");
-  assert.equal(palette.timeline.token.command.fg, "#2C5A8A");
-  assert.equal(palette.commandMenu.selectedMarker, "#F6E8B3");
+  assert.equal(palette.timeline.card.welcome.border, theme.palette.chrome.utility);
+  assert.equal(palette.timeline.token.command.fg, theme.palette.token.command);
+  assert.equal(palette.commandMenu.selectedMarker, theme.palette.chrome.selection);
 });

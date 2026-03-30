@@ -8,6 +8,8 @@ type TerminalInputHandlers = Pick<
   | "onExit"
   | "onMoveSelectionUp"
   | "onMoveSelectionDown"
+  | "onMoveSelectionLeft"
+  | "onMoveSelectionRight"
   | "onToggleSelectedItem"
 >;
 
@@ -90,6 +92,10 @@ export function handleTerminalInputChunk(
           handlers.onMoveSelectionUp();
         } else if (escapeSequence.sequence === "\u001b[B") {
           handlers.onMoveSelectionDown();
+        } else if (escapeSequence.sequence === "\u001b[D") {
+          handlers.onMoveSelectionLeft?.();
+        } else if (escapeSequence.sequence === "\u001b[C") {
+          handlers.onMoveSelectionRight?.();
         }
         continue;
       }

@@ -2,8 +2,9 @@ import { mkdir, readFile, appendFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { runtimeEventSchema, type RuntimeEvent } from "../contracts/event-schema.ts";
+import { currentAppPath } from "../core/brand.ts";
 
-const eventDirectory = ".beta-agent/state/events";
+const eventDirectory = currentAppPath("state", "events");
 
 function ensureValidSessionId(sessionId: string): string {
   if (sessionId.includes("/") || sessionId.includes("\\")) {
@@ -35,14 +36,13 @@ export class EventLogStore {
 
   async list(sessionId: string): Promise<RuntimeEvent[]> {
     const content = await readFile(this.toEventLogPath(sessionId), "utf8");
-
     return content
       .split("\n")
       .filter((line) => line.trim().length > 0)
       .map((line) => runtimeEventSchema.parse(JSON.parse(line)));
   }
 
-  private toEventLogPath(sessionId: string): string {
-    return join(this.projectRoot, eventDirectory, `${ensureValidSessionId(sessionId)}.jsonl`);
+  private toEventLogPath(sessionId: string, directory = eventDirectory): string {
+    return join(this.projectRoot, directory, `${ensureValidSessionId(sessionId)}.jsonl`);
   }
 }

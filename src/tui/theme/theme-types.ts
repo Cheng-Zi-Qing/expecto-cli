@@ -65,7 +65,8 @@ export type ThemePalette = {
     selection: string;
   };
   surface: {
-    emphasisBg: string;
+    userCardBg: string;
+    composerBg: string;
   };
   token: {
     command: string;

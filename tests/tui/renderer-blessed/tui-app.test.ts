@@ -73,7 +73,7 @@ test("renderStatusBar escapes brace characters in dynamic values while preservin
 
   assert.match(
     output,
-    /^beta \| open\{open\}router\{close\}\/gpt-\{open\}5\{close\} \| proj\{open\}root\{close\} \| feature\/\{open\}safety\{close\}/,
+    /^expecto \| open\{open\}router\{close\}\/gpt-\{open\}5\{close\} \| proj\{open\}root\{close\} \| feature\/\{open\}safety\{close\}/,
   );
 });
 

@@ -2,25 +2,26 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { runCli } from "../../src/cli/entry.ts";
 import { SESSION_ENV_RELATIVE_PATH } from "../../src/cli/session-env.ts";
+import { currentAppPath } from "../../src/core/brand.ts";
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-cli-renderer-"));
-  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
+  const root = await mkdtemp(join(tmpdir(), "expecto-cli-renderer-"));
+  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
   return root;
 }
 
 async function makeEmptyHomeDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-home-empty-"));
+  return mkdtemp(join(tmpdir(), "expecto-home-empty-"));
 }
 
 async function makeHomeDirWithSessionEnv(contents: string): Promise<string> {
-  const homeDir = await mkdtemp(join(tmpdir(), "beta-agent-home-session-"));
+  const homeDir = await mkdtemp(join(tmpdir(), "expecto-home-session-"));
   const sessionEnvPath = join(homeDir, SESSION_ENV_RELATIVE_PATH);
-  await mkdir(join(homeDir, ".beta-agent"), { recursive: true });
+  await mkdir(dirname(sessionEnvPath), { recursive: true });
   await writeFile(sessionEnvPath, contents, "utf8");
   return homeDir;
 }
@@ -49,7 +50,7 @@ test("runCli defaults to the sticky terminal renderer for fullscreen TTY session
   assert.equal(observedShutdownSignal, shutdownController.signal);
 });
 
-test("BETA_TUI_RENDERER=terminal stays warning-only after the terminal renderer becomes default", async () => {
+test("runCli ignores the removed legacy BETA_TUI_RENDERER override", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv("BETA_TUI_RENDERER=blessed\n");
   let observedRenderer = "";
@@ -72,5 +73,5 @@ test("BETA_TUI_RENDERER=terminal stays warning-only after the terminal renderer 
   });
 
   assert.equal(observedRenderer, "terminal");
-  assert.match(stderr, /BETA_TUI_RENDERER=terminal is deprecated/i);
+  assert.equal(stderr, "");
 });

@@ -40,7 +40,7 @@ without taking on the full risk of automatic promotion or automatic workflow mut
 ### Not Allowed in `v1`
 
 - background self-modification
-- silent updates to `AGENTS.md`, `.beta-agent/docs/`, or active skills
+- silent updates to `AGENTS.md`, `.expecto-cli/docs/`, or active skills
 - automatic promotion from observation to lesson, skill, command, or hook
 - automatic enabling of promoted assets in future sessions
 - non-audited writes outside the observer-owned storage area
@@ -64,8 +64,8 @@ runtime events
 
 Use private support storage for raw observations and indexes:
 
-- `.beta-agent/state/observations/`
-- `.beta-agent/state/observer/`
+- `.expecto-cli/state/observations/`
+- `.expecto-cli/state/observer/`
 
 This layer is machine-oriented, append-friendly, and not loaded into context by default.
 
@@ -73,8 +73,8 @@ This layer is machine-oriented, append-friendly, and not loaded into context by 
 
 Use markdown for reviewable candidate outputs:
 
-- `.beta-agent/evolution/candidates/`
-- `.beta-agent/memory/lessons/`
+- `.expecto-cli/evolution/candidates/`
+- `.expecto-cli/memory/lessons/`
 
 Candidates are drafts. Lessons are approved artifacts. Neither should be auto-loaded into the hot context path unless explicitly requested.
 

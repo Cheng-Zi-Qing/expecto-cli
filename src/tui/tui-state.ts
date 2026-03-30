@@ -1,5 +1,6 @@
 import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
 import { listImplementedCommands } from "../commands/command-registry.ts";
+import { PRODUCT_DISPLAY_NAME } from "../core/brand.ts";
 import {
   appendTranscriptChunk,
   createExecutionTranscriptBuffer,
@@ -51,15 +52,40 @@ function createThemePickerState(
   };
 }
 
+const THEME_PICKER_COLUMN_COUNT = 2;
+
 function moveThemeSelection(
   picker: NonNullable<TuiState["themePicker"]>,
-  offset: number,
+  direction: "up" | "down" | "left" | "right",
 ): NonNullable<TuiState["themePicker"]> {
   const currentIndex = Math.max(0, picker.themeIds.indexOf(picker.selectedThemeId));
-  const nextIndex = Math.max(
-    0,
-    Math.min(picker.themeIds.length - 1, currentIndex + offset),
-  );
+  let nextIndex = currentIndex;
+
+  switch (direction) {
+    case "left":
+      if (currentIndex % THEME_PICKER_COLUMN_COUNT !== 0) {
+        nextIndex = currentIndex - 1;
+      }
+      break;
+    case "right":
+      if (
+        currentIndex % THEME_PICKER_COLUMN_COUNT !== THEME_PICKER_COLUMN_COUNT - 1 &&
+        currentIndex + 1 < picker.themeIds.length
+      ) {
+        nextIndex = currentIndex + 1;
+      }
+      break;
+    case "up":
+      if (currentIndex - THEME_PICKER_COLUMN_COUNT >= 0) {
+        nextIndex = currentIndex - THEME_PICKER_COLUMN_COUNT;
+      }
+      break;
+    case "down":
+      if (currentIndex + THEME_PICKER_COLUMN_COUNT < picker.themeIds.length) {
+        nextIndex = currentIndex + THEME_PICKER_COLUMN_COUNT;
+      }
+      break;
+  }
 
   return {
     ...picker,
@@ -151,7 +177,7 @@ function createWelcomeCard(input: CreateInitialTuiStateInput): TimelineItem {
   return {
     id: "welcome",
     kind: "welcome",
-    summary: `beta is ready in ${input.projectLabel} on ${input.branchLabel}.`,
+    summary: `${PRODUCT_DISPLAY_NAME} is ready in ${input.projectLabel} on ${input.branchLabel}.`,
     body: [
       "Enter send",
       "Alt+Enter newline",
@@ -535,11 +561,29 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         ...state,
         focus: "composer",
       };
+    case "move_selection_left":
+      if (state.themePicker !== null) {
+        return {
+          ...state,
+          themePicker: moveThemeSelection(state.themePicker, "left"),
+        };
+      }
+
+      return state;
+    case "move_selection_right":
+      if (state.themePicker !== null) {
+        return {
+          ...state,
+          themePicker: moveThemeSelection(state.themePicker, "right"),
+        };
+      }
+
+      return state;
     case "move_selection_up":
       if (state.themePicker !== null) {
         return {
           ...state,
-          themePicker: moveThemeSelection(state.themePicker, -1),
+          themePicker: moveThemeSelection(state.themePicker, "up"),
         };
       }
 
@@ -561,7 +605,7 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
       if (state.themePicker !== null) {
         return {
           ...state,
-          themePicker: moveThemeSelection(state.themePicker, 1),
+          themePicker: moveThemeSelection(state.themePicker, "down"),
         };
       }
 

@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const SESSION_ENV_RELATIVE_PATH = ".beta-agent/session.env";
+import { currentAppPath } from "../core/brand.ts";
+
+export const SESSION_ENV_RELATIVE_PATH = currentAppPath("session.env");
 
 export type LoadSessionEnvOptions = {
   homeDir?: string;
@@ -52,7 +54,8 @@ export function resolveSessionEnvPath(homeDir = homedir()): string {
 }
 
 export async function loadSessionEnv(options: LoadSessionEnvOptions = {}): Promise<Record<string, string>> {
-  const path = resolveSessionEnvPath(options.homeDir);
+  const homeDir = options.homeDir ?? homedir();
+  const path = resolveSessionEnvPath(homeDir);
 
   try {
     const contents = await readFile(path, "utf8");

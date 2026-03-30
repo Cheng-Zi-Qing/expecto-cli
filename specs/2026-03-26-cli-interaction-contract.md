@@ -706,14 +706,14 @@ Persistence is intentionally split by data shape.
 
 Project session context stays file-based under project state directories:
 
-- `.beta-agent/state/events/*.jsonl`
-- `.beta-agent/state/snapshots/*.json`
+- `.expecto-cli/state/events/*.jsonl`
+- `.expecto-cli/state/snapshots/*.json`
 
 ### Non-Project Workspaces
 
 If the current directory is not a valid project workspace, project-like state must be redirected under:
 
-- `~/.beta-agent/workspaces/<fingerprint>/`
+- `~/.expecto-cli/workspaces/<fingerprint>/`
 
 This prevents polluting arbitrary directories such as `/tmp` or `~/Downloads`.
 
@@ -721,7 +721,7 @@ This prevents polluting arbitrary directories such as `/tmp` or `~/Downloads`.
 
 Global command history lives in SQLite:
 
-- `~/.beta-agent/history/commands.sqlite`
+- `~/.expecto-cli/history/commands.sqlite`
 
 ### Draft Snapshot
 

@@ -101,6 +101,8 @@ export type TuiAction =
   | { type: "toggle_timeline_mode" }
   | { type: "focus_timeline" }
   | { type: "focus_composer" }
+  | { type: "move_selection_left" }
+  | { type: "move_selection_right" }
   | { type: "move_selection_up" }
   | { type: "move_selection_down" }
   | { type: "append_system_message"; line: string }

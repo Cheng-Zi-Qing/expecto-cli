@@ -12,7 +12,7 @@ const baseInput = () => ({
   deprecatedTerminalRendererEnv: false,
 });
 
-test("bare beta on a full TTY resolves to blessed fullscreen", () => {
+test("bare invocation on a full TTY resolves to fullscreen TUI", () => {
   const result = resolveCliRoute({
     ...baseInput(),
     parsed: parseCliArgs([]),
@@ -28,7 +28,7 @@ test("bare beta on a full TTY resolves to blessed fullscreen", () => {
   assert.deepEqual(result.warnings, []);
 });
 
-test("beta with a positional prompt resolves to single-shot stream output", () => {
+test("positional prompt resolves to single-shot stream output", () => {
   const result = resolveCliRoute({
     ...baseInput(),
     parsed: parseCliArgs(["fix auth regression"]),
@@ -201,7 +201,7 @@ test("deprecated print alias returns a warning instead of remaining a first-clas
   );
 });
 
-test("deprecated BETA_TUI_RENDERER=terminal warns but does not replace routing intent", () => {
+test("removed deprecated terminal renderer env no longer adds route warnings", () => {
   const result = resolveCliRoute({
     ...baseInput(),
     parsed: parseCliArgs([]),
@@ -209,7 +209,5 @@ test("deprecated BETA_TUI_RENDERER=terminal warns but does not replace routing i
   });
 
   assert.equal(result.kind, "tui");
-  assert.ok(
-    result.warnings.some((warning) => warning.code === "DEPRECATED_TERMINAL_RENDERER_ENV"),
-  );
+  assert.deepEqual(result.warnings, []);
 });

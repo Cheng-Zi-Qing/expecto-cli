@@ -6,22 +6,24 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { runCli } from "../../src/cli/entry.ts";
+import { SESSION_ENV_RELATIVE_PATH } from "../../src/cli/session-env.ts";
+import { currentAppPath } from "../../src/core/brand.ts";
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-cli-"));
-  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
+  const root = await mkdtemp(join(tmpdir(), "expecto-cli-"));
+  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
   return root;
 }
 
 async function makeHomeDirWithSessionEnv(contents: string): Promise<string> {
-  const homeDir = await mkdtemp(join(tmpdir(), "beta-agent-home-"));
-  await mkdir(join(homeDir, ".beta-agent"), { recursive: true });
-  await writeFile(join(homeDir, ".beta-agent", "session.env"), contents);
+  const homeDir = await mkdtemp(join(tmpdir(), "expecto-home-"));
+  await mkdir(join(homeDir, currentAppPath()), { recursive: true });
+  await writeFile(join(homeDir, SESSION_ENV_RELATIVE_PATH), contents);
   return homeDir;
 }
 
 async function makeEmptyHomeDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-home-empty-"));
+  return mkdtemp(join(tmpdir(), "expecto-home-empty-"));
 }
 
 function makeUnreadableStdinStream(): Readable {
@@ -32,7 +34,7 @@ function makeUnreadableStdinStream(): Readable {
   });
 }
 
-test("beta with a positional prompt routes to one-shot native execution", async () => {
+test("expecto with a positional prompt routes to one-shot native execution", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -65,7 +67,7 @@ test("beta with a positional prompt routes to one-shot native execution", async 
   assert.equal(stderr, "");
 });
 
-test("beta -p routes to one-shot native execution and emits a deprecation warning on stderr", async () => {
+test("expecto -p routes to one-shot native execution and emits a deprecation warning on stderr", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -98,7 +100,7 @@ test("beta -p routes to one-shot native execution and emits a deprecation warnin
   assert.match(stderr, /-p\/--print alias is deprecated/i);
 });
 
-test("beta with no args uses the sticky main-screen TUI runner only in full TTY sessions", async () => {
+test("expecto with no args uses the sticky main-screen TUI runner only in full TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -129,7 +131,7 @@ test("beta with no args uses the sticky main-screen TUI runner only in full TTY 
   assert.equal(observedRenderer, "terminal");
 });
 
-test("beta with a positional prompt does not use fullscreen TUI even in full TTY sessions", async () => {
+test("expecto with a positional prompt does not use fullscreen TUI even in full TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -161,7 +163,7 @@ test("beta with a positional prompt does not use fullscreen TUI even in full TTY
   assert.equal(observedPrompt, "fix auth regression");
 });
 
-test("beta --tui uses the fullscreen TUI runner in full TTY sessions", async () => {
+test("expecto --tui uses the fullscreen TUI runner in full TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -187,7 +189,7 @@ test("beta --tui uses the fullscreen TUI runner in full TTY sessions", async () 
   assert.equal(observedRenderer, "terminal");
 });
 
-test("beta --native with no prompt uses the native REPL route in full TTY sessions", async () => {
+test("expecto --native with no prompt uses the native REPL route in full TTY sessions", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -218,7 +220,7 @@ test("beta --native with no prompt uses the native REPL route in full TTY sessio
   assert.equal(observedEntryKind, "interactive");
 });
 
-test("beta with no prompt fails fast when stdout is redirected but stdin stays interactive", async () => {
+test("expecto with no prompt fails fast when stdout is redirected but stdin stays interactive", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let interactiveRuns = 0;
@@ -246,7 +248,7 @@ test("beta with no prompt fails fast when stdout is redirected but stdin stays i
   assert.equal(nativeRuns, 0);
 });
 
-test("beta assembles a stdin-only prompt when stdin is non-TTY and no prompt is provided", async () => {
+test("expecto assembles a stdin-only prompt when stdin is non-TTY and no prompt is provided", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedPrompt = "";
@@ -270,7 +272,7 @@ test("beta assembles a stdin-only prompt when stdin is non-TTY and no prompt is 
   assert.match(observedPrompt, /\[Input\]\nhello from stdin/);
 });
 
-test("beta preserves explicit empty prompt vs undefined when assembling stdin pipeline prompts", async () => {
+test("expecto preserves explicit empty prompt vs undefined when assembling stdin pipeline prompts", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedPrompt = "";
@@ -295,7 +297,7 @@ test("beta preserves explicit empty prompt vs undefined when assembling stdin pi
   assert.doesNotMatch(observedPrompt, /Please analyze the following input/i);
 });
 
-test("beta --continue preserves legacy routing without consuming piped stdin", async () => {
+test("expecto --continue preserves legacy routing without consuming piped stdin", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -316,7 +318,7 @@ test("beta --continue preserves legacy routing without consuming piped stdin", a
   assert.equal(observedRouteKind, "continue");
 });
 
-test("beta --resume preserves legacy routing without consuming piped stdin", async () => {
+test("expecto --resume preserves legacy routing without consuming piped stdin", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -342,7 +344,7 @@ test("beta --resume preserves legacy routing without consuming piped stdin", asy
   assert.equal(observedSession, "session-123");
 });
 
-test("beta --continue ignores incomplete provider env on the legacy route", async () => {
+test("expecto --continue ignores incomplete provider env on the legacy route", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -350,7 +352,7 @@ test("beta --continue ignores incomplete provider env on the legacy route", asyn
   await runCli(["--continue"], {
     cwd: projectRoot,
     env: {
-      BETA_PROVIDER: "openai",
+      EXPECTO_PROVIDER: "openai",
     },
     processEnv: {},
     homeDir,
@@ -364,7 +366,7 @@ test("beta --continue ignores incomplete provider env on the legacy route", asyn
   assert.equal(observedRouteKind, "continue");
 });
 
-test("beta --resume ignores incomplete provider env on the legacy route", async () => {
+test("expecto --resume ignores incomplete provider env on the legacy route", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
@@ -372,7 +374,7 @@ test("beta --resume ignores incomplete provider env on the legacy route", async 
   await runCli(["--resume", "session-123"], {
     cwd: projectRoot,
     env: {
-      BETA_PROVIDER: "openai",
+      EXPECTO_PROVIDER: "openai",
     },
     processEnv: {},
     homeDir,
@@ -386,14 +388,14 @@ test("beta --resume ignores incomplete provider env on the legacy route", async 
   assert.equal(observedRouteKind, "resume");
 });
 
-test("beta with a positional prompt uses a configured provider runner from environment variables", async () => {
+test("expecto with a positional prompt uses a configured provider runner from environment variables", async () => {
   const projectRoot = await makeProjectRoot();
   let output = "";
 
   await runCli(["say hello"], {
     cwd: projectRoot,
     env: {
-      BETA_PROVIDER: "openai",
+      EXPECTO_PROVIDER: "openai",
       OPENAI_API_KEY: "test-openai-key",
       OPENAI_MODEL: "gpt-5",
       OPENAI_BASE_URL: "https://api.openai.test/v1",
@@ -425,13 +427,13 @@ test("beta with a positional prompt uses a configured provider runner from envir
   assert.match(output, /hello from model/);
 });
 
-test("beta with a positional prompt loads provider config from ~/.beta-agent/session.env", async () => {
+test("expecto with a positional prompt loads provider config from ~/.expecto-cli/session.env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
-BETA_PROVIDER=anthropic
-ANTHROPIC_AUTH_TOKEN=file-anthropic-token
-ANTHROPIC_BASE_URL=https://code.newcli.com/claude/ultra
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
+EXPECTO_PROVIDER=anthropic
+EXPECTO_API_KEY=file-anthropic-token
+EXPECTO_BASE_URL=https://code.newcli.com/claude/ultra
+EXPECTO_MODEL=claude-sonnet-4-20250514
 `);
   let output = "";
   let observedUrl = "";
@@ -474,10 +476,10 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   assert.match(output, /hello from session env/);
 });
 
-test("beta with a positional prompt lets explicit env vars override ~/.beta-agent/session.env", async () => {
+test("expecto with a positional prompt lets explicit env vars override ~/.expecto-cli/session.env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
-BETA_PROVIDER=anthropic
+EXPECTO_PROVIDER=anthropic
 ANTHROPIC_AUTH_TOKEN=file-anthropic-token
 ANTHROPIC_BASE_URL=https://file-gateway.example.com/claude
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
@@ -525,7 +527,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
   assert.match(output, /override worked/);
 });
 
-test("beta with a positional prompt treats ~/.beta-agent/session.env as authoritative over ambient provider env", async () => {
+test("expecto with a positional prompt treats ~/.expecto-cli/session.env as authoritative over ambient provider env", async () => {
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeHomeDirWithSessionEnv(`
 ANTHROPIC_AUTH_TOKEN=file-anthropic-token

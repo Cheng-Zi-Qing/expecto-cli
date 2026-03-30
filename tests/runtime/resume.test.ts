@@ -4,6 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { resolveResumeTarget } from "../../src/runtime/resume.ts";
 import { SessionSnapshotStore } from "../../src/runtime/session-snapshot-store.ts";
 
@@ -26,15 +27,15 @@ function makeSnapshot(
     state: overrides.state ?? "planning",
     activeArtifacts: [
       {
-        id: ".beta-agent/docs/01-plan.md",
+        id: currentAppPath("docs", "01-plan.md"),
         kind: "plan" as const,
-        path: ".beta-agent/docs/01-plan.md",
+        path: currentAppPath("docs", "01-plan.md"),
         title: "01-plan",
       },
       {
-        id: ".beta-agent/docs/tasks/T-001-auth.md",
+        id: currentAppPath("docs", "tasks", "T-001-auth.md"),
         kind: "task" as const,
-        path: ".beta-agent/docs/tasks/T-001-auth.md",
+        path: currentAppPath("docs", "tasks", "T-001-auth.md"),
         title: "T-001-auth",
       },
     ],
@@ -64,7 +65,7 @@ function makeSnapshot(
 }
 
 async function makeProjectRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "beta-agent-resume-"));
+  return mkdtemp(join(tmpdir(), "expecto-resume-"));
 }
 
 test("session snapshot store saves and loads a snapshot", async () => {

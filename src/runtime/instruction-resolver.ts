@@ -1,4 +1,5 @@
 import type { ArtifactDocument, ArtifactRef } from "../contracts/artifact-schema.ts";
+import { RUNTIME_IDENTITY_CONTENT, RUNTIME_IDENTITY_TITLE } from "../core/brand.ts";
 import type { SessionMode } from "./bootstrap-context.ts";
 import type { LoadedTextDocument } from "./instruction-loader.ts";
 
@@ -46,8 +47,8 @@ export function resolveInstructionSet(
     {
       id: "runtime:identity",
       kind: "identity",
-      title: "beta-identity",
-      content: "You are beta, a CLI-first coding assistant with a Markdown-driven workspace.",
+      title: RUNTIME_IDENTITY_TITLE,
+      content: RUNTIME_IDENTITY_CONTENT,
     },
     {
       id: `runtime:mode:${input.mode}`,
