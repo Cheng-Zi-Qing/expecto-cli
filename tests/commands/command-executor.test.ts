@@ -146,9 +146,34 @@ test("executeBuiltinCommand preserves /branch behavior through registry-based re
       {
         type: "execution_item",
         summary: "Read git branch",
-        body: "$ git rev-parse --abbrev-ref HEAD\ntask-two-branch",
+        body: "$ git branch --show-current\ntask-two-branch\nresolved: task-two-branch",
       },
     ]);
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("executeBuiltinCommand resolves detached main to the main label", async () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "command-executor-detached-"));
+  const gitOptions = { cwd: projectRoot, stdio: "ignore" as const };
+
+  try {
+    execFileSync("git", ["-c", "init.defaultBranch=main", "init"], gitOptions);
+    execFileSync("git", ["config", "user.name", "Expecto Test"], gitOptions);
+    execFileSync("git", ["config", "user.email", "expecto@example.com"], gitOptions);
+    writeFileSync(join(projectRoot, "README.md"), "test\n");
+    execFileSync("git", ["add", "README.md"], gitOptions);
+    execFileSync("git", ["commit", "-m", "init"], gitOptions);
+    execFileSync("git", ["checkout", "--detach"], gitOptions);
+
+    const result = await executeBuiltinCommand("/branch", createContext("ready", projectRoot));
+
+    assert.equal(result.handled, true);
+    assert.deepEqual(result.effects[0], { type: "system_message", line: "branch: main" });
+    assert.equal(result.effects[1]?.type, "execution_item");
+    assert.equal(result.effects[1]?.summary, "Read git branch");
+    assert.match(result.effects[1]?.body ?? "", /\bmain\b/);
   } finally {
     rmSync(projectRoot, { recursive: true, force: true });
   }

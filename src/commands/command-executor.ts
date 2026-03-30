@@ -1,6 +1,5 @@
-import { execa } from "execa";
-
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
+import { resolveGitBranch } from "../core/git-branch.ts";
 import { createHelpSections, findCommandByInput } from "./command-registry.ts";
 import { parseSlashCommand } from "./command-parser.ts";
 
@@ -37,22 +36,6 @@ function buildHelpEffects(): CommandExecutionEffect[] {
   });
 
   return lines.map((line) => ({ type: "system_message", line }));
-}
-
-async function resolveBranchLabel(projectRoot: string): Promise<string> {
-  try {
-    const result = await execa("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-      cwd: projectRoot,
-      reject: false,
-    });
-    const branch = result.stdout.trim();
-
-    if (result.exitCode === 0 && branch.length > 0) {
-      return branch;
-    }
-  } catch {}
-
-  return "no-git";
 }
 
 export async function executeBuiltinCommand(
@@ -112,19 +95,19 @@ export async function executeBuiltinCommand(
       };
     case "project.branch":
       {
-        const branch = await resolveBranchLabel(context.projectRoot);
+        const branch = await resolveGitBranch(context.projectRoot);
 
         return {
           handled: true,
           effects: [
             {
               type: "system_message",
-              line: `branch: ${branch}`,
+              line: `branch: ${branch.label}`,
             },
             {
               type: "execution_item",
               summary: "Read git branch",
-              body: `$ git rev-parse --abbrev-ref HEAD\n${branch}`,
+              body: branch.detail,
             },
           ],
         };

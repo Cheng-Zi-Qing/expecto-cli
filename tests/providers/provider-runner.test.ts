@@ -187,6 +187,101 @@ test("provider runner uses message history when assistant-step input has no prom
   });
 });
 
+test("provider runner injects instruction stack as system messages before conversation history", async () => {
+  const registry = new ProviderRegistry();
+  const router = new ProviderRouter({
+    main: "instruction-provider:instruction-model",
+  });
+  let observedMessages: Array<{ role: string; content: string }> = [];
+
+  registry.register(
+    createStaticProvider({
+      id: "instruction-provider",
+      complete: async (request) => {
+        observedMessages = request.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
+
+        return {
+          providerId: "instruction-provider",
+          model: request.model,
+          outputText: "assistant: instruction output",
+          stopReason: "end_turn",
+        };
+      },
+    }),
+  );
+
+  const runner = createProviderRunner({
+    registry,
+    router,
+  });
+  const assistantStep = runner.createAssistantStep();
+
+  await assistantStep({
+    sessionId: "session-1",
+    turnId: "turn-1",
+    prompt: "fix auth regression",
+    messages: [
+      {
+        role: "user",
+        content: "fix auth regression",
+      },
+    ],
+    context: {
+      projectRoot: "/tmp/project",
+      mode: "balanced",
+      entry: {
+        kind: "interactive",
+        initialPrompt: "fix auth regression",
+      },
+      instructions: [],
+      instructionStack: [
+        {
+          id: "runtime:identity",
+          kind: "identity",
+          title: "expecto-cli-identity",
+          content: "You are Expecto Cli.",
+        },
+        {
+          id: "project:AGENTS.md",
+          kind: "project_instruction",
+          title: "AGENTS.md",
+          content: "Follow project conventions.",
+          path: "AGENTS.md",
+        },
+      ],
+      memory: [],
+      activeArtifacts: {
+        required: [],
+        optional: [],
+        onDemand: [],
+      },
+      loadedArtifacts: {
+        required: [],
+        optional: [],
+      },
+      sessionSummary: "required docs: none",
+    },
+  });
+
+  assert.deepEqual(observedMessages, [
+    {
+      role: "system",
+      content: "You are Expecto Cli.",
+    },
+    {
+      role: "system",
+      content: "Follow project conventions.",
+    },
+    {
+      role: "user",
+      content: "fix auth regression",
+    },
+  ]);
+});
+
 test("provider router falls back to the main route and exposes provider id plus model", () => {
   const router = new ProviderRouter({
     main: "openai:gpt-5",

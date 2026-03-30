@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,23 @@ import { currentAppPath } from "../../src/core/brand.ts";
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "expecto-cli-"));
   await mkdir(join(root, currentAppPath("docs")), { recursive: true });
+  return root;
+}
+
+async function makeGitProjectRoot(options: { detachHead?: boolean } = {}): Promise<string> {
+  const root = await makeProjectRoot();
+
+  execFileSync("git", ["-c", "init.defaultBranch=main", "init"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Expecto Test"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "expecto@example.com"], { cwd: root, stdio: "ignore" });
+  await writeFile(join(root, "README.md"), "test\n");
+  execFileSync("git", ["add", "README.md"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: root, stdio: "ignore" });
+
+  if (options.detachHead) {
+    execFileSync("git", ["checkout", "--detach"], { cwd: root, stdio: "ignore" });
+  }
+
   return root;
 }
 
@@ -129,6 +147,26 @@ test("expecto with no args uses the sticky main-screen TUI runner only in full T
   assert.equal(nativeRuns, 0);
   assert.equal(observedEntryKind, "interactive");
   assert.equal(observedRenderer, "terminal");
+});
+
+test("expecto with no args resolves detached main to the main branch label", async () => {
+  const projectRoot = await makeGitProjectRoot({ detachHead: true });
+  const homeDir = await makeEmptyHomeDir();
+  let observedBranchLabel = "";
+
+  await runCli([], {
+    cwd: projectRoot,
+    env: {},
+    processEnv: {},
+    homeDir,
+    stdinIsTTY: true,
+    stdoutIsTTY: true,
+    runInteractiveTui: async (input) => {
+      observedBranchLabel = input.branchLabel;
+    },
+  });
+
+  assert.equal(observedBranchLabel, "main");
 });
 
 test("expecto with a positional prompt does not use fullscreen TUI even in full TTY sessions", async () => {

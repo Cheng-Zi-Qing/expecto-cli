@@ -1358,16 +1358,20 @@ test("runInteractiveTui projects /branch execution output into a real execution 
   assert.equal(state.timeline[1]?.collapsed, true);
   assert.equal(state.inputLocked, false);
   assert.deepEqual(state.timeline[1]?.executionTranscript?.headLines, [
-    "$ git rev-parse --abbrev-ref HEAD",
+    "$ git branch --show-current",
+    "<exit 128>",
+    "$ git rev-parse --short HEAD",
+    "<exit 128>",
   ]);
-  assert.equal(state.timeline[1]?.executionTranscript?.pendingFragment, "no-git");
+  assert.equal(state.timeline[1]?.executionTranscript?.pendingFragment, "resolved: no-git");
   assert.match(latestRenderedTimelineContent(app), /Execution/);
   assert.match(latestRenderedTimelineContent(app), /Read git branch/);
-  assert.doesNotMatch(latestRenderedTimelineContent(app), /git rev-parse --abbrev-ref HEAD/);
+  assert.doesNotMatch(latestRenderedTimelineContent(app), /git branch --show-current/);
 
   app?.toggleSelectedItem();
 
-  assert.match(latestRenderedTimelineContent(app), /git rev-parse --abbrev-ref HEAD/);
+  assert.match(latestRenderedTimelineContent(app), /git branch --show-current/);
+  assert.match(latestRenderedTimelineContent(app), /resolved: no-git/);
 
   app?.exit();
   await runPromise;

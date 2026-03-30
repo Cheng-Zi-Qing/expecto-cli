@@ -4,7 +4,6 @@ import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
-import { execa } from "execa";
 
 import { loadSessionEnv } from "./session-env.ts";
 import { createProviderRunnerFromEnv } from "../providers/provider-bootstrap.ts";
@@ -18,6 +17,7 @@ import {
   runNativeSession as defaultRunNativeSession,
   type RunNativeSessionInput,
 } from "./run-native-session.ts";
+import { resolveGitBranch } from "../core/git-branch.ts";
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type TuiRenderer = "terminal";
@@ -170,22 +170,6 @@ function resolveProviderPresentation(
   }
 }
 
-async function resolveBranchLabel(cwd: string): Promise<string> {
-  try {
-    const result = await execa("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-      cwd,
-      reject: false,
-    });
-    const branch = result.stdout.trim();
-
-    if (result.exitCode === 0 && branch.length > 0) {
-      return branch;
-    }
-  } catch {}
-
-  return "no-git";
-}
-
 async function runDefaultInteractiveTui(
   input: InteractiveTuiRunnerInput,
 ): Promise<void> {
@@ -322,7 +306,7 @@ async function runCliCommand(
   if (runnableRoute.kind === "tui") {
     const interactiveTuiRunner = options.runInteractiveTui ?? runDefaultInteractiveTui;
     const { providerLabel, modelLabel } = resolveProviderPresentation(env);
-    const branchLabel = await resolveBranchLabel(context.projectRoot);
+    const branchLabel = (await resolveGitBranch(context.projectRoot)).label;
 
     await interactiveTuiRunner({
       context,

@@ -22,6 +22,15 @@ export type ProviderCompletionInput = {
   signal?: AbortSignal;
 };
 
+function buildAssistantStepMessages(input: AssistantStepInput): ProviderMessage[] {
+  const instructionMessages = input.context.instructionStack?.map((layer) => ({
+    role: "system" as const,
+    content: layer.content,
+  })) ?? [];
+
+  return [...instructionMessages, ...input.messages];
+}
+
 function defaultModelName(providerId: string): string {
   return `${providerId}/default`;
 }
@@ -72,7 +81,7 @@ export class ProviderRunner {
       const response = await this.complete({
         role: "main",
         mode: input.context.mode,
-        messages: input.messages,
+        messages: buildAssistantStepMessages(input),
         ...(input.signal ? { signal: input.signal } : {}),
       });
 
