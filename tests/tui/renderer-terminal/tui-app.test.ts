@@ -63,7 +63,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
     selectedTimelineIndex: 0,
     draft: "",
     inputLocked: false,
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude",
@@ -297,7 +297,7 @@ test("createTerminalTuiApp replays the current transcript when welcome content i
       {
         id: "welcome",
         kind: "welcome",
-        summary: "beta is ready",
+        summary: "expecto is ready",
         body: "Enter send",
         collapsed: false,
       },

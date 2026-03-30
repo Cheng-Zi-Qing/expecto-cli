@@ -18,6 +18,7 @@ import type {
   InteractionEvent,
   RequestCompletedStatus,
 } from "../contracts/interaction-event-schema.ts";
+import { PRIMARY_CLI_BINARY_NAME } from "../core/brand.ts";
 
 export type RuntimeSessionResult = {
   sessionId: string;
@@ -444,16 +445,16 @@ export class RuntimeSession {
   private renderHeader(): void {
     switch (this.context.entry.kind) {
       case "interactive":
-        this.emitSystemLine("beta interactive session");
+        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} interactive session`);
         break;
       case "print":
-        this.emitSystemLine("beta one-shot session");
+        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} one-shot session`);
         break;
       case "continue":
-        this.emitSystemLine("beta continue session");
+        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} continue session`);
         break;
       case "resume":
-        this.emitSystemLine("beta resume session");
+        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} resume session`);
         break;
     }
 

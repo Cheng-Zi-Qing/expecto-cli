@@ -159,14 +159,14 @@ test("semantic tokenizer recognizes command path shortcut and status", () => {
 });
 
 test("semantic tokenizer includes slash paths and does not highlight freeform nouns", () => {
-  const source = "Use ./scripts/install-local-beta.sh while the branch is ready";
+  const source = "Use ./scripts/install-local-expecto.sh while the branch is ready";
   const blocks = parseMarkdownBlocks(source);
 
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0]?.kind, "paragraph");
   assert.deepEqual(blocks[0]?.tokens, [
     { kind: "default", text: "Use " },
-    { kind: "path", text: "./scripts/install-local-beta.sh" },
+    { kind: "path", text: "./scripts/install-local-expecto.sh" },
     { kind: "default", text: " while the branch is " },
     { kind: "status", text: "ready" },
   ]);

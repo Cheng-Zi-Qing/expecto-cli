@@ -276,6 +276,12 @@ export function createInteractiveConsoleApp(
       onExit: input.handlers.onExit,
       onMoveSelectionUp: input.handlers.onMoveSelectionUp,
       onMoveSelectionDown: input.handlers.onMoveSelectionDown,
+      ...(input.handlers.onMoveSelectionLeft
+        ? { onMoveSelectionLeft: input.handlers.onMoveSelectionLeft }
+        : {}),
+      ...(input.handlers.onMoveSelectionRight
+        ? { onMoveSelectionRight: input.handlers.onMoveSelectionRight }
+        : {}),
       onToggleSelectedItem: input.handlers.onToggleSelectedItem,
     });
   };

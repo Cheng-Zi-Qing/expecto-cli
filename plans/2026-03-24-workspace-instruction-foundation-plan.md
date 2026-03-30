@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn `.beta-agent/docs/`, active artifacts, layered instructions, and resume summaries into real runtime behavior so `beta` starts acting like a Markdown-driven agent instead of a TUI shell with mostly static bootstrap context.
+**Goal:** Turn `.expecto-cli/docs/`, active artifacts, layered instructions, and resume summaries into real runtime behavior so `expecto` starts acting like a Markdown-driven agent instead of a TUI shell with mostly static bootstrap context.
 
 **Architecture:** Keep the current runtime shell and fullscreen TUI intact. Strengthen the foundation underneath it by adding explicit workspace lifecycle helpers, a real instruction resolver, richer session/task summaries, and bootstrap wiring that keeps renderer logic isolated from runtime, provider, and memory layers.
 
@@ -70,7 +70,7 @@ Document:
 Run: `node --experimental-strip-types --test tests/contracts/schema.test.ts`
 Expected: PASS
 
-### Task 2: Add Workspace Lifecycle Helpers For `.beta-agent/docs/`
+### Task 2: Add Workspace Lifecycle Helpers For `.expecto-cli/docs/`
 
 **Files:**
 - Create: `src/core/artifact-workspace.ts`
@@ -82,7 +82,7 @@ Expected: PASS
 - [x] **Step 1: Write failing tests for workspace initialization and active artifact selection**
 
 Cover:
-- initializing the standard docs skeleton under `.beta-agent/docs/`
+- initializing the standard docs skeleton under `.expecto-cli/docs/`
 - creating the baseline `00-requirements.md` and `01-plan.md` when missing
 - resolving an active task plus the latest relevant summary
 - keeping research-only findings out of `required` unless explicitly requested

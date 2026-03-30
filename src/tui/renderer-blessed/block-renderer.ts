@@ -27,6 +27,10 @@ type CardChrome = {
 
 const BLOCK_INDENT = "  ";
 
+function applyBackground(markup: string, bg: string): string {
+  return `{${bg}-bg}${markup}{/${bg}-bg}`;
+}
+
 function cardChrome(card: TimelineCard, palette: RendererPalette): CardChrome {
   switch (card.kind) {
     case "user":
@@ -282,13 +286,19 @@ function renderUserCard(card: TimelineCard, palette: RendererPalette): string {
     }
 
     return renderInlineTextTokens(block.tokens, palette).split("\n").map((line) =>
-      `${styleText("│", { fg: chrome.border })} ${line}`
+      `${styleText("│", { fg: chrome.border, bg: palette.timeline.card.user.bg })}${
+        applyBackground(` ${line}`, palette.timeline.card.user.bg)
+      }`
     );
   });
   const top = `${BLOCK_INDENT}${styleText("╭", {
     fg: chrome.border,
-  })}${styleText("─", { fg: chrome.border }).repeat(2)}`;
-  const bottom = `${BLOCK_INDENT}${styleText("╰", { fg: chrome.border })}`;
+    bg: palette.timeline.card.user.bg,
+  })}${styleText("─", { fg: chrome.border, bg: palette.timeline.card.user.bg }).repeat(2)}`;
+  const bottom = `${BLOCK_INDENT}${styleText("╰", {
+    fg: chrome.border,
+    bg: palette.timeline.card.user.bg,
+  })}`;
 
   return [
     renderHeader(card, palette),

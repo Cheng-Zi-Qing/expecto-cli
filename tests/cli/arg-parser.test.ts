@@ -17,7 +17,7 @@ test("parses a positional prompt without treating it as fullscreen intent", () =
   });
 });
 
-test("distinguishes an explicit empty prompt from bare beta", () => {
+test("distinguishes an explicit empty prompt from a bare invocation", () => {
   assert.deepEqual(parseCliArgs([""]), {
     prompt: "",
   });

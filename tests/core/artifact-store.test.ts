@@ -6,19 +6,23 @@ import { join } from "node:path";
 
 import { ActiveArtifactResolver } from "../../src/core/active-artifact-resolver.ts";
 import { ArtifactStore } from "../../src/core/artifact-store.ts";
+import { currentAppPath } from "../../src/core/brand.ts";
+
+const docsRoot = currentAppPath("docs");
+const memoryRoot = currentAppPath("memory");
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-"));
-  await mkdir(join(root, ".beta-agent", "docs", "tasks"), { recursive: true });
-  await mkdir(join(root, ".beta-agent", "docs", "summaries"), { recursive: true });
-  await mkdir(join(root, ".beta-agent", "memory"), { recursive: true });
+  const root = await mkdtemp(join(tmpdir(), "expecto-artifacts-"));
+  await mkdir(join(root, docsRoot, "tasks"), { recursive: true });
+  await mkdir(join(root, docsRoot, "summaries"), { recursive: true });
+  await mkdir(join(root, memoryRoot), { recursive: true });
 
-  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
-  await writeFile(join(root, ".beta-agent", "docs", "tasks", "T-001-auth.md"), "# Task 1\n");
-  await writeFile(join(root, ".beta-agent", "docs", "summaries", "T-001-2026-03-23.md"), "# Summary 1\n");
-  await writeFile(join(root, ".beta-agent", "docs", "findings.md"), "# Findings\n");
-  await writeFile(join(root, ".beta-agent", "memory", "INDEX.md"), "# Memory Index\n");
+  await writeFile(join(root, docsRoot, "00-requirements.md"), "# Requirements\n");
+  await writeFile(join(root, docsRoot, "01-plan.md"), "# Plan\n");
+  await writeFile(join(root, docsRoot, "tasks", "T-001-auth.md"), "# Task 1\n");
+  await writeFile(join(root, docsRoot, "summaries", "T-001-2026-03-23.md"), "# Summary 1\n");
+  await writeFile(join(root, docsRoot, "findings.md"), "# Findings\n");
+  await writeFile(join(root, memoryRoot, "INDEX.md"), "# Memory Index\n");
 
   return root;
 }
@@ -43,7 +47,7 @@ test("artifact store writes and reads a summary artifact", async () => {
 
   const ref = await store.write({
     kind: "summary",
-    path: ".beta-agent/docs/summaries/T-001-2026-03-24.md",
+    path: currentAppPath("docs", "summaries", "T-001-2026-03-24.md"),
     title: "T-001-2026-03-24",
     content: "# Summary 2\n",
     status: "completed",
@@ -55,7 +59,7 @@ test("artifact store writes and reads a summary artifact", async () => {
 
   const doc = await store.read(ref.id);
   const content = await readFile(
-    join(projectRoot, ".beta-agent", "docs", "summaries", "T-001-2026-03-24.md"),
+    join(projectRoot, docsRoot, "summaries", "T-001-2026-03-24.md"),
     "utf8",
   );
 
@@ -97,7 +101,7 @@ test("active artifact resolver can use summary metadata to prefer the latest sum
 
   await store.write({
     kind: "summary",
-    path: ".beta-agent/docs/summaries/daily-checkpoint-2026-03-24.md",
+    path: currentAppPath("docs", "summaries", "daily-checkpoint-2026-03-24.md"),
     title: "daily-checkpoint-2026-03-24",
     content: "# Daily checkpoint\n",
     metadata: {
@@ -108,7 +112,7 @@ test("active artifact resolver can use summary metadata to prefer the latest sum
 
   await store.write({
     kind: "summary",
-    path: ".beta-agent/docs/summaries/other-task-2026-03-24.md",
+    path: currentAppPath("docs", "summaries", "other-task-2026-03-24.md"),
     title: "other-task-2026-03-24",
     content: "# Other task checkpoint\n",
     metadata: {

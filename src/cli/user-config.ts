@@ -2,10 +2,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { currentAppPath } from "../core/brand.ts";
 import type { ThemeId } from "../tui/theme/theme-types.ts";
 import { isThemeId } from "../tui/theme/theme-types.ts";
 
-export const USER_CONFIG_RELATIVE_PATH = ".beta-agent/config.json";
+export const USER_CONFIG_RELATIVE_PATH = currentAppPath("config.json");
 
 export type UserConfig = {
   themeId: ThemeId | null;
@@ -35,10 +36,11 @@ export function resolveUserConfigPath(homeDir = homedir()): string {
 export async function loadUserConfig(
   options: UserConfigOptions = {},
 ): Promise<UserConfig> {
-  const path = resolveUserConfigPath(options.homeDir);
+  const homeDir = options.homeDir ?? homedir();
+  const currentPath = resolveUserConfigPath(homeDir);
 
   try {
-    const raw = await readFile(path, "utf8");
+    const raw = await readFile(currentPath, "utf8");
     const parsed = JSON.parse(raw) as {
       themeId?: unknown;
     };

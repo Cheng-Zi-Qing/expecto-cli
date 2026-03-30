@@ -4,8 +4,9 @@ import { basename, join, resolve } from "node:path";
 import { globby } from "globby";
 
 import { sessionSnapshotSchema, type SessionSnapshot } from "../contracts/session-snapshot-schema.ts";
+import { currentAppPath } from "../core/brand.ts";
 
-const snapshotDirectory = ".beta-agent/state/snapshots";
+const snapshotDirectory = currentAppPath("state", "snapshots");
 
 function ensureValidSnapshotId(id: string): string {
   if (id.includes("/") || id.includes("\\")) {
@@ -59,8 +60,8 @@ export class SessionSnapshotStore {
     return snapshots.at(-1) ?? null;
   }
 
-  private toSnapshotPath(id: string): string {
+  private toSnapshotPath(id: string, directory = snapshotDirectory): string {
     const snapshotId = ensureValidSnapshotId(id);
-    return join(this.projectRoot, snapshotDirectory, `${snapshotId}.json`);
+    return join(this.projectRoot, directory, `${snapshotId}.json`);
   }
 }

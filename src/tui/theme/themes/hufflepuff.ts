@@ -22,7 +22,8 @@ export const hufflepuffTheme: ThemeDefinition = {
       selection: "#F2D16B",
     },
     surface: {
-      emphasisBg: "#F3EAD0",
+      userCardBg: "#FBF6EA",
+      composerBg: "#F3EAD0",
     },
     token: {
       command: "#D6A93D",
@@ -76,9 +77,9 @@ export const hufflepuffTheme: ThemeDefinition = {
     ],
   },
   sample: {
-    tipTitle: "Tips for getting started",
+    tipTitle: "Tips",
     tipText: "Run /help to inspect available commands.",
-    highlightTitle: "Highlight sample",
+    highlightTitle: "Highlights",
     highlightTokens: [
       { kind: "command", text: "/theme" },
       { kind: "path", text: "README.md" },

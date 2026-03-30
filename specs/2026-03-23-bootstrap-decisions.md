@@ -3,13 +3,13 @@
 ## Frozen Decisions
 
 - Product shape: `CLI-first`
-- Public command name: `beta`
+- Public command name: `expecto`
 - Interaction model: Claude-like
-  - `beta`
-  - `beta "<prompt>"`
-  - `beta -p "<prompt>"`
-- Project entrypoint: `AGENTS.md` as primary, `.beta-agent/` as private support layer
-- Project doc workspace: `<repo>/.beta-agent/docs/`
+  - `expecto`
+  - `expecto "<prompt>"`
+  - `expecto -p "<prompt>"`
+- Project entrypoint: `AGENTS.md` as primary, `.expecto-cli/` as private support layer
+- Project doc workspace: `<repo>/.expecto-cli/docs/`
 - Complex-task minimum documents:
   - `requirements`
   - `plan`

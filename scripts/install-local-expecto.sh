@@ -11,14 +11,14 @@ npm run build
 npm link
 
 cat <<'EOF'
-beta linked successfully.
+Expecto Cli linked successfully.
 
 Credentials file:
-  ~/.beta-agent/session.env
+  ~/.expecto-cli/session.env
 
 Start interactive mode:
-  beta
+  expecto
 
 Run one-shot:
-  beta -p "say hello in one sentence"
+  expecto "say hello in one sentence"
 EOF

@@ -11,14 +11,14 @@ else
   PROMPT="$*"
 fi
 
-if [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" && -z "${ANTHROPIC_API_KEY:-}" && -z "${BETA_API_KEY:-}" ]]; then
-  echo "Set ANTHROPIC_AUTH_TOKEN, ANTHROPIC_API_KEY, or BETA_API_KEY before running this script." >&2
+if [[ -z "${ANTHROPIC_AUTH_TOKEN:-}" && -z "${ANTHROPIC_API_KEY:-}" && -z "${EXPECTO_API_KEY:-}" ]]; then
+  echo "Set ANTHROPIC_AUTH_TOKEN, ANTHROPIC_API_KEY, or EXPECTO_API_KEY before running this script." >&2
   exit 1
 fi
 
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-https://code.newcli.com/claude/ultra}"
 export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}"
-export BETA_PROVIDER="${BETA_PROVIDER:-anthropic}"
+export EXPECTO_PROVIDER="${EXPECTO_PROVIDER:-anthropic}"
 
 cd "${PROJECT_ROOT}"
-exec node --experimental-strip-types src/cli/entry.ts -p "${PROMPT}"
+exec node --experimental-strip-types src/cli/entry.ts "${PROMPT}"

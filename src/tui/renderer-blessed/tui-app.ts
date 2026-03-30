@@ -1,6 +1,7 @@
 import blessed from "neo-blessed";
 import type { Widgets } from "blessed";
 
+import { PRIMARY_CLI_BINARY_NAME, PRODUCT_DISPLAY_NAME } from "../../core/brand.ts";
 import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput } from "../tui-app.ts";
 import type { TuiState } from "../tui-types.ts";
 import { buildTuiFooterView } from "../view-model/tui-view-model.ts";
@@ -74,7 +75,7 @@ export function renderStatusBar(state: TuiState): string {
   const modeLabel = timelineMode === "select" ? "Select Mode" : "Scroll Mode";
 
   return [
-    "beta",
+    PRIMARY_CLI_BINARY_NAME,
     `${escapeTaggedText(state.providerLabel)}/${escapeTaggedText(state.modelLabel)}`,
     escapeTaggedText(state.projectLabel),
     escapeTaggedText(state.branchLabel),
@@ -141,7 +142,7 @@ export function createBlessedTuiApp(
     dockBorders: true,
     useBCE: true,
     autoPadding: false,
-    title: "beta",
+    title: PRODUCT_DISPLAY_NAME,
     warnings: false,
     terminal: resolveBlessedTerminal(process.env.TERM),
   });
@@ -521,6 +522,12 @@ export function createBlessedTuiApp(
           break;
         case "move_selection_down":
           input.handlers.onMoveSelectionDown();
+          break;
+        case "move_selection_left":
+          input.handlers.onMoveSelectionLeft?.();
+          break;
+        case "move_selection_right":
+          input.handlers.onMoveSelectionRight?.();
           break;
         case "move_selection_page_up":
           scrollTimelineByPage("up");

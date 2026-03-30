@@ -1,4 +1,4 @@
-# beta-agent Memory Index
+# Expecto Cli Memory Index
 
 ## Purpose
 
@@ -9,10 +9,10 @@ Use topic files when details grow.
 
 ## Current Stable Facts
 
-- command name: `beta`
+- command name: `expecto`
 - Claude-like default interaction model
 - `AGENTS.md` is primary public project guidance
-- `.beta-agent/` stores private agent workspace state
+- `.expecto-cli/` stores private agent workspace state
 - complex tasks use document layers:
   - requirements
   - plan

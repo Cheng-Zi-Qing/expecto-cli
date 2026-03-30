@@ -16,6 +16,14 @@ import {
 
 const USER_HEADER_LABEL = "Submitted Input";
 const FRAME_SIDE_WIDTH = 4;
+const THEME_PICKER_COLUMN_GAP = 5;
+
+const THEME_PICKER_HOUSE_EMOJIS = {
+  hufflepuff: "🦡",
+  gryffindor: "🦁",
+  ravenclaw: "🦅",
+  slytherin: "🐍",
+} as const;
 
 type RgbColor = [number, number, number];
 
@@ -182,21 +190,13 @@ function renderStyledTokens(tokens: TextToken[], view: TuiTranscriptView): strin
 
 function renderThemePickerHouseLabel(
   entry: TuiThemePickerOverlayView["entries"][number],
-  compactLabels: boolean,
 ): string {
   const theme = getThemeDefinition(entry.id);
   const accentStyle: AnsiStyle = {
     fg: hexToRgb(theme.palette.chrome.user),
     ...(entry.selected ? { bold: true } : {}),
   };
-  const coloredName = styleText(entry.displayName, accentStyle);
-
-  if (compactLabels) {
-    return coloredName;
-  }
-
-  const plannedLabel = entry.availability === "planned" ? " · planned" : "";
-  return `${coloredName} · ${entry.animal} · ${entry.paletteLabel}${plannedLabel}`;
+  return styleText(entry.displayName, accentStyle);
 }
 
 function splitTokenLines(tokens: TextToken[]): TextToken[][] {
@@ -566,16 +566,104 @@ function padStyledContent(content: string, width: number): string {
   return `${content}${" ".repeat(Math.max(0, width - visibleWidth))}`;
 }
 
-function buildThemePickerGuidanceLine(overlay: TuiThemePickerOverlayView): string {
-  const selectedEntry = overlay.entries.find((entry) => entry.selected) ?? null;
-  const applyLabel = selectedEntry?.availability === "planned"
-    ? "Preview only · not yet available"
-    : "Enter apply";
+function centerStyledContent(content: string, width: number): string {
+  const visibleWidth = textDisplayWidth(stripAnsiCodes(content));
+  return `${" ".repeat(Math.max(0, Math.floor((width - visibleWidth) / 2)))}${content}`;
+}
+
+function renderThemePickerSelectionEntry(
+  entry: TuiThemePickerOverlayView["entries"][number],
+): string {
+  const theme = getThemeDefinition(entry.id);
+  const accentStyle: AnsiStyle = {
+    fg: hexToRgb(theme.palette.chrome.user),
+    ...(entry.selected ? { bold: true } : {}),
+  };
+  const marker = entry.selected ? styleText("❯", accentStyle) : " ";
+  const emoji = styleText(THEME_PICKER_HOUSE_EMOJIS[entry.id], accentStyle);
+  const label = renderThemePickerHouseLabel(entry);
+
+  return `${marker} ${emoji} ${label}`;
+}
+
+function renderThemePickerSelectionLines(
+  overlay: TuiThemePickerOverlayView,
+  width: number,
+): string[] {
+  if (width < 48) {
+    return overlay.entries.map((entry) => `  ${renderThemePickerSelectionEntry(entry)}`);
+  }
+
+  const columnWidth = Math.max(
+    18,
+    Math.floor((width - THEME_PICKER_COLUMN_GAP) / 2),
+  );
+  const rows: string[] = [];
+
+  for (let index = 0; index < overlay.entries.length; index += 2) {
+    const leftEntry = overlay.entries[index];
+    const rightEntry = overlay.entries[index + 1];
+
+    if (leftEntry === undefined) {
+      continue;
+    }
+
+    const left = padStyledContent(renderThemePickerSelectionEntry(leftEntry), columnWidth);
+    const right = rightEntry ? renderThemePickerSelectionEntry(rightEntry) : "";
+    rows.push(`  ${left}${" ".repeat(THEME_PICKER_COLUMN_GAP)}${right}`.trimEnd());
+  }
+
+  return rows;
+}
+
+function renderThemePickerPreviewLines(
+  overlay: TuiThemePickerOverlayView,
+  width: number,
+): string[] {
+  const previewGlyphRows = overlay.sampleTheme.welcome.glyphRows.slice(0, 5);
+  const rawPreviewRows = previewGlyphRows.map((row) => row.map((segment) => segment.text).join(""));
+  const glyphBlockWidth = Math.max(...rawPreviewRows.map((row) => textDisplayWidth(row)), 0);
+  const glyphBlockOffset = Math.max(0, Math.floor((width - glyphBlockWidth) / 2));
+  const previewView: TuiTranscriptView = {
+    theme: {
+      id: overlay.sampleTheme.id,
+      palette: overlay.sampleTheme.palette,
+    },
+    blocks: [],
+  };
+  const titleStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.text.heading),
+    bold: true,
+  };
+  const subtitleStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.text.body),
+  };
+
+  const title = centerStyledContent(styleText(overlay.sampleTheme.welcome.title, titleStyle), width);
+  const subtitleLines = wrapPlainText(
+    overlay.sampleTheme.welcome.subtitle,
+    width,
+  ).map((line) => centerStyledContent(styleText(line, subtitleStyle), width));
+  const glyphLines = previewGlyphRows.map((row) => {
+    const rendered = row.map((segment) =>
+      styleText(segment.text, {
+        fg: hexToRgb(overlay.sampleTheme.palette.glyph[segment.color]),
+        bold: segment.color === "chin" || segment.color === "highlight",
+      })
+    ).join("");
+
+    return `${" ".repeat(glyphBlockOffset)}${rendered}`;
+  });
+
+  return [title, ...subtitleLines, "", ...glyphLines];
+}
+
+function buildThemePickerApplyLine(overlay: TuiThemePickerOverlayView): string {
   const availabilityLabel = overlay.reason === "first_launch"
-    ? "Required before entering"
+    ? "Required before entering the Room of Requirement"
     : "Press /theme any time";
 
-  return `${applyLabel} · ${availabilityLabel}`;
+  return `  [ Enter ] apply · ${availabilityLabel}`;
 }
 
 function renderRailBodyLine(
@@ -630,15 +718,15 @@ function renderCard(
     const contentWidth = width < FRAME_SIDE_WIDTH ? width : Math.max(1, width - FRAME_SIDE_WIDTH);
     const bodyLines = renderCardBodyLines(card, contentWidth, view);
     const borderStyle = chromeStyleFor(card, view);
-    const emphasisBackground = hexToRgb(view.theme.palette.surface.emphasisBg);
+    const userCardBackground = hexToRgb(view.theme.palette.surface.userCardBg);
     const frameInnerStyle: AnsiStyle = {
       fg: hexToRgb(view.theme.palette.chrome.user),
-      bg: emphasisBackground,
+      bg: userCardBackground,
       bold: true,
     };
     const contentStyle: AnsiStyle = {
       fg: hexToRgb(view.theme.palette.text.body),
-      bg: emphasisBackground,
+      bg: userCardBackground,
     };
 
     return [
@@ -780,107 +868,92 @@ export function renderThemePickerOverlay(
   width: number,
 ): string[] {
   const normalizedWidth = Number.isFinite(width) && width > 0 ? Math.floor(width) : 1;
-  const stackedLayout = normalizedWidth < 96;
-  const compactLabels = normalizedWidth <= 96;
   const outerBorderStyle: AnsiStyle = {
     fg: hexToRgb(overlay.sampleTheme.palette.chrome.execution),
     bold: true,
   };
+  const bodyWidth = normalizedWidth < FRAME_SIDE_WIDTH ? normalizedWidth : Math.max(1, normalizedWidth - FRAME_SIDE_WIDTH);
   const dividerStyle: AnsiStyle = {
     fg: hexToRgb(overlay.sampleTheme.palette.chrome.execution),
     dim: true,
   };
-  const guidanceStyle: AnsiStyle = {
-    fg: hexToRgb(overlay.sampleTheme.palette.chrome.utility),
+  const sectionLabelStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.text.muted),
   };
-  const bodyWidth = normalizedWidth < FRAME_SIDE_WIDTH ? normalizedWidth : Math.max(1, normalizedWidth - FRAME_SIDE_WIDTH);
-  const separator = "  ";
-  const houseLines = overlay.entries.map((entry) => {
-      const entryTheme = getThemeDefinition(entry.id);
-      const label = renderThemePickerHouseLabel(entry, compactLabels);
-      const marker = entry.selected
-        ? styleText(">", {
-            fg: hexToRgb(entryTheme.palette.chrome.user),
-            bold: true,
-          })
-        : " ";
+  const infoTitleStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.chrome.utility),
+    bold: true,
+  };
+  const infoBodyStyle: AnsiStyle = {
+    fg: hexToRgb(overlay.sampleTheme.palette.text.body),
+  };
+  const previewView: TuiTranscriptView = {
+    theme: {
+      id: overlay.sampleTheme.id,
+      palette: overlay.sampleTheme.palette,
+    },
+    blocks: [],
+  };
+  const highlightLines = wrapTokenLines(
+    buildThemeHighlightTokens({
+      kind: "theme_welcome",
+      title: overlay.sampleTheme.welcome.title,
+      subtitle: overlay.sampleTheme.welcome.subtitle,
+      glyphRows: overlay.sampleTheme.welcome.glyphRows,
+      tipTitle: overlay.sampleTheme.sample.tipTitle,
+      tipText: overlay.sampleTheme.sample.tipText,
+      highlightTitle: overlay.sampleTheme.sample.highlightTitle,
+      highlightTokens: overlay.sampleTheme.sample.highlightTokens,
+    }),
+    Math.max(1, bodyWidth - 2),
+  ).map((tokens) => `  ${renderStyledTokens(tokens, previewView)}`);
+  const tipLines = wrapPlainText(
+    overlay.sampleTheme.sample.tipText,
+    Math.max(1, bodyWidth - 2),
+  ).map((line) => `  ${styleText(line, infoBodyStyle)}`);
+  const bodyLines: string[] = [
+    "",
+    `  ${styleText("[ House Selection ]", sectionLabelStyle)}`,
+    ...renderThemePickerSelectionLines(overlay, bodyWidth),
+    "",
+  ];
 
-      return `${marker} ${label}`;
-    });
-  const guidanceLine = styleText(buildThemePickerGuidanceLine(overlay), guidanceStyle);
-  const dividerLine = styleText("─".repeat(bodyWidth), dividerStyle);
-  let bodyLines: string[];
+  const output = [
+    renderStyledFrameLine(normalizedWidth, "╭", "╮", " 🧙 Sorting Hat ", outerBorderStyle, outerBorderStyle),
+  ];
 
-  if (stackedLayout) {
-    const welcomeLines = renderThemeWelcomeBlock(
-      {
-        kind: "theme_welcome",
-        title: overlay.sampleTheme.welcome.title,
-        subtitle: overlay.sampleTheme.welcome.subtitle,
-        glyphRows: overlay.sampleTheme.welcome.glyphRows,
-        tipTitle: overlay.sampleTheme.sample.tipTitle,
-        tipText: overlay.sampleTheme.sample.tipText,
-        highlightTitle: overlay.sampleTheme.sample.highlightTitle,
-        highlightTokens: overlay.sampleTheme.sample.highlightTokens,
-      },
-      bodyWidth,
-      {
-        theme: {
-          id: overlay.sampleTheme.id,
-          palette: overlay.sampleTheme.palette,
-        },
-        blocks: [],
-      },
-      {
-        centerGlyph: false,
-      },
-    );
-
-    bodyLines = [
-      ...houseLines,
-      "",
-      ...welcomeLines,
-      "",
-      dividerLine,
-      guidanceLine,
-    ];
-  } else {
-    const leftColumnWidth = compactLabels
-      ? 18
-      : Math.max(24, Math.min(32, Math.floor(bodyWidth * 0.28)));
-    const rightColumnWidth = Math.max(20, bodyWidth - leftColumnWidth - separator.length);
-    const welcomeLines = renderThemeWelcomeBlock(
-      {
-        kind: "theme_welcome",
-        title: overlay.sampleTheme.welcome.title,
-        subtitle: overlay.sampleTheme.welcome.subtitle,
-        glyphRows: overlay.sampleTheme.welcome.glyphRows,
-        tipTitle: overlay.sampleTheme.sample.tipTitle,
-        tipText: overlay.sampleTheme.sample.tipText,
-        highlightTitle: overlay.sampleTheme.sample.highlightTitle,
-        highlightTokens: overlay.sampleTheme.sample.highlightTokens,
-      },
-      rightColumnWidth,
-      {
-        theme: {
-          id: overlay.sampleTheme.id,
-          palette: overlay.sampleTheme.palette,
-        },
-        blocks: [],
-      },
-      {
-        centerGlyph: compactLabels,
-      },
-    );
-    const upperLineCount = Math.max(houseLines.length, welcomeLines.length);
-    bodyLines = Array.from({ length: upperLineCount }, (_value, index) => {
-      const left = padStyledContent(houseLines[index] ?? "", leftColumnWidth);
-      const right = padStyledContent(welcomeLines[index] ?? "", rightColumnWidth);
-
-      return `${left}${separator}${right}`.trimEnd();
-    });
-    bodyLines.push("", dividerLine, guidanceLine);
+  for (const line of bodyLines) {
+    output.push(renderPrestyledBodyLine(line, normalizedWidth, outerBorderStyle));
   }
 
-  return renderOverlayPanel(bodyLines, normalizedWidth, outerBorderStyle, " Sorting Hat ");
+  output.push(renderStyledFrameLine(normalizedWidth, "╟", "╢", "", outerBorderStyle, dividerStyle));
+  output.push(renderPrestyledBodyLine("", normalizedWidth, outerBorderStyle));
+
+  for (const line of renderThemePickerPreviewLines(overlay, bodyWidth)) {
+    output.push(renderPrestyledBodyLine(line, normalizedWidth, outerBorderStyle));
+  }
+
+  output.push(renderPrestyledBodyLine("", normalizedWidth, outerBorderStyle));
+  output.push(renderStyledFrameLine(normalizedWidth, "╟", "╢", "", outerBorderStyle, dividerStyle));
+  output.push(renderPrestyledBodyLine("", normalizedWidth, outerBorderStyle));
+  output.push(renderPrestyledBodyLine(`  ${styleText("💡 Tips", infoTitleStyle)}`, normalizedWidth, outerBorderStyle));
+
+  for (const line of tipLines) {
+    output.push(renderPrestyledBodyLine(line, normalizedWidth, outerBorderStyle));
+  }
+
+  output.push(renderPrestyledBodyLine("", normalizedWidth, outerBorderStyle));
+  output.push(renderPrestyledBodyLine(`  ${styleText("✨ Highlights", infoTitleStyle)}`, normalizedWidth, outerBorderStyle));
+
+  for (const line of highlightLines) {
+    output.push(renderPrestyledBodyLine(line, normalizedWidth, outerBorderStyle));
+  }
+
+  output.push(renderPrestyledBodyLine("", normalizedWidth, outerBorderStyle));
+  output.push(renderStyledFrameLine(normalizedWidth, "╰", "╯", "", outerBorderStyle, outerBorderStyle));
+  output.push(styleText(buildThemePickerApplyLine(overlay), {
+    fg: hexToRgb(overlay.sampleTheme.palette.chrome.utility),
+  }));
+
+  return output;
 }

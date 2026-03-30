@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { execa } from "execa";
 
 import { createUserConfigStore, type UserConfigStore } from "../cli/user-config.ts";
+import { PRIMARY_CLI_BINARY_NAME } from "../core/brand.ts";
 import type { ProviderRunner } from "../providers/provider-runner.ts";
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import {
@@ -37,7 +38,7 @@ export type RunInteractiveTuiOptions = {
 function noopWrite(): void {}
 
 function shouldForceThemePickerForTesting(): boolean {
-  const value = process.env.BETA_FORCE_THEME_PICKER?.trim().toLowerCase();
+  const value = process.env.EXPECTO_FORCE_THEME_PICKER?.trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes";
 }
 
@@ -51,7 +52,7 @@ async function defaultOpenPager(logPath: string): Promise<void> {
 
 function shouldHideSystemLine(line: string): boolean {
   return (
-    line === "beta interactive session" ||
+    line === `${PRIMARY_CLI_BINARY_NAME} interactive session` ||
     line.startsWith("mode: ") ||
     line.startsWith("project: ") ||
     line.startsWith("initial prompt: ")
@@ -316,6 +317,16 @@ export async function runInteractiveTui(
       onMoveSelectionDown: () => {
         applyAction({
           type: "move_selection_down",
+        });
+      },
+      onMoveSelectionLeft: () => {
+        applyAction({
+          type: "move_selection_left",
+        });
+      },
+      onMoveSelectionRight: () => {
+        applyAction({
+          type: "move_selection_right",
         });
       },
       onToggleSelectedItem: () => {

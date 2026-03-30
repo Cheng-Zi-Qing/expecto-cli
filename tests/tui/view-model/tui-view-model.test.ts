@@ -22,7 +22,7 @@ function createSampleTuiState(overrides: Partial<TuiState> = {}): TuiState {
     selectedTimelineIndex: 0,
     draft: "",
     inputLocked: false,
-    projectLabel: "beta-agent",
+    projectLabel: "expecto-cli",
     branchLabel: "main",
     providerLabel: "anthropic",
     modelLabel: "claude",
@@ -79,7 +79,10 @@ test("buildTuiViewModel exposes a structured theme picker overlay when active", 
   assert.equal(view.overlay?.entries.length, 4);
   assert.equal(view.overlay?.entries[1]?.selected, true);
   assert.equal(view.overlay?.sampleTheme.id, "gryffindor");
+  assert.equal(view.overlay?.sampleTheme.availability, "available");
   assert.match(view.overlay?.sampleTheme.welcome.subtitle ?? "", /Gryffindor Lion/i);
+  assert.equal(view.overlay?.sampleTheme.sample.tipTitle, "Tips");
+  assert.equal(view.overlay?.sampleTheme.sample.highlightTitle, "Highlights");
   assert.equal((view.footer as TuiFooterViewWithTheme).theme?.id, "gryffindor");
 });
 

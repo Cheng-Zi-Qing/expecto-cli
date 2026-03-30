@@ -1,4 +1,4 @@
-# beta-agent Bootstrap Plan
+# Expecto Cli Bootstrap Plan
 
 ## Current Goal
 
@@ -19,7 +19,7 @@ Phase 0: repository bootstrap
 ## Active Tasks
 
 - Create repo-local specs for CLI and memory architecture
-- Add `.beta-agent` workspace templates
+- Add `.expecto-cli` workspace templates
 - Define the first contract modules
 
 ## Risks

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { resolveInstructionSet } from "../../src/runtime/instruction-resolver.ts";
 
 test("instruction resolver builds runtime, project, and artifact layers in priority order", () => {
@@ -14,25 +15,25 @@ test("instruction resolver builds runtime, project, and artifact layers in prior
     ],
     requiredArtifacts: [
       {
-        id: ".beta-agent/docs/00-requirements.md",
+        id: currentAppPath("docs", "00-requirements.md"),
         kind: "requirements",
-        path: ".beta-agent/docs/00-requirements.md",
+        path: currentAppPath("docs", "00-requirements.md"),
         title: "00-requirements",
         content: "# Requirements\n\nBuild a Markdown-driven runtime.\n",
       },
       {
-        id: ".beta-agent/docs/01-plan.md",
+        id: currentAppPath("docs", "01-plan.md"),
         kind: "plan",
-        path: ".beta-agent/docs/01-plan.md",
+        path: currentAppPath("docs", "01-plan.md"),
         title: "01-plan",
         content: "# Plan\n\nCurrent phase: foundation.\n",
       },
     ],
     optionalArtifacts: [
       {
-        id: ".beta-agent/docs/summaries/T-001-2026-03-24.md",
+        id: currentAppPath("docs", "summaries", "T-001-2026-03-24.md"),
         kind: "summary",
-        path: ".beta-agent/docs/summaries/T-001-2026-03-24.md",
+        path: currentAppPath("docs", "summaries", "T-001-2026-03-24.md"),
         title: "T-001-2026-03-24",
       },
     ],
@@ -42,7 +43,8 @@ test("instruction resolver builds runtime, project, and artifact layers in prior
     resolved.promptLayers.map((layer) => layer.kind),
     ["identity", "mode", "project_instruction", "artifact_summary", "artifact_summary"],
   );
-  assert.equal(resolved.promptLayers[0]?.title, "beta-identity");
+  assert.equal(resolved.promptLayers[0]?.title, "expecto-cli-identity");
+  assert.match(resolved.promptLayers[0]?.content ?? "", /You are Expecto Cli/i);
   assert.equal(resolved.promptLayers[1]?.title, "mode-balanced");
   assert.equal(resolved.promptLayers[2]?.path, "AGENTS.md");
   assert.deepEqual(
@@ -60,7 +62,7 @@ test("instruction resolver keeps memory documents out of prompt layers", () => {
   });
 
   assert.equal(
-    resolved.promptLayers.some((layer) => layer.path === ".beta-agent/memory/INDEX.md"),
+    resolved.promptLayers.some((layer) => layer.path === currentAppPath("memory", "INDEX.md")),
     false,
   );
 });

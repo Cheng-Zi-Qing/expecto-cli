@@ -1,11 +1,11 @@
 {
-  "name": "beta-agent",
+  "name": "expecto-cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "A personal, markdown-driven, Claude-like code agent runtime.",
   "bin": {
-    "beta": "./dist/src/cli/entry.js"
+    "expecto": "./dist/src/cli/entry.js"
   },
   "engines": {
     "node": ">=22"
@@ -14,9 +14,9 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "dev": "node --experimental-strip-types src/cli/entry.ts",
-    "dev:init": "BETA_FORCE_THEME_PICKER=1 node --experimental-strip-types src/cli/entry.ts",
-    "dev:watch:init": "BETA_FORCE_THEME_PICKER=1 node --watch-path=src --watch-path=package.json --watch-path=tsconfig.json --experimental-strip-types src/cli/entry.ts",
-    "install:local": "bash ./scripts/install-local-beta.sh",
+    "dev:init": "EXPECTO_FORCE_THEME_PICKER=1 node --experimental-strip-types src/cli/entry.ts",
+    "dev:watch:init": "EXPECTO_FORCE_THEME_PICKER=1 node --watch-path=src --watch-path=package.json --watch-path=tsconfig.json --experimental-strip-types src/cli/entry.ts",
+    "install:local": "bash ./scripts/install-local-expecto.sh",
     "test": "node --experimental-strip-types --test $(find tests -name '*.test.ts' -print)"
   },
   "dependencies": {

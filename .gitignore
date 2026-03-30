@@ -4,5 +4,6 @@ dist/
 .DS_Store
 .env
 coverage/
-.beta-agent/state/
+.expecto-cli/state/
+.superpowers/
 .worktrees/

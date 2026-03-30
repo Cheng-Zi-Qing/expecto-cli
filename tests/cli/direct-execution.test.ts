@@ -8,12 +8,12 @@ import { pathToFileURL } from "node:url";
 import { isDirectExecution } from "../../src/cli/entry.ts";
 
 test("isDirectExecution returns true when invoked through a symlinked bin path", async () => {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-direct-exec-"));
+  const root = await mkdtemp(join(tmpdir(), "expecto-cli-direct-exec-"));
   const realDir = join(root, "dist", "src", "cli");
   await mkdir(realDir, { recursive: true });
 
   const realEntry = join(realDir, "entry.js");
-  const symlinkEntry = join(root, "beta");
+  const symlinkEntry = join(root, "expecto");
 
   await writeFile(realEntry, "#!/usr/bin/env node\n");
   await symlink(realEntry, symlinkEntry);

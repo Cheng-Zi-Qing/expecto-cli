@@ -1,9 +1,10 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+import { currentAppPath } from "./brand.ts";
 import { ArtifactStore } from "./artifact-store.ts";
 
-const docsRoot = ".beta-agent/docs";
+const docsRoot = currentAppPath("docs");
 
 const baselineDocuments = {
   requirements: {
@@ -51,10 +52,8 @@ export class ArtifactWorkspace {
     fallbackContent: string,
   ): Promise<void> {
     const document = baselineDocuments[kind];
-    const absolutePath = join(this.projectRoot, document.path);
-
     try {
-      await readFile(absolutePath, "utf8");
+      await readFile(join(this.projectRoot, document.path), "utf8");
       return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

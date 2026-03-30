@@ -1,13 +1,13 @@
-# beta-agent Requirements
+# Expecto Cli Requirements
 
 ## Product Shape
 
 - `CLI-first`
-- public command name: `beta`
+- public command name: `expecto`
 - interaction model should feel like Claude Code:
-  - `beta`
-  - `beta "<prompt>"`
-  - `beta -p "<prompt>"`
+  - `expecto`
+  - `expecto "<prompt>"`
+  - `expecto -p "<prompt>"`
 
 ## Core Goals
 
@@ -28,7 +28,7 @@
 ## Working Principles
 
 - `AGENTS.md` is the primary project entrypoint.
-- `.beta-agent/` is the private agent workspace.
+- `.expecto-cli/` is the private agent workspace.
 - complex tasks should use:
   - requirements
   - plan

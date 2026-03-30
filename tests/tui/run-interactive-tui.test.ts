@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
+import { currentAppPath } from "../../src/core/brand.ts";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 import type { RenderedTimelineLayout } from "../../src/tui/renderer-blessed/block-layout.ts";
 import { renderTimelineItems } from "../../src/tui/renderer-blessed/block-renderer.ts";
@@ -14,10 +15,10 @@ import type { TuiState } from "../../src/tui/tui-types.ts";
 import type { UserConfig, UserConfigStore } from "../../src/cli/user-config.ts";
 
 async function makeProjectRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "beta-agent-tui-"));
-  await mkdir(join(root, ".beta-agent", "docs"), { recursive: true });
-  await writeFile(join(root, ".beta-agent", "docs", "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, ".beta-agent", "docs", "01-plan.md"), "# Plan\n");
+  const root = await mkdtemp(join(tmpdir(), "expecto-tui-"));
+  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
+  await writeFile(join(root, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(root, currentAppPath("docs", "01-plan.md")), "# Plan\n");
   return root;
 }
 
@@ -324,8 +325,8 @@ test("runInteractiveTui opens the picker on first launch and blocks prompt mode 
 });
 
 test("runInteractiveTui can force the first-launch picker for local testing even with a saved theme", async () => {
-  const previousForceThemePicker = process.env.BETA_FORCE_THEME_PICKER;
-  process.env.BETA_FORCE_THEME_PICKER = "1";
+  const previousForceThemePicker = process.env.EXPECTO_FORCE_THEME_PICKER;
+  process.env.EXPECTO_FORCE_THEME_PICKER = "1";
 
   try {
     const projectRoot = await makeProjectRoot();
@@ -359,6 +360,53 @@ test("runInteractiveTui can force the first-launch picker for local testing even
     assert.equal(app?.latestState().activeThemeId, "hufflepuff");
     assert.equal(app?.latestState().themePicker?.reason, "first_launch");
     assert.equal(app?.latestState().themePicker?.selectedThemeId, "hufflepuff");
+
+    app?.exit();
+    await runPromise;
+  } finally {
+    if (previousForceThemePicker === undefined) {
+      delete process.env.EXPECTO_FORCE_THEME_PICKER;
+    } else {
+      process.env.EXPECTO_FORCE_THEME_PICKER = previousForceThemePicker;
+    }
+  }
+});
+
+test("runInteractiveTui ignores the removed legacy BETA_FORCE_THEME_PICKER override", async () => {
+  const previousForceThemePicker = process.env.BETA_FORCE_THEME_PICKER;
+  delete process.env.EXPECTO_FORCE_THEME_PICKER;
+  process.env.BETA_FORCE_THEME_PICKER = "1";
+
+  try {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+      },
+      cwd: projectRoot,
+    });
+    const userConfigStore = createUserConfigStore({
+      themeId: "hufflepuff",
+    });
+    let app: FakeInteractiveTuiApp | undefined;
+
+    const runPromise = runInteractiveTui(context, {
+      providerLabel: "anthropic",
+      modelLabel: "claude-sonnet-4-20250514",
+      branchLabel: "main",
+      userConfigStore,
+      createApp: (input) => {
+        app = new FakeInteractiveTuiApp(input);
+        return app;
+      },
+      assistantStep: async (input) => ({
+        output: `assistant: ${input.prompt}`,
+      }),
+    });
+
+    await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+    assert.equal(app?.latestState().themePicker, null);
 
     app?.exit();
     await runPromise;

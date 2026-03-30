@@ -1,8 +1,7 @@
 import type { ParsedCliArgs } from "./arg-parser.ts";
 
 export type CliRouteWarningCode =
-  | "DEPRECATED_PRINT_ALIAS"
-  | "DEPRECATED_TERMINAL_RENDERER_ENV";
+  | "DEPRECATED_PRINT_ALIAS";
 
 export type CliRouteWarning = {
   code: CliRouteWarningCode;
@@ -98,15 +97,6 @@ export function resolveCliRoute(input: RouteResolutionInput): CliRoute {
       printWarning(
         "DEPRECATED_PRINT_ALIAS",
         "The -p/--print alias is deprecated and will be removed in a future release.",
-      ),
-    );
-  }
-
-  if (deprecatedTerminalRendererEnv) {
-    warnings.push(
-      printWarning(
-        "DEPRECATED_TERMINAL_RENDERER_ENV",
-        "BETA_TUI_RENDERER=terminal is deprecated and no longer controls routing.",
       ),
     );
   }

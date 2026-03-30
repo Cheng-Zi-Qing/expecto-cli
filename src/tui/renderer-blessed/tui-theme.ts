@@ -34,6 +34,7 @@ export type RendererPalette = {
         label: string;
         summary: string;
         body: string;
+        bg: string;
       };
       assistant: {
         border: string;
@@ -266,6 +267,7 @@ export function createRendererPalette(
           label: theme.palette.chrome.user,
           summary: theme.palette.text.heading,
           body: theme.palette.text.body,
+          bg: theme.palette.surface.userCardBg,
         },
         assistant: {
           border: theme.palette.chrome.assistant,
@@ -316,7 +318,7 @@ export function createRendererPalette(
       label: theme.palette.chrome.user,
       placeholder: theme.palette.text.muted,
       cursor: input.inputLocked ? theme.palette.chrome.selection : theme.palette.chrome.user,
-      bg: "#F3F4F6",
+      bg: theme.palette.surface.composerBg,
     },
     commandMenu: {
       text: theme.palette.chrome.user,
