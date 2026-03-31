@@ -300,7 +300,7 @@ function ensureExecutionCard(
 }
 
 function isBuiltinCommandRequest(event: InteractionEvent): boolean {
-  return event.requestId.startsWith("request-command-");
+  return "requestId" in event && event.requestId.startsWith("request-command-");
 }
 
 function isBuiltinCommandExecutionEvent(event: InteractionEvent): boolean {
@@ -353,7 +353,7 @@ function shouldProjectPromptLifecycleEventIntoTimeline(
 ): boolean {
   const activeLedger = state.activeRequestLedger;
 
-  if (activeLedger === null || event.requestId !== activeLedger.requestId) {
+  if (activeLedger === null || !("requestId" in event) || event.requestId !== activeLedger.requestId) {
     return false;
   }
 
@@ -501,7 +501,7 @@ function projectInteractionEventIntoRequestLedger(
     return state;
   }
 
-  if (event.requestId !== activeLedger.requestId) {
+  if (!("requestId" in event) || event.requestId !== activeLedger.requestId) {
     return state;
   }
 
@@ -788,6 +788,11 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
       return {
         ...state,
         inputLocked: action.locked,
+      };
+    case "set_session_id":
+      return {
+        ...state,
+        sessionId: action.sessionId,
       };
     case "set_runtime_state":
       return {

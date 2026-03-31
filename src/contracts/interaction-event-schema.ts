@@ -9,6 +9,11 @@ const executionItemStartedEventType = "execution_item_started";
 const executionItemChunkEventType = "execution_item_chunk";
 const executionItemCompletedEventType = "execution_item_completed";
 const requestCompletedEventType = "request_completed";
+const sessionInitializedEventType = "session_initialized";
+const userPromptReceivedEventType = "user_prompt_received";
+const sessionStateChangedEventType = "session_state_changed";
+const conversationClearedEventType = "conversation_cleared";
+const promptInterruptedEventType = "prompt_interrupted";
 
 const interactionEventTypeValues = [
   assistantResponseStartedEventType,
@@ -18,6 +23,11 @@ const interactionEventTypeValues = [
   executionItemChunkEventType,
   executionItemCompletedEventType,
   requestCompletedEventType,
+  sessionInitializedEventType,
+  userPromptReceivedEventType,
+  sessionStateChangedEventType,
+  conversationClearedEventType,
+  promptInterruptedEventType,
 ] as const;
 
 export const interactionEventTypeSchema = z.enum(interactionEventTypeValues);
@@ -174,7 +184,57 @@ export const requestCompletedPayloadSchema = z
   })
   .strict();
 
+export const sessionInitializedPayloadSchema = z
+  .object({
+    sessionId: nonEmptyStringSchema,
+  })
+  .strict();
+
+export const userPromptReceivedPayloadSchema = z
+  .object({
+    prompt: z.string(),
+  })
+  .strict();
+
+// Session-level events: not scoped to a specific turn/request
+export const sessionLevelEventEnvelopeFieldsSchema = z
+  .object({
+    timestamp: z.string().datetime(),
+    sessionId: nonEmptyStringSchema,
+  })
+  .strict();
+
+export const sessionStateSchema = z.enum(["ready", "streaming", "interrupted", "error"]);
+
+export const sessionStateChangedPayloadSchema = z
+  .object({
+    state: sessionStateSchema,
+  })
+  .strict();
+
+export const conversationClearedPayloadSchema = z.object({}).strict();
+
+export const promptInterruptedPayloadSchema = z
+  .object({
+    prompt: z.string(),
+  })
+  .strict();
+
 type InteractionEventTypeValue = z.infer<typeof interactionEventTypeSchema>;
+
+const buildSessionLevelEventSchema = <
+  TEventType extends InteractionEventTypeValue,
+  TPayload extends z.ZodTypeAny,
+>(
+  eventType: TEventType,
+  payloadSchema: TPayload,
+) =>
+  sessionLevelEventEnvelopeFieldsSchema
+    .extend({
+      eventType: z.literal(eventType),
+      payload: payloadSchema,
+    })
+    .strict();
 
 const buildEventSchema = <
   TEventType extends InteractionEventTypeValue,
@@ -225,6 +285,31 @@ export const requestCompletedEventSchema = buildEventSchema(
   requestCompletedPayloadSchema,
 );
 
+export const sessionInitializedEventSchema = buildSessionLevelEventSchema(
+  sessionInitializedEventType,
+  sessionInitializedPayloadSchema,
+);
+
+export const userPromptReceivedEventSchema = buildEventSchema(
+  userPromptReceivedEventType,
+  userPromptReceivedPayloadSchema,
+);
+
+export const sessionStateChangedEventSchema = buildSessionLevelEventSchema(
+  sessionStateChangedEventType,
+  sessionStateChangedPayloadSchema,
+);
+
+export const conversationClearedEventSchema = buildSessionLevelEventSchema(
+  conversationClearedEventType,
+  conversationClearedPayloadSchema,
+);
+
+export const promptInterruptedEventSchema = buildSessionLevelEventSchema(
+  promptInterruptedEventType,
+  promptInterruptedPayloadSchema,
+);
+
 export const interactionEventSchema = z.discriminatedUnion("eventType", [
   assistantResponseStartedEventSchema,
   assistantStreamChunkEventSchema,
@@ -233,6 +318,11 @@ export const interactionEventSchema = z.discriminatedUnion("eventType", [
   executionItemChunkEventSchema,
   executionItemCompletedEventSchema,
   requestCompletedEventSchema,
+  sessionInitializedEventSchema,
+  userPromptReceivedEventSchema,
+  sessionStateChangedEventSchema,
+  conversationClearedEventSchema,
+  promptInterruptedEventSchema,
 ]);
 
 export type InteractionEventType = z.infer<typeof interactionEventTypeSchema>;
@@ -272,6 +362,8 @@ export type ExecutionItemCompletedPayload = z.infer<
 >;
 export type RequestCompletedStatus = z.infer<typeof requestCompletedStatusSchema>;
 export type RequestCompletedPayload = z.infer<typeof requestCompletedPayloadSchema>;
+export type SessionInitializedPayload = z.infer<typeof sessionInitializedPayloadSchema>;
+export type UserPromptReceivedPayload = z.infer<typeof userPromptReceivedPayloadSchema>;
 export type AssistantResponseStartedEvent = z.infer<
   typeof assistantResponseStartedEventSchema
 >;
@@ -289,4 +381,14 @@ export type ExecutionItemCompletedEvent = z.infer<
   typeof executionItemCompletedEventSchema
 >;
 export type RequestCompletedEvent = z.infer<typeof requestCompletedEventSchema>;
+export type SessionInitializedEvent = z.infer<typeof sessionInitializedEventSchema>;
+export type UserPromptReceivedEvent = z.infer<typeof userPromptReceivedEventSchema>;
+export type SessionLevelEventEnvelopeFields = z.infer<typeof sessionLevelEventEnvelopeFieldsSchema>;
+export type SessionState = z.infer<typeof sessionStateSchema>;
+export type SessionStateChangedPayload = z.infer<typeof sessionStateChangedPayloadSchema>;
+export type ConversationClearedPayload = z.infer<typeof conversationClearedPayloadSchema>;
+export type PromptInterruptedPayload = z.infer<typeof promptInterruptedPayloadSchema>;
+export type SessionStateChangedEvent = z.infer<typeof sessionStateChangedEventSchema>;
+export type ConversationClearedEvent = z.infer<typeof conversationClearedEventSchema>;
+export type PromptInterruptedEvent = z.infer<typeof promptInterruptedEventSchema>;
 export type InteractionEvent = z.infer<typeof interactionEventSchema>;

@@ -19,14 +19,8 @@ export type SessionManagerOptions = {
   interruptController?: SessionInterruptController;
   maxTurnLimit?: number;
   onSystemLine?: RuntimeSessionHooks["onSystemLine"];
-  onUserPrompt?: RuntimeSessionHooks["onUserPrompt"];
-  onAssistantOutput?: RuntimeSessionHooks["onAssistantOutput"];
-  onExecutionItem?: RuntimeSessionHooks["onExecutionItem"];
   onOpenThemePicker?: RuntimeSessionHooks["onOpenThemePicker"];
   onInteractionEvent?: RuntimeSessionHooks["onInteractionEvent"];
-  onRuntimeStateChange?: RuntimeSessionHooks["onRuntimeStateChange"];
-  onConversationCleared?: RuntimeSessionHooks["onConversationCleared"];
-  onPromptInterrupted?: RuntimeSessionHooks["onPromptInterrupted"];
 };
 
 function defaultWrite(chunk: string): void {
@@ -53,14 +47,8 @@ export class SessionManager {
     this.maxTurnLimit = options.maxTurnLimit;
     this.hooks = {
       ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
-      ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
-      ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
       ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
-      ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
-      ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),
-      ...(options.onPromptInterrupted ? { onPromptInterrupted: options.onPromptInterrupted } : {}),
     };
   }
 

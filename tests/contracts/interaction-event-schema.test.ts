@@ -319,6 +319,33 @@ test("request completed accepts terminal status and optional errorCode", () => {
   assert.equal(parsed.payload.status, "error");
 });
 
+test("session_initialized accepts a session-level payload without turn metadata", () => {
+  const parsed = interactionEventSchema.parse({
+    timestamp: "2026-03-26T10:00:00.000Z",
+    sessionId: "session-1",
+    eventType: "session_initialized",
+    payload: {
+      sessionId: "session-1",
+    },
+  });
+
+  assertEventType(parsed, "session_initialized");
+  assert.equal(parsed.payload.sessionId, "session-1");
+});
+
+test("user_prompt_received accepts a turn-scoped prompt payload", () => {
+  const parsed = interactionEventSchema.parse({
+    ...baseEnvelope,
+    eventType: "user_prompt_received",
+    payload: {
+      prompt: "inspect auth flow",
+    },
+  });
+
+  assertEventType(parsed, "user_prompt_received");
+  assert.equal(parsed.payload.prompt, "inspect auth flow");
+});
+
 test("interaction events require envelope fields on every event", () => {
   const result = interactionEventSchema.safeParse({
     timestamp: "2026-03-26T10:00:00.000Z",

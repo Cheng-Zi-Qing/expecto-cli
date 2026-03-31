@@ -129,6 +129,7 @@ export type TuiAction =
   | { type: "set_draft"; draft: string }
   | { type: "add_draft_attachment"; id: string; content: string }
   | { type: "set_input_locked"; locked: boolean }
+  | { type: "set_session_id"; sessionId: string }
   | { type: "set_runtime_state"; state: TuiRuntimeState }
   | { type: "set_context_metrics"; contextMetrics: ContextMetrics }
   | { type: "open_theme_picker"; reason: ThemePickerReason; selectedThemeId?: ThemeId };

@@ -28,6 +28,18 @@ function assistantOutputResult(output: string, responseId = "response-1") {
   };
 }
 
+function captureAssistantOutputChunk(
+  assistantOutputs: string[],
+  event: InteractionEvent,
+): void {
+  if (
+    event.eventType === "assistant_stream_chunk" &&
+    event.payload.channel === "output_text"
+  ) {
+    assistantOutputs.push(event.payload.delta);
+  }
+}
+
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "expecto-session-"));
   await mkdir(join(root, currentAppPath("docs")), { recursive: true });
@@ -46,9 +58,13 @@ test("session manager runs an interactive session and persists lifecycle events"
     cwd: projectRoot,
   });
   let output = "";
+  const interactionEvents: InteractionEvent[] = [];
   const manager = new SessionManager({
     write: (chunk) => {
       output += chunk;
+    },
+    onInteractionEvent: (event) => {
+      interactionEvents.push(event);
     },
   });
 
@@ -63,7 +79,10 @@ test("session manager runs an interactive session and persists lifecycle events"
   );
   assert.equal(events[1]?.payload.prompt, "fix auth regression");
   assert.match(output, new RegExp(`${PRIMARY_CLI_BINARY_NAME} interactive session`));
-  assert.match(output, new RegExp(`session: ${result.sessionId}`));
+  assert.equal(
+    interactionEvents.find((event) => event.eventType === "session_initialized")?.payload.sessionId,
+    result.sessionId,
+  );
 });
 
 test("session manager runs a one-shot session and records the prompt in turn payload", async () => {
@@ -158,6 +177,7 @@ test("session manager calls the assistant step hook and renders its output", asy
   });
   let output = "";
   let observedPrompt = "";
+  const interactionEvents: InteractionEvent[] = [];
   const manager = new SessionManager({
     write: (chunk) => {
       output += chunk;
@@ -167,13 +187,19 @@ test("session manager calls the assistant step hook and renders its output", asy
 
       return assistantOutputResult("assistant: bootstrap placeholder");
     },
+    onInteractionEvent: (event) => {
+      interactionEvents.push(event);
+    },
   });
 
   const result = await manager.run(context);
 
   assert.equal(observedPrompt, "summarize the plan");
   assert.match(output, /assistant: bootstrap placeholder/);
-  assert.match(output, new RegExp(`session: ${result.sessionId}`));
+  assert.equal(
+    interactionEvents.find((event) => event.eventType === "session_initialized")?.payload.sessionId,
+    result.sessionId,
+  );
 });
 
 test("session manager can use a provider runner through the assistant hook boundary", async () => {
@@ -239,10 +265,15 @@ test("session manager emits assistant lifecycle envelopes and request_completed 
   await manager.run(context);
 
   assert.deepEqual(eventTypes, [
+    "session_initialized",
+    "session_state_changed",
+    "user_prompt_received",
+    "session_state_changed",
     "assistant_response_started",
     "assistant_stream_chunk",
     "assistant_response_completed",
     "request_completed",
+    "session_state_changed",
   ]);
 });
 
@@ -279,16 +310,21 @@ test("session manager normalizes malformed assistant output results before emitt
   assert.deepEqual(
     interactionEvents.map((event) => event.eventType),
     [
+      "session_initialized",
+      "session_state_changed",
+      "user_prompt_received",
+      "session_state_changed",
       "assistant_response_started",
       "assistant_stream_chunk",
       "assistant_response_completed",
       "request_completed",
+      "session_state_changed",
     ],
   );
-  const startedPayload = interactionEvents[0]?.payload as
+  const startedPayload = interactionEvents[4]?.payload as
     | { responseId?: unknown }
     | undefined;
-  const completedPayload = interactionEvents[2]?.payload as
+  const completedPayload = interactionEvents[6]?.payload as
     | { finishReason?: unknown; usage?: unknown }
     | undefined;
   assert.equal(startedPayload?.responseId, "response-turn-1");
@@ -334,9 +370,16 @@ test("session manager rejects malformed assistant tool_calls results before emit
 
   assert.deepEqual(
     interactionEvents.map((event) => event.eventType),
-    ["request_completed"],
+    [
+      "session_initialized",
+      "session_state_changed",
+      "user_prompt_received",
+      "session_state_changed",
+      "request_completed",
+      "session_state_changed",
+    ],
   );
-  const requestCompletedPayload = interactionEvents[0]?.payload as
+  const requestCompletedPayload = interactionEvents[4]?.payload as
     | { status?: unknown; errorCode?: unknown }
     | undefined;
   assert.equal(requestCompletedPayload?.status, "error");
@@ -359,8 +402,8 @@ test("session manager continues a request after tool_calls and keeps requestId s
   const assistantInputs: Array<{ turnId: string; prompt?: string }> = [];
   const events: Array<{
     eventType: string;
-    turnId: string;
-    requestId: string;
+    turnId: string | undefined;
+    requestId: string | undefined;
     payload: Record<string, unknown>;
   }> = [];
   let callCount = 0;
@@ -397,8 +440,8 @@ test("session manager continues a request after tool_calls and keeps requestId s
     onInteractionEvent: (event) => {
       events.push({
         eventType: event.eventType,
-        turnId: event.turnId,
-        requestId: event.requestId,
+        turnId: "turnId" in event ? event.turnId : undefined,
+        requestId: "requestId" in event ? event.requestId : undefined,
         payload: event.payload,
       });
     },
@@ -414,6 +457,10 @@ test("session manager continues a request after tool_calls and keeps requestId s
   assert.deepEqual(
     events.map((event) => event.eventType),
     [
+      "session_initialized",
+      "session_state_changed",
+      "user_prompt_received",
+      "session_state_changed",
       "assistant_response_started",
       "assistant_response_completed",
       "execution_item_started",
@@ -425,15 +472,17 @@ test("session manager continues a request after tool_calls and keeps requestId s
       "assistant_stream_chunk",
       "assistant_response_completed",
       "request_completed",
+      "session_state_changed",
     ],
   );
 
-  const requestIds = new Set(events.map((event) => event.requestId));
+  const turnScopedEvents = events.filter((e) => e.requestId !== undefined);
+  const requestIds = new Set(turnScopedEvents.map((event) => event.requestId));
   assert.equal(requestIds.size, 1);
-  assert.equal(events[0]?.requestId, `request-${assistantInputs[0]?.turnId}`);
-  assert.equal(events[1]?.payload.finishReason, "tool_calls");
-  assert.equal(events[1]?.payload.continuation, "awaiting_execution");
-  assert.deepEqual(events[1]?.payload.plannedExecutionIds, ["execution-1", "execution-2"]);
+  assert.equal(turnScopedEvents[0]?.requestId, `request-${assistantInputs[0]?.turnId}`);
+  assert.equal(events[5]?.payload.finishReason, "tool_calls");
+  assert.equal(events[5]?.payload.continuation, "awaiting_execution");
+  assert.deepEqual(events[5]?.payload.plannedExecutionIds, ["execution-1", "execution-2"]);
 });
 
 test("session manager emits AGENT_LOOP_LIMIT_EXCEEDED when tool_calls continuation exceeds maxTurnLimit", async () => {
@@ -540,10 +589,8 @@ test("session manager treats legacy empty assistant output as an explicit assist
     assistantStep: async () => ({
       output: "",
     }),
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
       interactionEvents.push({
         eventType: event.eventType,
         payload: event.payload,
@@ -558,13 +605,18 @@ test("session manager treats legacy empty assistant output as an explicit assist
   assert.deepEqual(
     interactionEvents.map((event) => event.eventType),
     [
+      "session_initialized",
+      "session_state_changed",
+      "user_prompt_received",
+      "session_state_changed",
       "assistant_response_started",
       "assistant_stream_chunk",
       "assistant_response_completed",
       "request_completed",
+      "session_state_changed",
     ],
   );
-  assert.equal(interactionEvents[1]?.payload.delta, "");
+  assert.equal(interactionEvents[5]?.payload.delta, "");
 });
 
 test("session manager emits renderer-neutral session events for prompts, outputs, state, and clears", async () => {
@@ -585,20 +637,18 @@ test("session manager emits renderer-neutral session events for prompts, outputs
     write: () => {},
     readLine: () => Promise.resolve(inputs.shift() ?? null),
     assistantStep: async (input) => assistantOutputResult(`assistant: ${input.prompt}`),
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
-    onRuntimeStateChange: (state) => {
-      runtimeStates.push(state);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
     },
-    onConversationCleared: () => {
-      clears += 1;
+    onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
+      if (event.eventType === "user_prompt_received") {
+        userPrompts.push(event.payload.prompt);
+      } else if (event.eventType === "session_state_changed") {
+        runtimeStates.push(event.payload.state);
+      } else if (event.eventType === "conversation_cleared") {
+        clears += 1;
+      }
     },
   });
 
@@ -613,6 +663,68 @@ test("session manager emits renderer-neutral session events for prompts, outputs
   assert.ok(runtimeStates.includes("ready"));
   assert.equal(clears, 1);
   assert.ok(systemLines.some((line) => line.includes("conversation cleared")));
+});
+
+test("session manager emits session_initialized and user_prompt_received for accepted prompts", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const inputs = ["hello", "start over", "/exit"];
+  const interactionEvents: InteractionEvent[] = [];
+  const manager = new SessionManager({
+    write: () => {},
+    readLine: () => Promise.resolve(inputs.shift() ?? null),
+    assistantStep: async (input) => assistantOutputResult(`assistant: ${input.prompt}`),
+    onInteractionEvent: (event) => {
+      interactionEvents.push(event);
+    },
+  });
+
+  const result = await manager.run(context);
+
+  assert.ok(
+    interactionEvents.some((event) => event.eventType === "session_initialized"),
+  );
+  assert.deepEqual(
+    interactionEvents
+      .filter((event) => event.eventType === "user_prompt_received")
+      .map((event) => ({
+        turnId: "turnId" in event ? event.turnId : undefined,
+        requestId: "requestId" in event ? event.requestId : undefined,
+        payload: event.payload,
+      })),
+    [
+      {
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        payload: {
+          prompt: "hello",
+        },
+      },
+      {
+        turnId: "turn-2",
+        requestId: "request-turn-2",
+        payload: {
+          prompt: "start over",
+        },
+      },
+    ],
+  );
+
+  const sessionInitializedEvent = interactionEvents.find(
+    (event) => event.eventType === "session_initialized",
+  ) as
+    | {
+        payload: {
+          sessionId: string;
+        };
+      }
+    | undefined;
+  assert.equal(sessionInitializedEvent?.payload.sessionId, result.sessionId);
 });
 
 test("session manager keeps built-in slash commands out of prompt and assistant event streams", async () => {
@@ -631,14 +743,14 @@ test("session manager keeps built-in slash commands out of prompt and assistant 
     write: () => {},
     readLine: () => Promise.resolve(inputs.shift() ?? null),
     assistantStep: async (input) => assistantOutputResult(`assistant: ${input.prompt}`),
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
+    },
+    onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
+      if (event.eventType === "user_prompt_received") {
+        userPrompts.push(event.payload.prompt);
+      }
     },
   });
 
@@ -666,14 +778,14 @@ test("session manager keeps /help and unknown slash commands out of prompt and a
     write: () => {},
     readLine: () => Promise.resolve(inputs.shift() ?? null),
     assistantStep: async (input) => assistantOutputResult(`assistant: ${input.prompt}`),
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
+    },
+    onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
+      if (event.eventType === "user_prompt_received") {
+        userPrompts.push(event.payload.prompt);
+      }
     },
   });
 
@@ -697,14 +809,8 @@ test("session manager emits a renderer-neutral execution item for /branch withou
   });
   const userPrompts: string[] = [];
   const assistantOutputs: string[] = [];
-  const executionItems: Array<{ summary: string; body?: string }> = [];
   const systemLines: string[] = [];
-  const interactionEvents: Array<{
-    eventType: string;
-    turnId: string;
-    requestId: string;
-    payload: Record<string, unknown>;
-  }> = [];
+  const interactionEvents: InteractionEvent[] = [];
   const inputs = ["/branch", "/exit"];
   const manager = new SessionManager({
     write: () => {},
@@ -712,20 +818,11 @@ test("session manager emits a renderer-neutral execution item for /branch withou
     assistantStep: async () => {
       throw new Error("assistantStep should not be called for built-in slash commands");
     },
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
     },
-    // NOTE: this is intentionally not part of the user/assistant streams.
-    onExecutionItem: (item) => {
-      executionItems.push(item);
-    },
     onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
       if (event.eventType.startsWith("execution_item_") || event.eventType === "request_completed") {
         interactionEvents.push(event);
       }
@@ -738,9 +835,6 @@ test("session manager emits a renderer-neutral execution item for /branch withou
   assert.deepEqual(userPrompts, []);
   assert.deepEqual(assistantOutputs, []);
   assert.ok(systemLines.some((line) => line.includes("branch: no-git")));
-  assert.equal(executionItems.length, 1);
-  assert.equal(executionItems[0]?.summary, "Read git branch");
-  assert.match(executionItems[0]?.body ?? "", /no-git/);
   assert.deepEqual(
     interactionEvents.map((event) => event.eventType),
     [
@@ -750,19 +844,22 @@ test("session manager emits a renderer-neutral execution item for /branch withou
       "request_completed",
     ],
   );
-  assert.equal(interactionEvents[0]?.requestId, interactionEvents[1]?.requestId);
-  assert.equal(interactionEvents[1]?.requestId, interactionEvents[2]?.requestId);
-  assert.equal(interactionEvents[2]?.requestId, interactionEvents[3]?.requestId);
-  assert.match(interactionEvents[0]?.requestId ?? "", /^request-command-\d+$/);
-  assert.match(interactionEvents[0]?.turnId ?? "", /^turn-command-\d+$/);
-  assert.equal(interactionEvents[0]?.payload.executionKind, "command");
-  assert.equal(interactionEvents[0]?.payload.title, "Read git branch");
-  assert.equal(interactionEvents[1]?.payload.stream, "system");
-  assert.match(String(interactionEvents[1]?.payload.output ?? ""), /no-git/);
-  assert.equal(interactionEvents[2]?.payload.status, "success");
-  assert.equal(interactionEvents[2]?.payload.summary, "Read git branch");
-  assert.equal(/[\r\n]/.test(String(interactionEvents[2]?.payload.summary ?? "")), false);
-  assert.equal(interactionEvents[3]?.payload.status, "completed");
+  // All events in this test are turn-scoped (execution_item_* and request_completed)
+  type TurnScopedEvent = { requestId: string; turnId: string; payload: Record<string, unknown> };
+  const turnEvents = interactionEvents as unknown as TurnScopedEvent[];
+  assert.equal(turnEvents[0]?.requestId, turnEvents[1]?.requestId);
+  assert.equal(turnEvents[1]?.requestId, turnEvents[2]?.requestId);
+  assert.equal(turnEvents[2]?.requestId, turnEvents[3]?.requestId);
+  assert.match(turnEvents[0]?.requestId ?? "", /^request-command-\d+$/);
+  assert.match(turnEvents[0]?.turnId ?? "", /^turn-command-\d+$/);
+  assert.equal(turnEvents[0]?.payload.executionKind, "command");
+  assert.equal(turnEvents[0]?.payload.title, "Read git branch");
+  assert.equal(turnEvents[1]?.payload.stream, "system");
+  assert.match(String(turnEvents[1]?.payload.output ?? ""), /no-git/);
+  assert.equal(turnEvents[2]?.payload.status, "success");
+  assert.equal(turnEvents[2]?.payload.summary, "Read git branch");
+  assert.equal(/[\r\n]/.test(String(turnEvents[2]?.payload.summary ?? "")), false);
+  assert.equal(turnEvents[3]?.payload.status, "completed");
 });
 
 test("session manager routes interactive initialPrompt slash commands through built-in command effects", async () => {
@@ -776,24 +873,21 @@ test("session manager routes interactive initialPrompt slash commands through bu
   });
   const userPrompts: string[] = [];
   const assistantOutputs: string[] = [];
-  const executionItems: Array<{ summary: string; body?: string }> = [];
   const systemLines: string[] = [];
+  const interactionEvents: InteractionEvent[] = [];
   const manager = new SessionManager({
     write: () => {},
     assistantStep: async () => {
       throw new Error("assistantStep should not be called for built-in slash commands");
     },
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
     },
-    onExecutionItem: (item) => {
-      executionItems.push(item);
+    onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
+      if (event.eventType.startsWith("execution_item_") || event.eventType === "request_completed") {
+        interactionEvents.push(event);
+      }
     },
   });
 
@@ -803,9 +897,20 @@ test("session manager routes interactive initialPrompt slash commands through bu
   assert.deepEqual(userPrompts, []);
   assert.deepEqual(assistantOutputs, []);
   assert.ok(systemLines.some((line) => line.includes("branch: no-git")));
-  assert.equal(executionItems.length, 1);
-  assert.equal(executionItems[0]?.summary, "Read git branch");
-  assert.match(executionItems[0]?.body ?? "", /no-git/);
+  assert.deepEqual(
+    interactionEvents.map((event) => event.eventType),
+    [
+      "execution_item_started",
+      "execution_item_chunk",
+      "execution_item_completed",
+      "request_completed",
+    ],
+  );
+  type TurnScopedEvent = { requestId: string; turnId: string; payload: Record<string, unknown> };
+  const turnEvents = interactionEvents as unknown as TurnScopedEvent[];
+  assert.equal(turnEvents[0]?.payload.title, "Read git branch");
+  assert.match(String(turnEvents[1]?.payload.output ?? ""), /no-git/);
+  assert.equal(turnEvents[2]?.payload.summary, "Read git branch");
 });
 
 test("session manager normalizes bare interactive initialPrompt exit aliases before processing", async () => {
@@ -819,17 +924,10 @@ test("session manager normalizes bare interactive initialPrompt exit aliases bef
       cwd: projectRoot,
     });
     const userPrompts: string[] = [];
-    const assistantOutputs: string[] = [];
     const manager = new SessionManager({
       write: () => {},
       assistantStep: async () => {
         throw new Error("assistantStep should not be called for bare exit aliases");
-      },
-      onUserPrompt: (prompt) => {
-        userPrompts.push(prompt);
-      },
-      onAssistantOutput: (output) => {
-        assistantOutputs.push(output);
       },
     });
 
@@ -837,7 +935,6 @@ test("session manager normalizes bare interactive initialPrompt exit aliases bef
 
     assert.equal(result.turnCount, 0);
     assert.deepEqual(userPrompts, []);
-    assert.deepEqual(assistantOutputs, []);
   }
 });
 
@@ -852,24 +949,21 @@ test("session manager routes print-mode slash commands through built-in command 
   });
   const userPrompts: string[] = [];
   const assistantOutputs: string[] = [];
-  const executionItems: Array<{ summary: string; body?: string }> = [];
   const systemLines: string[] = [];
+  const interactionEvents: InteractionEvent[] = [];
   const manager = new SessionManager({
     write: () => {},
     assistantStep: async () => {
       throw new Error("assistantStep should not be called for built-in slash commands");
     },
-    onUserPrompt: (prompt) => {
-      userPrompts.push(prompt);
-    },
-    onAssistantOutput: (output) => {
-      assistantOutputs.push(output);
-    },
     onSystemLine: (line) => {
       systemLines.push(line);
     },
-    onExecutionItem: (item) => {
-      executionItems.push(item);
+    onInteractionEvent: (event) => {
+      captureAssistantOutputChunk(assistantOutputs, event);
+      if (event.eventType.startsWith("execution_item_") || event.eventType === "request_completed") {
+        interactionEvents.push(event);
+      }
     },
   });
 
@@ -879,9 +973,20 @@ test("session manager routes print-mode slash commands through built-in command 
   assert.deepEqual(userPrompts, []);
   assert.deepEqual(assistantOutputs, []);
   assert.ok(systemLines.some((line) => line.includes("branch: no-git")));
-  assert.equal(executionItems.length, 1);
-  assert.equal(executionItems[0]?.summary, "Read git branch");
-  assert.match(executionItems[0]?.body ?? "", /no-git/);
+  assert.deepEqual(
+    interactionEvents.map((event) => event.eventType),
+    [
+      "execution_item_started",
+      "execution_item_chunk",
+      "execution_item_completed",
+      "request_completed",
+    ],
+  );
+  type TurnScopedEvent = { requestId: string; turnId: string; payload: Record<string, unknown> };
+  const turnEvents = interactionEvents as unknown as TurnScopedEvent[];
+  assert.equal(turnEvents[0]?.payload.title, "Read git branch");
+  assert.match(String(turnEvents[1]?.payload.output ?? ""), /no-git/);
+  assert.equal(turnEvents[2]?.payload.summary, "Read git branch");
 });
 
 test("session manager interrupts an active assistant step and emits an interrupted prompt event", async () => {
@@ -918,15 +1023,13 @@ test("session manager interrupts an active assistant step and emits an interrupt
           { once: true },
         );
       }),
-    onPromptInterrupted: (prompt) => {
-      interruptedPrompts.push(prompt);
-    },
-    onRuntimeStateChange: (state) => {
-      runtimeStates.push(state);
-    },
     onInteractionEvent: (event) => {
       if (event.eventType === "request_completed") {
         requestCompletionStatuses.push(event.payload.status);
+      } else if (event.eventType === "prompt_interrupted") {
+        interruptedPrompts.push(event.payload.prompt);
+      } else if (event.eventType === "session_state_changed") {
+        runtimeStates.push(event.payload.state);
       }
     },
   });

@@ -6,6 +6,7 @@ import { basename, join } from "node:path";
 
 import { currentAppPath } from "../../src/core/brand.ts";
 import { buildBootstrapContext } from "../../src/runtime/bootstrap-context.ts";
+import { SessionManager } from "../../src/runtime/session-manager.ts";
 import type { RenderedTimelineLayout } from "../../src/tui/renderer-blessed/block-layout.ts";
 import { renderTimelineItems } from "../../src/tui/renderer-blessed/block-renderer.ts";
 import { createRendererPalette } from "../../src/tui/renderer-blessed/tui-theme.ts";
@@ -263,6 +264,238 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
 
   assert.equal(app?.closed, true);
 });
+
+test(
+  "runInteractiveTui keeps the rendered sessionId sourced from session_initialized events",
+  { concurrency: false },
+  async () => {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+      },
+      cwd: projectRoot,
+    });
+    let app: FakeInteractiveTuiApp | undefined;
+    const originalRun = SessionManager.prototype.run;
+
+    SessionManager.prototype.run = async function patchedRun(...args) {
+      const result = await originalRun.apply(this, args);
+
+      return {
+        ...result,
+        sessionId: `shadow-${result.sessionId}`,
+      };
+    };
+
+    try {
+      const runPromise = runInteractiveTui(context, {
+        providerLabel: "anthropic",
+        modelLabel: "claude-sonnet-4-20250514",
+        branchLabel: "main",
+        userConfigStore: createReturningUserConfigStore(),
+        createApp: (input) => {
+          app = new FakeInteractiveTuiApp(input);
+          return app;
+        },
+        assistantStep: async (input) => ({
+          output: `assistant: ${input.prompt}`,
+        }),
+      });
+
+      await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+      await waitFor(
+        () => app?.latestState().sessionId !== "pending-session",
+        "expected session_initialized to project a real sessionId before the session exits",
+      );
+
+      const eventSessionId = app?.latestState().sessionId ?? "";
+
+      assert.match(eventSessionId, /^session-/);
+
+      app?.exit();
+
+      const result = await runPromise;
+
+      assert.equal(result.sessionId, `shadow-${eventSessionId}`);
+      assert.equal(app?.latestState().sessionId, eventSessionId);
+    } finally {
+      SessionManager.prototype.run = originalRun;
+    }
+  },
+);
+
+test(
+  "runInteractiveTui folds assistant_stream_chunk text into context metrics",
+  { concurrency: false },
+  async () => {
+    const projectRoot = await makeProjectRoot();
+    const context = await buildBootstrapContext({
+      command: {
+        kind: "interactive",
+      },
+      cwd: projectRoot,
+    });
+    let app: FakeInteractiveTuiApp | undefined;
+    let releaseStream: (() => void) | undefined;
+    const streamReady = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+    const chunkA = "Alpha ".repeat(900);
+    const chunkB = "Beta ".repeat(900);
+    const originalRun = SessionManager.prototype.run;
+
+    SessionManager.prototype.run = async function patchedRun() {
+      const hooks = (this as unknown as {
+        hooks?: {
+          onInteractionEvent?: (event: Record<string, unknown>) => void;
+        };
+      }).hooks;
+
+      await streamReady;
+
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.000Z",
+        sessionId: "session-stream-test",
+        eventType: "session_initialized",
+        payload: {
+          sessionId: "session-stream-test",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.010Z",
+        sessionId: "session-stream-test",
+        eventType: "session_state_changed",
+        payload: {
+          state: "streaming",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.020Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "user_prompt_received",
+        payload: {
+          prompt: "chunk this",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.030Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "assistant_response_started",
+        payload: {
+          responseId: "response-1",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.040Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "assistant_stream_chunk",
+        payload: {
+          responseId: "response-1",
+          channel: "output_text",
+          format: "markdown",
+          delta: chunkA,
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.050Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "assistant_stream_chunk",
+        payload: {
+          responseId: "response-1",
+          channel: "output_text",
+          format: "markdown",
+          delta: chunkB,
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.060Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "assistant_response_completed",
+        payload: {
+          responseId: "response-1",
+          finishReason: "stop",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.070Z",
+        sessionId: "session-stream-test",
+        turnId: "turn-1",
+        requestId: "request-turn-1",
+        eventType: "request_completed",
+        payload: {
+          status: "completed",
+        },
+      });
+      hooks?.onInteractionEvent?.({
+        timestamp: "2026-03-31T09:00:00.080Z",
+        sessionId: "session-stream-test",
+        eventType: "session_state_changed",
+        payload: {
+          state: "ready",
+        },
+      });
+
+      return {
+        sessionId: "session-stream-test",
+        state: "idle" as const,
+        turnCount: 1,
+      };
+    };
+
+    try {
+      const runPromise = runInteractiveTui(context, {
+        providerLabel: "local",
+        modelLabel: "test-model",
+        branchLabel: "main",
+        userConfigStore: createReturningUserConfigStore(),
+        createApp: (input) => {
+          app = new FakeInteractiveTuiApp(input);
+          return app;
+        },
+      });
+
+      await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+      app?.submit("chunk this");
+
+      await waitFor(() => {
+        return app?.latestState().timeline.some((item) => item.kind === "user") ?? false;
+      }, "expected prompt to be projected locally before runtime confirmation");
+
+      const afterPromptPercent = app?.latestState().contextMetrics.percent ?? 0;
+
+      releaseStream?.();
+
+      await waitFor(() => {
+        const assistantCard = app?.latestState().timeline.find((item) => item.kind === "assistant");
+        return assistantCard?.kind === "assistant" && assistantCard.body === `${chunkA}${chunkB}`;
+      }, "expected assistant stream chunks to accumulate into a single assistant card");
+
+      const finalPercent = app?.latestState().contextMetrics.percent ?? 0;
+
+      assert.ok(
+        finalPercent > afterPromptPercent,
+        `expected assistant stream chunks to increase context metrics (${afterPromptPercent} -> ${finalPercent})`,
+      );
+
+      await runPromise;
+      assert.equal(app?.closed, true);
+    } finally {
+      SessionManager.prototype.run = originalRun;
+    }
+  },
+);
 
 test("runInteractiveTui opens the picker on first launch and blocks prompt mode until a theme is applied", async () => {
   const projectRoot = await makeProjectRoot();
