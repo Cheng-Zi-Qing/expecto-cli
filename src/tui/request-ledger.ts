@@ -63,7 +63,7 @@ export function reduceRequestLedger(
   ledger: ForegroundRequestLedger,
   event: InteractionEvent,
 ): ForegroundRequestLedger {
-  if (event.requestId !== ledger.requestId) {
+  if (!("requestId" in event) || event.requestId !== ledger.requestId) {
     return ledger;
   }
 

@@ -1,4 +1,9 @@
 import type { InteractiveTuiHandlers, TerminalTuiInputChunk } from "../tui-app.ts";
+import {
+  deleteLastDraftUnit,
+  shouldConvertToAttachment,
+} from "../draft-attachment.ts";
+import type { DraftAttachment } from "../tui-types.ts";
 
 type TerminalInputHandlers = Pick<
   InteractiveTuiHandlers,
@@ -11,6 +16,7 @@ type TerminalInputHandlers = Pick<
   | "onMoveSelectionLeft"
   | "onMoveSelectionRight"
   | "onToggleSelectedItem"
+  | "onAddAttachment"
 >;
 
 function normalizeChunk(chunk: TerminalTuiInputChunk): string {
@@ -19,12 +25,6 @@ function normalizeChunk(chunk: TerminalTuiInputChunk): string {
   }
 
   return Buffer.from(chunk).toString("utf8");
-}
-
-function removeLastCharacter(value: string): string {
-  const characters = Array.from(value);
-  characters.pop();
-  return characters.join("");
 }
 
 function isPrintableCharacter(character: string): boolean {
@@ -72,20 +72,61 @@ function readEscapeSequence(
   };
 }
 
+export type PasteState = {
+  inPaste: boolean;
+  pasteBuffer: string;
+  pasteStartDraft: string;
+};
+
+export function createPasteState(): PasteState {
+  return { inPaste: false, pasteBuffer: "", pasteStartDraft: "" };
+}
+
 export function handleTerminalInputChunk(
   chunk: TerminalTuiInputChunk,
-  state: { draft: string; inputLocked: boolean; themePickerActive?: boolean },
+  state: { draft: string; inputLocked: boolean; themePickerActive?: boolean; draftAttachments?: DraftAttachment[]; pasteState?: PasteState },
   handlers: TerminalInputHandlers,
 ): void {
   const characters = Array.from(normalizeChunk(chunk));
   let nextDraft = state.draft;
   let draftChanged = false;
+  const ps = state.pasteState ?? { inPaste: false, pasteBuffer: "", pasteStartDraft: "" };
+  // local aliases for readability
+  let inPaste = ps.inPaste;
+  let pasteBuffer = ps.pasteBuffer;
+  let pasteStartDraft = ps.pasteStartDraft;
+  let lastWasPasteCR = false;
 
   for (let index = 0; index < characters.length; index += 1) {
     const escapeSequence = readEscapeSequence(characters, index);
 
     if (escapeSequence !== null) {
+      lastWasPasteCR = false;
       index += escapeSequence.length - 1;
+
+      if (escapeSequence.sequence === "\u001b[200~") {
+        inPaste = true;
+        pasteBuffer = "";
+        pasteStartDraft = nextDraft;
+        continue;
+      }
+
+      if (escapeSequence.sequence === "\u001b[201~") {
+        inPaste = false;
+        if (shouldConvertToAttachment(pasteBuffer) && handlers.onAddAttachment) {
+          // Revert draft to pre-paste state, then add attachment
+          nextDraft = pasteStartDraft;
+          if (draftChanged) {
+            handlers.onDraftChange(nextDraft);
+            draftChanged = false;
+          }
+          handlers.onAddAttachment(pasteBuffer);
+          pasteBuffer = "";
+          continue;
+        }
+        pasteBuffer = "";
+        continue;
+      }
 
       if (state.themePickerActive) {
         if (escapeSequence.sequence === "\u001b[A") {
@@ -144,18 +185,37 @@ export function handleTerminalInputChunk(
     }
 
     if (character === "\u007f" || character === "\b") {
-      nextDraft = removeLastCharacter(nextDraft);
+      nextDraft = deleteLastDraftUnit(nextDraft, state.draftAttachments ?? []);
       draftChanged = true;
       continue;
     }
 
     if (character === "\n") {
+      if (inPaste && lastWasPasteCR) {
+        // normalize \r\n → \n (already added \n for the \r)
+        lastWasPasteCR = false;
+        continue;
+      }
+      lastWasPasteCR = false;
+      if (inPaste) {
+        pasteBuffer += "\n";
+      }
       nextDraft = `${nextDraft}\n`;
       draftChanged = true;
       continue;
     }
 
     if (character === "\r") {
+      if (inPaste) {
+        lastWasPasteCR = true;
+        pasteBuffer += "\n";
+        nextDraft = `${nextDraft}\n`;
+        draftChanged = true;
+        continue;
+      }
+
+      lastWasPasteCR = false;
+
       if (draftChanged) {
         handlers.onDraftChange(nextDraft);
         draftChanged = false;
@@ -166,6 +226,10 @@ export function handleTerminalInputChunk(
     }
 
     if (isPrintableCharacter(character)) {
+      lastWasPasteCR = false;
+      if (inPaste) {
+        pasteBuffer += character;
+      }
       nextDraft = `${nextDraft}${character}`;
       draftChanged = true;
     }
@@ -174,4 +238,9 @@ export function handleTerminalInputChunk(
   if (draftChanged) {
     handlers.onDraftChange(nextDraft);
   }
+
+  // Write back paste state so callers with persistent pasteState get updates
+  ps.inPaste = inPaste;
+  ps.pasteBuffer = pasteBuffer;
+  ps.pasteStartDraft = pasteStartDraft;
 }

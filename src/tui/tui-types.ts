@@ -64,6 +64,13 @@ export type ThemePickerState = {
   themeIds: ThemeId[];
 };
 
+export type DraftAttachment = {
+  id: string;
+  content: string;
+  lineCount: number;
+  tokenCount: number;
+};
+
 export type TuiState = {
   sessionId: string;
   activeThemeId: ThemeId;
@@ -76,6 +83,7 @@ export type TuiState = {
   timeline: TimelineItem[];
   selectedTimelineIndex: number;
   draft: string;
+  draftAttachments: DraftAttachment[];
   inputLocked: boolean;
   projectLabel: string;
   branchLabel: string;
@@ -119,7 +127,9 @@ export type TuiAction =
   | { type: "project_interaction_event"; event: InteractionEvent }
   | { type: "toggle_selected_item" }
   | { type: "set_draft"; draft: string }
+  | { type: "add_draft_attachment"; id: string; content: string }
   | { type: "set_input_locked"; locked: boolean }
+  | { type: "set_session_id"; sessionId: string }
   | { type: "set_runtime_state"; state: TuiRuntimeState }
   | { type: "set_context_metrics"; contextMetrics: ContextMetrics }
   | { type: "open_theme_picker"; reason: ThemePickerReason; selectedThemeId?: ThemeId };

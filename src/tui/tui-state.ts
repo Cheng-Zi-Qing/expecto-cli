@@ -16,11 +16,16 @@ import type {
   CommandMenuItem,
   CommandMenuState,
   CreateInitialTuiStateInput,
+  DraftAttachment,
   TimelineItem,
   TuiAction,
   TuiState,
 } from "./tui-types.ts";
 import type { ThemeId, ThemeAvailability } from "./theme/theme-types.ts";
+
+export function attachmentPlaceholder(id: string): string {
+  return `\x00att:${id}\x00`;
+}
 
 function createTimelineItemId(state: TuiState, kind: TimelineItem["kind"]): string {
   const nextIndex = state.timeline.filter((item) => item.kind === kind).length + 1;
@@ -295,7 +300,7 @@ function ensureExecutionCard(
 }
 
 function isBuiltinCommandRequest(event: InteractionEvent): boolean {
-  return event.requestId.startsWith("request-command-");
+  return "requestId" in event && event.requestId.startsWith("request-command-");
 }
 
 function isBuiltinCommandExecutionEvent(event: InteractionEvent): boolean {
@@ -348,7 +353,7 @@ function shouldProjectPromptLifecycleEventIntoTimeline(
 ): boolean {
   const activeLedger = state.activeRequestLedger;
 
-  if (activeLedger === null || event.requestId !== activeLedger.requestId) {
+  if (activeLedger === null || !("requestId" in event) || event.requestId !== activeLedger.requestId) {
     return false;
   }
 
@@ -496,7 +501,7 @@ function projectInteractionEventIntoRequestLedger(
     return state;
   }
 
-  if (event.requestId !== activeLedger.requestId) {
+  if (!("requestId" in event) || event.requestId !== activeLedger.requestId) {
     return state;
   }
 
@@ -529,6 +534,7 @@ export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiSta
     timeline: [createWelcomeCard(input)],
     selectedTimelineIndex: 0,
     draft: "",
+    draftAttachments: [],
     inputLocked: false,
     projectLabel: input.projectLabel,
     branchLabel: input.branchLabel,
@@ -537,6 +543,10 @@ export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiSta
     contextMetrics: input.contextMetrics,
     themePicker,
   };
+}
+
+function pruneOrphanedAttachments(attachments: DraftAttachment[], draft: string): DraftAttachment[] {
+  return attachments.filter((att) => draft.includes(attachmentPlaceholder(att.id)));
 }
 
 export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
@@ -751,16 +761,38 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         timeline,
       };
     }
+    case "add_draft_attachment": {
+      const attachment: DraftAttachment = {
+        id: action.id,
+        content: action.content,
+        lineCount: action.content.split("\n").length,
+        tokenCount: Math.max(1, Math.round(action.content.length / 4)), // ~4 chars per token heuristic
+      };
+      const placeholder = attachmentPlaceholder(action.id);
+      const nextDraft = `${state.draft}${placeholder}`;
+      return {
+        ...state,
+        draft: nextDraft,
+        draftAttachments: [...state.draftAttachments, attachment],
+        commandMenu: deriveCommandMenu(nextDraft),
+      };
+    }
     case "set_draft":
       return {
         ...state,
         draft: action.draft,
+        draftAttachments: pruneOrphanedAttachments(state.draftAttachments, action.draft),
         commandMenu: deriveCommandMenu(action.draft),
       };
     case "set_input_locked":
       return {
         ...state,
         inputLocked: action.locked,
+      };
+    case "set_session_id":
+      return {
+        ...state,
+        sessionId: action.sessionId,
       };
     case "set_runtime_state":
       return {

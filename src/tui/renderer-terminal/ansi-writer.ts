@@ -10,6 +10,8 @@ export type AnsiWriter = {
   clearScreen: () => void;
   setScrollRegion: (top: number, bottom: number) => void;
   resetScrollRegion: () => void;
+  enableBracketedPaste: () => void;
+  disableBracketedPaste: () => void;
 };
 
 export function createAnsiWriter(write: (chunk: string) => void): AnsiWriter {
@@ -46,6 +48,12 @@ export function createAnsiWriter(write: (chunk: string) => void): AnsiWriter {
     },
     resetScrollRegion: () => {
       write("\u001b[r");
+    },
+    enableBracketedPaste: () => {
+      write("\u001b[?2004h");
+    },
+    disableBracketedPaste: () => {
+      write("\u001b[?2004l");
     },
   };
 }

@@ -1,10 +1,23 @@
 import blessed from "neo-blessed";
 import type { Widgets } from "blessed";
 
+type BlessedListInternal = {
+  border?: unknown;
+  padding?: { left?: number; right?: number };
+  lpos?: { xi: number; xl: number; yi: number; yl: number };
+  height?: number;
+  scroll?: (offset: number) => void;
+  scrollTo: (offset: number) => void;
+  setScrollPerc: (value: number) => void;
+  getScroll?: () => number;
+  mouse?: boolean;
+};
+
 import { PRIMARY_CLI_BINARY_NAME, PRODUCT_DISPLAY_NAME } from "../../core/brand.ts";
 import type { InteractiveTuiApp, InteractiveTuiAppFactoryInput } from "../tui-app.ts";
 import type { TuiState } from "../tui-types.ts";
 import { buildTuiFooterView } from "../view-model/tui-view-model.ts";
+import { renderDraftForDisplay } from "../draft-attachment.ts";
 import {
   type RendererPalette,
   createRendererPalette,
@@ -259,25 +272,7 @@ export function createBlessedTuiApp(
 
   let lastRenderedSelectionIndex: number | null = null;
 
-  const timelineNode = timeline as unknown as {
-    border?: unknown;
-    padding?: {
-      left?: number;
-      right?: number;
-    };
-    lpos?: {
-      xi: number;
-      xl: number;
-      yi: number;
-      yl: number;
-    };
-    height?: number;
-    scroll?: (offset: number) => void;
-    scrollTo: (offset: number) => void;
-    setScrollPerc: (value: number) => void;
-    getScroll?: () => number;
-    mouse?: boolean;
-  };
+  const timelineNode = timeline as BlessedListInternal;
 
   const getTimelineScrollOffset = (): number => {
     const current = timelineNode.getScroll?.();
@@ -442,7 +437,7 @@ export function createBlessedTuiApp(
     const composerLocked = state.inputLocked || themePickerActive;
     const composerDraft = themePickerActive
       ? "Use ↑↓ to move\nEnter apply"
-      : localDraft;
+      : renderDraftForDisplay(localDraft, state.draftAttachments);
     composer.setContent(
       renderComposerMarkup({
         draft: composerDraft,
@@ -492,6 +487,7 @@ export function createBlessedTuiApp(
         inputLocked: state.inputLocked,
         draft: localDraft,
         themePickerActive: state.themePicker !== null,
+        draftAttachments: state.draftAttachments,
       },
       character,
       key,

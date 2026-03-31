@@ -34,6 +34,12 @@ function createWriter(calls: string[]) {
     resetScrollRegion: () => {
       calls.push("region:reset");
     },
+    enableBracketedPaste: () => {
+      calls.push("paste:enable");
+    },
+    disableBracketedPaste: () => {
+      calls.push("paste:disable");
+    },
   };
 }
 
@@ -48,7 +54,7 @@ test("createTerminalSession enter stays on the main screen and hides the cursor 
 
   session.enter();
 
-  assert.deepEqual(calls, ["raw:true", "cursor:hide"]);
+  assert.deepEqual(calls, ["raw:true", "cursor:hide", "paste:enable"]);
 });
 
 test("createTerminalSession exit shows cursor, disables raw mode, and resets the scroll region", () => {
@@ -62,7 +68,7 @@ test("createTerminalSession exit shows cursor, disables raw mode, and resets the
 
   session.exit();
 
-  assert.deepEqual(calls, ["cursor:show", "raw:false", "region:reset"]);
+  assert.deepEqual(calls, ["paste:disable", "cursor:show", "raw:false", "region:reset"]);
 });
 
 test("createTerminalSession enter does not attempt screen cleanup if enabling raw mode throws", () => {
@@ -119,5 +125,5 @@ test("createTerminalSession exit attempts all cleanup steps even if one throws",
   });
 
   assert.throws(() => session.exit(), /show failed/);
-  assert.deepEqual(calls, ["cursor:show", "raw:false", "region:reset"]);
+  assert.deepEqual(calls, ["paste:disable", "cursor:show", "raw:false", "region:reset"]);
 });

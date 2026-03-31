@@ -77,14 +77,8 @@ export type RuntimeSessionState = "ready" | "streaming" | "interrupted" | "error
 
 export type RuntimeSessionHooks = {
   onSystemLine?: (line: string) => void;
-  onUserPrompt?: (prompt: string) => void;
-  onAssistantOutput?: (output: string) => void;
-  onExecutionItem?: (item: { summary: string; body?: string }) => void;
   onOpenThemePicker?: () => void;
   onInteractionEvent?: (event: InteractionEvent) => void;
-  onRuntimeStateChange?: (state: RuntimeSessionState) => void;
-  onConversationCleared?: () => void;
-  onPromptInterrupted?: (prompt: string) => void;
 };
 
 export type RuntimeSessionOptions = RuntimeSessionHooks & {
@@ -316,14 +310,8 @@ export class RuntimeSession {
     this.maxTurnLimit = normalizeMaxTurnLimit(options.maxTurnLimit);
     this.hooks = {
       ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
-      ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
-      ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
       ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
-      ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
-      ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),
-      ...(options.onPromptInterrupted ? { onPromptInterrupted: options.onPromptInterrupted } : {}),
     };
   }
 
@@ -458,7 +446,14 @@ export class RuntimeSession {
         break;
     }
 
-    this.emitSystemLine(`session: ${this.sessionId}`);
+    this.emitInteractionEvent({
+      eventType: "session_initialized",
+      sessionId: this.sessionId,
+      timestamp: nowIsoString(),
+      payload: {
+        sessionId: this.sessionId,
+      },
+    });
     this.emitSystemLine(`mode: ${this.context.mode}`);
     this.emitSystemLine(`project: ${this.context.projectRoot}`);
   }
@@ -733,8 +728,6 @@ export class RuntimeSession {
     const initialTurnId = this.createPromptTurnId();
     const requestId = this.createRequestId(initialTurnId);
 
-    this.hooks.onUserPrompt?.(prompt);
-
     await this.eventLogStore.append({
       type: "turn:start",
       sessionId: this.sessionId,
@@ -742,6 +735,17 @@ export class RuntimeSession {
       payload: {
         turnId: initialTurnId,
         ...(buildTurnPayloadForPrompt(this.context.entry.kind, prompt)),
+      },
+    });
+
+    this.emitInteractionEvent({
+      eventType: "user_prompt_received",
+      timestamp: nowIsoString(),
+      sessionId: this.sessionId,
+      turnId: initialTurnId,
+      requestId,
+      payload: {
+        prompt,
       },
     });
 
@@ -776,7 +780,6 @@ export class RuntimeSession {
             role: "assistant",
             content: result.output,
           });
-          this.hooks.onAssistantOutput?.(result.output);
           writeLine(this.write, result.output);
           this.emitRequestCompleted(assistantTurnId, requestId, "completed");
           this.turnCount += 1;
@@ -815,7 +818,12 @@ export class RuntimeSession {
       if (isAbortError(error)) {
         this.removePromptFromConversation(prompt);
 
-        this.hooks.onPromptInterrupted?.(prompt);
+        this.emitInteractionEvent({
+          eventType: "prompt_interrupted",
+          sessionId: this.sessionId,
+          timestamp: nowIsoString(),
+          payload: { prompt },
+        });
         this.emitRuntimeState("interrupted");
         this.emitSystemLine("generation interrupted");
         this.emitRuntimeState("ready");
@@ -975,7 +983,6 @@ export class RuntimeSession {
       const title = this.sanitizeExecutionSummary(item?.title ?? executionId);
       const summary = this.sanitizeExecutionSummary(item?.summary ?? title);
       const output = item?.output;
-      this.hooks.onExecutionItem?.({ summary, ...(output !== undefined ? { body: output } : {}) });
 
       this.emitInteractionEvent({
         eventType: "execution_item_started",
@@ -1049,13 +1056,17 @@ export class RuntimeSession {
           this.emitSystemLine(effect.line);
           break;
         case "execution_item":
-          this.hooks.onExecutionItem?.({ summary: effect.summary, ...(effect.body ? { body: effect.body } : {}) });
           this.emitBuiltInExecutionItemEvents(interactionContext, executionIndex, effect);
           executionIndex += 1;
           break;
         case "clear_conversation":
           this.conversation.length = 0;
-          this.hooks.onConversationCleared?.();
+          this.emitInteractionEvent({
+            eventType: "conversation_cleared",
+            sessionId: this.sessionId,
+            timestamp: nowIsoString(),
+            payload: {},
+          });
           break;
         case "open_theme_picker":
           this.hooks.onOpenThemePicker?.();
@@ -1078,7 +1089,12 @@ export class RuntimeSession {
   }
 
   private emitRuntimeState(state: RuntimeSessionState): void {
-    this.hooks.onRuntimeStateChange?.(state);
+    this.emitInteractionEvent({
+      eventType: "session_state_changed",
+      sessionId: this.sessionId,
+      timestamp: nowIsoString(),
+      payload: { state },
+    });
   }
 }
 

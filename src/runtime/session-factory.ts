@@ -36,13 +36,7 @@ export function createRuntimeSession(
     ...(options.interruptController ? { interruptController: options.interruptController } : {}),
     ...(options.maxTurnLimit !== undefined ? { maxTurnLimit: options.maxTurnLimit } : {}),
     ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-    ...(options.onUserPrompt ? { onUserPrompt: options.onUserPrompt } : {}),
-    ...(options.onAssistantOutput ? { onAssistantOutput: options.onAssistantOutput } : {}),
-    ...(options.onExecutionItem ? { onExecutionItem: options.onExecutionItem } : {}),
     ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
     ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
-    ...(options.onRuntimeStateChange ? { onRuntimeStateChange: options.onRuntimeStateChange } : {}),
-    ...(options.onConversationCleared ? { onConversationCleared: options.onConversationCleared } : {}),
-    ...(options.onPromptInterrupted ? { onPromptInterrupted: options.onPromptInterrupted } : {}),
   });
 }
