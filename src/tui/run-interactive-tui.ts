@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { execa } from "execa";
 
@@ -14,6 +15,7 @@ import { SessionManager } from "../runtime/session-manager.ts";
 import { SessionInterruptController } from "../runtime/session-interrupt.ts";
 import type { AssistantStepInput, AssistantStepResult } from "../runtime/runtime-session.ts";
 import { deriveContextMetrics } from "./context-metrics.ts";
+import { expandDraftAttachments } from "./draft-attachment.ts";
 import { getThemeDefinition } from "./theme/theme-registry.ts";
 import type { CreateInteractiveTuiApp, InteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
 import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
@@ -262,7 +264,8 @@ export async function runInteractiveTui(
           return;
         }
 
-        const normalizedPrompt = normalizeInteractiveCommandPrompt(prompt);
+        const expandedPrompt = expandDraftAttachments(prompt, state.draftAttachments);
+        const normalizedPrompt = normalizeInteractiveCommandPrompt(expandedPrompt);
         const trimmedPrompt = normalizedPrompt.trim();
 
         if (trimmedPrompt.length === 0) {
@@ -342,6 +345,18 @@ export async function runInteractiveTui(
       onExit: () => {
         interruptController.interruptCurrentTurn();
         queuedInput.close();
+      },
+      onAddAttachment: (content) => {
+        if (state.themePicker !== null) {
+          return;
+        }
+
+        const id = randomUUID();
+        applyAction({
+          type: "add_draft_attachment",
+          id,
+          content,
+        });
       },
     },
     ...(options.terminal ? { terminal: options.terminal } : {}),

@@ -145,6 +145,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
     timeline: [],
     selectedTimelineIndex: 0,
     draft: "",
+    draftAttachments: [],
     inputLocked: false,
     projectLabel: "expecto-cli",
     branchLabel: "main",

@@ -50,6 +50,8 @@ function createWriterCalls() {
       enableLineWrap: () => {
         calls.push("wrap:enable");
       },
+      enableBracketedPaste: () => {},
+      disableBracketedPaste: () => {},
     },
   };
 }

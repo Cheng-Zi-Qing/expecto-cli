@@ -3,7 +3,7 @@ import { stdin as processStdin, stdout as processStdout } from "node:process";
 import {
   createAnsiWriter,
 } from "../renderer-terminal/ansi-writer.ts";
-import { handleTerminalInputChunk } from "../renderer-terminal/input-driver.ts";
+import { handleTerminalInputChunk, createPasteState } from "../renderer-terminal/input-driver.ts";
 import {
   createTerminalSession,
   type TerminalSession,
@@ -32,11 +32,19 @@ export type InteractiveConsoleAppDependencies = {
 };
 
 function resolveTerminalOutput(input: InteractiveTuiAppFactoryInput): TerminalTuiOutput {
-  return input.terminal?.stdout ?? (processStdout as unknown as TerminalTuiOutput);
+  if (input.terminal?.stdout) {
+    return input.terminal.stdout;
+  }
+  const { write, columns, rows, on, off, removeListener } = processStdout;
+  return { write: write.bind(processStdout), columns, rows, on: on.bind(processStdout), off: off.bind(processStdout), removeListener: removeListener.bind(processStdout) };
 }
 
 function resolveTerminalInput(input: InteractiveTuiAppFactoryInput): TerminalTuiInput {
-  return input.terminal?.stdin ?? (processStdin as unknown as TerminalTuiInput);
+  if (input.terminal?.stdin) {
+    return input.terminal.stdin;
+  }
+  const { on, off, removeListener, pause, setRawMode, isTTY } = processStdin;
+  return { on: on.bind(processStdin), off: off.bind(processStdin), removeListener: removeListener.bind(processStdin), pause: pause.bind(processStdin), setRawMode: setRawMode?.bind(processStdin), isTTY };
 }
 
 function resolveWrite(
@@ -106,6 +114,7 @@ export function createInteractiveConsoleApp(
     state.timeline.length === 1 && state.timeline[0]?.kind === "welcome";
   let idleInterruptArmed = false;
   let lineFeedSubmits: boolean | null = null;
+  const pasteState = createPasteState();
 
   const onResizeSettled = (): void => {
     if (!started) {
@@ -255,13 +264,17 @@ export function createInteractiveConsoleApp(
       idleInterruptArmed = false;
     }
 
-    if (normalizedChunk === "\r") {
-      lineFeedSubmits = false;
-    } else if (!state.inputLocked && state.themePicker === null && normalizedChunk === "\n") {
-      if (lineFeedSubmits !== false) {
-        lineFeedSubmits = true;
-        submitPrompt(state.draft);
-        return;
+    const isBracketedPaste = normalizedChunk.includes("\u001b[200~") || pasteState.inPaste;
+
+    if (!isBracketedPaste) {
+      if (normalizedChunk === "\r") {
+        lineFeedSubmits = false;
+      } else if (!state.inputLocked && state.themePicker === null && normalizedChunk === "\n") {
+        if (lineFeedSubmits !== false) {
+          lineFeedSubmits = true;
+          submitPrompt(state.draft);
+          return;
+        }
       }
     }
 
@@ -269,6 +282,8 @@ export function createInteractiveConsoleApp(
       draft: state.draft,
       inputLocked: state.inputLocked,
       themePickerActive: state.themePicker !== null,
+      draftAttachments: state.draftAttachments,
+      pasteState,
     }, {
       onDraftChange: input.handlers.onDraftChange,
       onSubmit: submitPrompt,
@@ -283,6 +298,9 @@ export function createInteractiveConsoleApp(
         ? { onMoveSelectionRight: input.handlers.onMoveSelectionRight }
         : {}),
       onToggleSelectedItem: input.handlers.onToggleSelectedItem,
+      ...(input.handlers.onAddAttachment
+        ? { onAddAttachment: input.handlers.onAddAttachment }
+        : {}),
     });
   };
 

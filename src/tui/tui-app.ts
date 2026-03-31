@@ -14,6 +14,7 @@ export type InteractiveTuiHandlers = {
   onMoveSelectionRight?: () => void;
   onToggleSelectedItem: () => void;
   onInspectExecution?: (executionId: string) => void;
+  onAddAttachment?: (content: string) => void;
   onExit: () => void;
 };
 

@@ -2,6 +2,7 @@ import {
   renderThemePickerOverlay,
   renderTranscriptLines,
 } from "../renderer-terminal/transcript-renderer.ts";
+import { renderDraftForDisplay } from "../draft-attachment.ts";
 import type { TuiState, TuiRuntimeState } from "../tui-types.ts";
 import { buildTuiFooterView, buildTuiViewModel } from "../view-model/tui-view-model.ts";
 import type {
@@ -46,10 +47,11 @@ function createActiveStatusText(runtimeState: TuiRuntimeState): ActiveStatusSnap
 function createComposerSnapshot(state: TuiState): ComposerSnapshot {
   const footerView = buildTuiFooterView(state);
   const themePickerActive = state.themePicker !== null;
+  const displayText = renderDraftForDisplay(state.draft, state.draftAttachments);
 
   return {
-    text: state.draft,
-    cursorOffset: Array.from(state.draft).length,
+    text: displayText,
+    cursorOffset: Array.from(displayText).length,
     locked: state.inputLocked || themePickerActive,
     hidden: themePickerActive,
     placeholder:

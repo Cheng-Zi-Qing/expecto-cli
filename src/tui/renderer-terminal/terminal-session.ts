@@ -17,6 +17,7 @@ export function createTerminalSession(options: CreateTerminalSessionOptions): Te
 
       try {
         options.writer.hideCursor();
+        options.writer.enableBracketedPaste();
       } catch (error) {
         try {
           options.setRawMode(false);
@@ -36,6 +37,7 @@ export function createTerminalSession(options: CreateTerminalSessionOptions): Te
         }
       };
 
+      runCleanup(() => options.writer.disableBracketedPaste());
       runCleanup(() => options.writer.showCursor());
       runCleanup(() => options.setRawMode(false));
       runCleanup(() => options.writer.resetScrollRegion());

@@ -1,4 +1,6 @@
 import type { CommandMenuState, TuiFocus } from "../tui-types.ts";
+import { deleteLastDraftUnit } from "../draft-attachment.ts";
+import type { DraftAttachment } from "../tui-types.ts";
 
 export type BlessedKey = {
   name?: string;
@@ -14,6 +16,7 @@ export type KeypressSnapshot = {
   inputLocked: boolean;
   draft: string;
   themePickerActive?: boolean;
+  draftAttachments?: DraftAttachment[];
 };
 
 export type KeypressAction =
@@ -216,7 +219,7 @@ export function interpretKeypress(
   if (key.name === "backspace") {
     return {
       actions: [],
-      nextDraft: deleteLastCharacter(snapshot.draft),
+      nextDraft: deleteLastDraftUnit(snapshot.draft, snapshot.draftAttachments ?? []),
     };
   }
 

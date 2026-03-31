@@ -26,6 +26,7 @@ function createState(overrides: Partial<TuiState> = {}): TuiState {
     timeline: [],
     selectedTimelineIndex: 0,
     draft: "",
+    draftAttachments: [],
     inputLocked: false,
     projectLabel: "proj{root}",
     branchLabel: "feature/{safety}",
