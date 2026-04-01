@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { execa } from "execa";
 
 import { createUserConfigStore, type UserConfigStore } from "../cli/user-config.ts";
-import { PRIMARY_CLI_BINARY_NAME } from "../core/brand.ts";
 import type { ProviderRunner } from "../providers/provider-runner.ts";
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import {
@@ -19,6 +18,7 @@ import { expandDraftAttachments } from "./draft-attachment.ts";
 import { getThemeDefinition } from "./theme/theme-registry.ts";
 import type { CreateInteractiveTuiApp, InteractiveTuiApp, TerminalTuiIo } from "./tui-app.ts";
 import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
+import { createTuiEventBridge } from "./tui-event-bridge.ts";
 import { QueuedInteractiveInput } from "./queued-interactive-input.ts";
 import type { ContextMetrics, TuiAction, TuiState } from "./tui-types.ts";
 
@@ -52,20 +52,11 @@ async function defaultOpenPager(logPath: string): Promise<void> {
   });
 }
 
-function shouldHideSystemLine(line: string): boolean {
-  return (
-    line === `${PRIMARY_CLI_BINARY_NAME} interactive session` ||
-    line.startsWith("mode: ") ||
-    line.startsWith("project: ") ||
-    line.startsWith("initial prompt: ")
-  );
-}
-
 function createContextMetrics(
   context: BootstrapContext,
   providerLabel: string,
   modelLabel: string,
-  conversation: string[],
+  conversation: readonly string[],
 ): ContextMetrics {
   return deriveContextMetrics({
     providerLabel,
@@ -96,17 +87,6 @@ function normalizeInteractiveCommandPrompt(prompt: string): string {
   return prompt;
 }
 
-function parsePromptTurnSequence(turnId: string): number | null {
-  const match = /^turn-(\d+)$/.exec(turnId);
-
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(match[1] ?? "", 10);
-  return Number.isSafeInteger(parsed) ? parsed : null;
-}
-
 export async function runInteractiveTui(
   context: BootstrapContext,
   options: RunInteractiveTuiOptions,
@@ -119,9 +99,6 @@ export async function runInteractiveTui(
     projectRoot: context.projectRoot,
   });
   const openPager = options.openPager ?? defaultOpenPager;
-  const conversation: string[] = [];
-  const assistantConversationEntryIndexByResponseId = new Map<string, number>();
-  let promptTurnSequence = 0;
   let state = createInitialTuiState({
     sessionId: "pending-session",
     projectLabel: basename(context.projectRoot),
@@ -134,7 +111,7 @@ export async function runInteractiveTui(
       context,
       options.providerLabel,
       options.modelLabel,
-      conversation,
+      [],
     ),
   });
 
@@ -142,37 +119,41 @@ export async function runInteractiveTui(
     state = reduceTuiState(state, action);
   };
 
-  const updateContextMetrics = (dispatch: (action: TuiAction) => void): void => {
-    dispatch({
-      type: "set_context_metrics",
-      contextMetrics: createContextMetrics(
-        context,
-        options.providerLabel,
-        options.modelLabel,
-        conversation,
-      ),
-    });
+  // app is assigned after bridge and initial seed; applyAction uses optional
+  // chaining so calls before app is ready update state without triggering render
+  let app!: InteractiveTuiApp;
+
+  const applyAction = (action: TuiAction): void => {
+    state = reduceTuiState(state, action);
+    app?.update(state);
   };
+
+  const bridge = createTuiEventBridge({
+    dispatch: applyAction,
+    executionLogStore,
+    onRefreshContextMetrics: () => {
+      applyAction({
+        type: "set_context_metrics",
+        contextMetrics: createContextMetrics(
+          context,
+          options.providerLabel,
+          options.modelLabel,
+          bridge.getConversation(),
+        ),
+      });
+    },
+    getState: () => state,
+  });
 
   const seedForegroundPromptLifecycle = (
     prompt: string,
     dispatch: (action: TuiAction) => void,
   ): void => {
-    promptTurnSequence += 1;
-    const turnId = `turn-${promptTurnSequence}`;
+    const { turnId, requestId } = bridge.allocateLocalTurn();
 
-    dispatch({
-      type: "append_user_message",
-      prompt,
-    });
-    dispatch({
-      type: "start_request_lifecycle",
-      requestId: `request-${turnId}`,
-      turnId,
-      startedAt: new Date().toISOString(),
-    });
-    conversation.push(`user: ${prompt}`);
-    updateContextMetrics(dispatch);
+    dispatch({ type: "append_user_message", prompt });
+    dispatch({ type: "start_request_lifecycle", requestId, turnId, startedAt: new Date().toISOString() });
+    bridge.pushConversationEntry(`user: ${prompt}`);
   };
 
   if (context.entry.kind === "interactive") {
@@ -188,18 +169,11 @@ export async function runInteractiveTui(
     }
   }
 
-  const applyAction = (action: TuiAction): void => {
-    state = reduceTuiState(state, action);
-    app.update(state);
-  };
-
   const applySelectedTheme = async (): Promise<void> => {
     const picker = state.themePicker;
 
     if (picker === null) {
-      applyAction({
-        type: "toggle_selected_item",
-      });
+      applyAction({ type: "toggle_selected_item" });
       return;
     }
 
@@ -207,16 +181,8 @@ export async function runInteractiveTui(
       return;
     }
 
-    await userConfigStore.save({
-      themeId: picker.selectedThemeId,
-    });
-    applyAction({
-      type: "toggle_selected_item",
-    });
-  };
-
-  const refreshContextMetrics = (): void => {
-    updateContextMetrics(applyAction);
+    await userConfigStore.save({ themeId: picker.selectedThemeId });
+    applyAction({ type: "toggle_selected_item" });
   };
 
   const inspectExecution = async (
@@ -247,7 +213,7 @@ export async function runInteractiveTui(
     }
   };
 
-  const app = options.createApp({
+  app = options.createApp({
     initialState: state,
     handlers: {
       onDraftChange: (draft) => {
@@ -255,10 +221,7 @@ export async function runInteractiveTui(
           return;
         }
 
-        applyAction({
-          type: "set_draft",
-          draft,
-        });
+        applyAction({ type: "set_draft", draft });
       },
       onSubmit: (prompt) => {
         if (state.themePicker !== null) {
@@ -273,10 +236,7 @@ export async function runInteractiveTui(
           return;
         }
 
-        applyAction({
-          type: "set_draft",
-          draft: "",
-        });
+        applyAction({ type: "set_draft", draft: "" });
 
         if (!isLocalCommandCandidate(normalizedPrompt)) {
           seedForegroundPromptLifecycle(normalizedPrompt, applyAction);
@@ -288,50 +248,32 @@ export async function runInteractiveTui(
         void inspectExecution(executionId, app);
       },
       onInterrupt: () => {
-        applyAction({
-          type: "mark_interrupt_intent",
-        });
+        applyAction({ type: "mark_interrupt_intent" });
         interruptController.interruptCurrentTurn();
       },
       onToggleInspector: () => {
-        applyAction({
-          type: "toggle_inspector",
-        });
+        applyAction({ type: "toggle_inspector" });
       },
       onToggleTimelineMode: () => {
-        applyAction({
-          type: "toggle_timeline_mode",
-        });
+        applyAction({ type: "toggle_timeline_mode" });
       },
       onFocusTimeline: () => {
-        applyAction({
-          type: "focus_timeline",
-        });
+        applyAction({ type: "focus_timeline" });
       },
       onFocusComposer: () => {
-        applyAction({
-          type: "focus_composer",
-        });
+        applyAction({ type: "focus_composer" });
       },
       onMoveSelectionUp: () => {
-        applyAction({
-          type: "move_selection_up",
-        });
+        applyAction({ type: "move_selection_up" });
       },
       onMoveSelectionDown: () => {
-        applyAction({
-          type: "move_selection_down",
-        });
+        applyAction({ type: "move_selection_down" });
       },
       onMoveSelectionLeft: () => {
-        applyAction({
-          type: "move_selection_left",
-        });
+        applyAction({ type: "move_selection_left" });
       },
       onMoveSelectionRight: () => {
-        applyAction({
-          type: "move_selection_right",
-        });
+        applyAction({ type: "move_selection_right" });
       },
       onToggleSelectedItem: () => {
         if (state.themePicker !== null) {
@@ -339,9 +281,7 @@ export async function runInteractiveTui(
           return;
         }
 
-        applyAction({
-          type: "toggle_selected_item",
-        });
+        applyAction({ type: "toggle_selected_item" });
       },
       onExit: () => {
         interruptController.interruptCurrentTurn();
@@ -353,23 +293,16 @@ export async function runInteractiveTui(
         }
 
         const id = randomUUID();
-        applyAction({
-          type: "add_draft_attachment",
-          id,
-          content,
-        });
+        applyAction({ type: "add_draft_attachment", id, content });
       },
     },
     ...(options.terminal ? { terminal: options.terminal } : {}),
   });
 
-  const requestShutdown = (): void => {
-    interruptController.interruptCurrentTurn();
-    queuedInput.close();
-  };
   const shutdownSignal = options.shutdownSignal;
   const handleShutdown = (): void => {
-    requestShutdown();
+    interruptController.interruptCurrentTurn();
+    queuedInput.close();
   };
 
   if (shutdownSignal) {
@@ -385,138 +318,15 @@ export async function runInteractiveTui(
   const manager = new SessionManager({
     write: options.write ?? noopWrite,
     readLine: () => queuedInput.readLine(),
-    closeInput: () => {
-      queuedInput.close();
-    },
+    closeInput: () => { queuedInput.close(); },
     ...(options.assistantStep ? { assistantStep: options.assistantStep } : {}),
     ...(options.providerRunner ? { providerRunner: options.providerRunner } : {}),
     interruptController,
-    onSystemLine: (line) => {
-      if (shouldHideSystemLine(line)) {
-        return;
-      }
-
-      applyAction({
-        type: "append_system_message",
-        line,
-      });
-    },
+    onSystemLine: bridge.onSystemLine,
     onOpenThemePicker: () => {
-      applyAction({
-        type: "open_theme_picker",
-        reason: "command",
-      });
+      applyAction({ type: "open_theme_picker", reason: "command" });
     },
-    onInteractionEvent: (event) => {
-      if (event.eventType === "session_initialized") {
-        applyAction({
-          type: "set_session_id",
-          sessionId: event.payload.sessionId,
-        });
-        return;
-      }
-
-      if (event.eventType === "user_prompt_received") {
-        const expectedConversationEntry = `user: ${event.payload.prompt}`;
-        const latestTimelineItem = state.timeline.at(-1);
-
-        if (conversation.at(-1) !== expectedConversationEntry) {
-          conversation.push(expectedConversationEntry);
-          refreshContextMetrics();
-        }
-
-        if (state.activeRequestLedger?.requestId !== event.requestId) {
-          applyAction({
-            type: "start_request_lifecycle",
-            requestId: event.requestId,
-            turnId: event.turnId,
-            startedAt: event.timestamp,
-          });
-        }
-
-        if (!(latestTimelineItem?.kind === "user" && latestTimelineItem.summary === event.payload.prompt)) {
-          applyAction({
-            type: "append_user_message",
-            prompt: event.payload.prompt,
-          });
-        }
-      }
-
-      if (event.eventType === "session_state_changed") {
-        applyAction({
-          type: "set_runtime_state",
-          state: event.payload.state,
-        });
-        return;
-      }
-
-      if (event.eventType === "conversation_cleared") {
-        conversation.length = 0;
-        assistantConversationEntryIndexByResponseId.clear();
-        refreshContextMetrics();
-        return;
-      }
-
-      if (event.eventType === "prompt_interrupted") {
-        const expectedEntry = `user: ${event.payload.prompt}`;
-
-        if (conversation.at(-1) === expectedEntry) {
-          conversation.pop();
-          refreshContextMetrics();
-        }
-
-        applyAction({
-          type: "set_draft",
-          draft: event.payload.prompt,
-        });
-        return;
-      }
-
-      if (event.eventType === "assistant_stream_chunk") {
-        if (event.payload.channel === "output_text") {
-          const existingIndex = assistantConversationEntryIndexByResponseId.get(event.payload.responseId);
-
-          if (existingIndex === undefined) {
-            conversation.push(`assistant: ${event.payload.delta}`);
-            assistantConversationEntryIndexByResponseId.set(
-              event.payload.responseId,
-              conversation.length - 1,
-            );
-          } else {
-            conversation[existingIndex] = `${conversation[existingIndex] ?? "assistant: "}${event.payload.delta}`;
-          }
-
-          refreshContextMetrics();
-        }
-      } else if (event.eventType === "assistant_response_completed") {
-        assistantConversationEntryIndexByResponseId.delete(event.payload.responseId);
-      }
-
-      if (event.eventType === "execution_item_started") {
-        void executionLogStore.ensureExecutionLog(event.payload.executionId).catch(() => {});
-      } else if (event.eventType === "execution_item_chunk") {
-        void executionLogStore.appendChunk(
-          event.payload.executionId,
-          event.payload.output,
-        ).catch(() => {});
-      }
-
-      const observedPromptTurnSequence = "turnId" in event
-        ? parsePromptTurnSequence(event.turnId)
-        : null;
-
-      if (
-        observedPromptTurnSequence !== null &&
-        observedPromptTurnSequence > promptTurnSequence
-      ) {
-        promptTurnSequence = observedPromptTurnSequence;
-      }
-
-      applyAction({
-        type: "project_interaction_event",
-        event,
-      });
-    },
+    onInteractionEvent: bridge.onInteractionEvent,
   });
 
   try {
