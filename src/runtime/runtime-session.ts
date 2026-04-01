@@ -471,7 +471,6 @@ export class RuntimeSession {
       case "continue":
         break;
       case "resume":
-        this.emitSystemLine(`session: ${this.context.entry.session}`);
         break;
     }
   }
