@@ -1,5 +1,6 @@
 import { gryffindorTheme } from "./themes/gryffindor.ts";
 import { hufflepuffTheme } from "./themes/hufflepuff.ts";
+import { originTheme } from "./themes/origin.ts";
 import { ravenclawTheme } from "./themes/ravenclaw.ts";
 import { slytherinTheme } from "./themes/slytherin.ts";
 import type { ThemeDefinition, ThemeId } from "./theme-types.ts";
@@ -9,6 +10,7 @@ const themeDefinitions: ThemeDefinition[] = [
   gryffindorTheme,
   ravenclawTheme,
   slytherinTheme,
+  originTheme,
 ];
 
 const themeDefinitionMap = new Map(

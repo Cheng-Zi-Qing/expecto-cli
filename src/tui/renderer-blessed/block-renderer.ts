@@ -308,11 +308,15 @@ function renderUserCard(card: TimelineCard, palette: RendererPalette): string {
   ].join("\n");
 }
 
+function hasThemeWelcomeBlock(card: TimelineCard): boolean {
+  return card.blocks.some((block) => block.kind === "theme_welcome");
+}
+
 export function renderTimelineCardMarkup(
   card: TimelineCard,
   palette: RendererPalette,
 ): string {
-  if (card.kind === "welcome") {
+  if (card.kind === "welcome" && hasThemeWelcomeBlock(card)) {
     return card.blocks.flatMap((block) => renderBlock(block, palette)).join("\n");
   }
 

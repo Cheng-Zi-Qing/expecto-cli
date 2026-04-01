@@ -17,6 +17,7 @@ import type {
   CommandMenuState,
   CreateInitialTuiStateInput,
   DraftAttachment,
+  ThemePickerReason,
   TimelineItem,
   TuiAction,
   TuiState,
@@ -42,18 +43,28 @@ function createEmptyCommandMenu(): CommandMenuState {
   };
 }
 
-function getVisibleThemeIds(): ThemeId[] {
-  return listThemeDefinitions().map((theme) => theme.id);
+function getVisibleThemeIds(reason: ThemePickerReason): ThemeId[] {
+  const themeIds = listThemeDefinitions().map((theme) => theme.id);
+
+  if (reason === "command") {
+    return themeIds;
+  }
+
+  return themeIds.filter((themeId) => themeId !== "origin");
 }
 
 function createThemePickerState(
-  reason: CreateInitialTuiStateInput["savedThemeId"] extends never ? never : "first_launch" | "command",
+  reason: ThemePickerReason,
   selectedThemeId: ThemeId,
 ): TuiState["themePicker"] {
+  const themeIds = getVisibleThemeIds(reason);
+
   return {
     reason,
-    selectedThemeId,
-    themeIds: getVisibleThemeIds(),
+    selectedThemeId: themeIds.includes(selectedThemeId)
+      ? selectedThemeId
+      : (themeIds[0] ?? getDefaultThemeId()),
+    themeIds,
   };
 }
 

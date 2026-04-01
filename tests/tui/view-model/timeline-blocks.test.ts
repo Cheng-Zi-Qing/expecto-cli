@@ -104,6 +104,30 @@ test("welcome card resolves the active theme welcome asset instead of generic tr
   assert.equal(welcomeBlock.highlightTokens[0]?.text, "/theme");
 });
 
+test("origin welcome card falls back to the legacy plain welcome content", () => {
+  const timeline = [
+    createItem({
+      id: "welcome-origin",
+      kind: "welcome",
+      summary: "expecto is ready in expecto-cli on main.",
+      body: "Enter send\nCtrl+C interrupt",
+      collapsed: false,
+    }),
+  ];
+
+  const cards = buildTimelineCards(timeline, 0, "origin");
+  const card = cards[0];
+  assert.ok(card);
+  assert.equal(card.blocks.length, 1);
+
+  const paragraphBlock = card.blocks[0];
+  assert.ok(paragraphBlock);
+  assert.equal(paragraphBlock.kind, "paragraph");
+  assert.deepEqual(paragraphBlock.tokens, [
+    { kind: "default", text: "Enter send\nCtrl+C interrupt" },
+  ]);
+});
+
 test("user card presents prompt text through a paragraph block", () => {
   const timeline = [
     createItem({

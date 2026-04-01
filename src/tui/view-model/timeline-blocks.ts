@@ -113,6 +113,10 @@ const buildThemeWelcomeBlock = (activeThemeId: ThemeId): ThemeWelcomeBlock => {
   };
 };
 
+const buildLegacyWelcomeBlocks = (item: TimelineItem): MarkdownBlock[] => {
+  return buildParagraphBlock(selectCardText(item));
+};
+
 const buildTranscriptBlock = (body: string): TranscriptBlock => {
   const normalized = body.replaceAll("\r\n", "\n");
   const lines = normalized.split("\n").map((line) => {
@@ -165,6 +169,10 @@ const buildBlocks = (
   activeThemeId: ThemeId,
 ): TimelineCardBlock[] => {
   if (item.kind === "welcome") {
+    if (activeThemeId === "origin") {
+      return buildLegacyWelcomeBlocks(item);
+    }
+
     return [buildThemeWelcomeBlock(activeThemeId)];
   }
 
