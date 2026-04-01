@@ -23,6 +23,7 @@ const THEME_PICKER_HOUSE_EMOJIS = {
   gryffindor: "🦁",
   ravenclaw: "🦅",
   slytherin: "🐍",
+  origin: "⌂",
 } as const;
 
 type RgbColor = [number, number, number];
@@ -705,13 +706,28 @@ function executionBodyStyleFor(view: TuiTranscriptView): AnsiStyle {
   };
 }
 
+function hasThemeWelcomeBlock(card: TuiTranscriptBlock): boolean {
+  return card.blocks.some((block) => block.kind === "theme_welcome");
+}
+
 function renderCard(
   card: TuiTranscriptBlock,
   width: number,
   view: TuiTranscriptView,
 ): string[] {
   if (card.kind === "welcome") {
-    return renderCardBodyLines(card, width, view);
+    if (hasThemeWelcomeBlock(card)) {
+      return renderCardBodyLines(card, width, view);
+    }
+
+    const header = styleText(
+      padOrTrimToWidth(`${card.headerLabel}: ${card.summary}`, width),
+      chromeStyleFor(card, view),
+    );
+    const contentWidth = Math.max(1, width - 2);
+    const bodyLines = renderCardBodyLines(card, contentWidth, view);
+
+    return [header, ...bodyLines.map((line) => `  ${line}`)];
   }
 
   if (card.kind === "user") {
@@ -913,7 +929,7 @@ export function renderThemePickerOverlay(
   ).map((line) => `  ${styleText(line, infoBodyStyle)}`);
   const bodyLines: string[] = [
     "",
-    `  ${styleText("[ House Selection ]", sectionLabelStyle)}`,
+    `  ${styleText(overlay.reason === "first_launch" ? "[ House Selection ]" : "[ Theme Selection ]", sectionLabelStyle)}`,
     ...renderThemePickerSelectionLines(overlay, bodyWidth),
     "",
   ];

@@ -258,6 +258,34 @@ test("reduceTuiState toggles the selected execution card", () => {
   assert.equal(toggled.timeline[0]?.collapsed, false);
 });
 
+test("reduceTuiState opens the command theme picker with origin available as a fallback", () => {
+  const initial = createInitialTuiState({
+    sessionId: "session-1",
+    projectLabel: "expecto-cli",
+    branchLabel: "main",
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    savedThemeId: "hufflepuff",
+    contextMetrics: {
+      percent: 12,
+      rules: 18,
+      hooks: 2,
+      docs: 6,
+    },
+  });
+
+  const opened = reduceTuiState(initial, {
+    type: "open_theme_picker",
+    reason: "command",
+  });
+
+  assert.deepEqual(opened.themePicker, {
+    reason: "command",
+    selectedThemeId: "hufflepuff",
+    themeIds: ["hufflepuff", "gryffindor", "ravenclaw", "slytherin", "origin"],
+  });
+});
+
 test("reduceTuiState derives slash suggestions from visible implemented commands in registry order", () => {
   const initial = createInitialTuiState({
     sessionId: "session-1",

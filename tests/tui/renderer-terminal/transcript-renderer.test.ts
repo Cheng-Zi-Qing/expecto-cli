@@ -57,11 +57,12 @@ function createThemePickerOverlay(
   selectedThemeId: "hufflepuff" | "gryffindor" | "ravenclaw" | "slytherin" = "hufflepuff",
 ) {
   const sampleTheme = getThemeDefinition(selectedThemeId);
+  const houseThemes = listThemeDefinitions().filter((theme) => theme.id !== "origin");
 
   return {
     kind: "theme_picker" as const,
     reason: "first_launch" as const,
-    entries: listThemeDefinitions().map((theme) => ({
+    entries: houseThemes.map((theme) => ({
       id: theme.id,
       displayName: theme.displayName,
       animal: theme.animal,
@@ -184,6 +185,31 @@ test("renderTranscript renders the Hufflepuff welcome using the active theme ass
   assert.match(plainOutput, /Highlights/);
   assert.match(plainOutput, /\/theme/);
   assert.doesNotMatch(plainOutput, /Enter send/);
+});
+
+test("renderTranscript restores the legacy plain welcome when origin is active", () => {
+  const view = buildTuiViewModel(
+    createSampleTuiState({
+      activeThemeId: "origin",
+      timeline: [
+        {
+          id: "welcome-1",
+          kind: "welcome",
+          summary: "expecto is ready in expecto-cli on main.",
+          body: "Enter send\nCtrl+C interrupt",
+          collapsed: false,
+        },
+      ],
+    }),
+  );
+
+  const output = renderTranscript(view.transcript, { width: 100, height: 20 }).join("\n");
+  const plainOutput = stripAnsi(output);
+
+  assert.match(plainOutput, /Welcome: expecto is ready in expecto-cli on main\./);
+  assert.match(plainOutput, /Enter send/);
+  assert.match(plainOutput, /Ctrl\+C interrupt/);
+  assert.doesNotMatch(plainOutput, /Welcome back!/);
 });
 
 test("renderTranscriptLines returns the full transcript without viewport clipping", () => {

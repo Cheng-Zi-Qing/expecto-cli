@@ -12,6 +12,10 @@ import {
 } from "../../../src/tui/renderer-blessed/block-renderer.ts";
 import * as blockRenderer from "../../../src/tui/renderer-blessed/block-renderer.ts";
 
+function stripBlessedTags(value: string): string {
+  return value.replace(/\{[^}]+\}/g, "");
+}
+
 const createPalette = () =>
   createRendererPalette({
     focus: "timeline",
@@ -282,6 +286,31 @@ test("welcome cards render the themed mascot block instead of the legacy placeho
   assert.match(markup, /▝▜██▇▇██▛▘/);
   assert.match(markup, /Highlights/);
   assert.doesNotMatch(markup, /Enter send/);
+});
+
+test("welcome cards restore the legacy header and body when origin is active", () => {
+  const [card] = buildTimelineCards(
+    [
+      {
+        id: "welcome-origin",
+        kind: "welcome",
+        summary: "expecto is ready in expecto-cli on main.",
+        body: "Enter send\nCtrl+C interrupt",
+      },
+    ],
+    0,
+    "origin",
+  );
+
+  assert.ok(card);
+
+  const markup = renderTimelineCardMarkup(card, createPalette());
+  const plainMarkup = stripBlessedTags(markup);
+
+  assert.match(plainMarkup, /Welcome: expecto is ready in expecto-cli on main\./);
+  assert.match(plainMarkup, /Enter send/);
+  assert.match(plainMarkup, /Ctrl\+C interrupt/);
+  assert.doesNotMatch(plainMarkup, /Welcome back!/);
 });
 
 test("timeline layout accounts for wrapped visual lines when a wrapWidth is provided", () => {

@@ -51,6 +51,21 @@ test("saveUserConfig persists a themeId and loadUserConfig reads it back", async
   assert.equal(saved.themeId, "hufflepuff");
 });
 
+test("saveUserConfig persists the origin theme fallback and loadUserConfig reads it back", async () => {
+  const homeDir = await makeHomeDir();
+
+  await saveUserConfig(
+    {
+      themeId: "origin",
+    },
+    { homeDir },
+  );
+
+  assert.deepEqual(await loadUserConfig({ homeDir }), {
+    themeId: "origin",
+  });
+});
+
 test("loadUserConfig ignores the removed legacy config path once expecto config is absent", async () => {
   const homeDir = await makeHomeDir();
   const legacyDir = join(homeDir, legacyWorkspaceDir);
@@ -73,11 +88,12 @@ function rawGlyphRows(themeId: "hufflepuff" | "gryffindor" | "ravenclaw" | "slyt
   );
 }
 
-test("theme registry returns four available house themes with stable assets", () => {
+test("theme registry keeps the four house themes stable", () => {
   const themes = listThemeDefinitions();
+  const houseThemes = themes.filter((theme) => theme.id !== "origin");
 
   assert.deepEqual(
-    themes.map((theme) => theme.id),
+    houseThemes.map((theme) => theme.id),
     ["hufflepuff", "gryffindor", "ravenclaw", "slytherin"],
   );
 
@@ -102,7 +118,7 @@ test("theme registry returns four available house themes with stable assets", ()
   assert.ok(hufflepuff.sample.highlightTokens.length > 0);
 
   assert.deepEqual(
-    themes.map((theme) => ({
+    houseThemes.map((theme) => ({
       id: theme.id,
       availability: theme.availability,
     })),
@@ -157,4 +173,17 @@ test("theme registry returns four available house themes with stable assets", ()
     "     ░▒ ▐▓▌◥██◤▐▓▌ ·▒░",
     "       ░▒ ▝▀▓▼▼▓▀▘  ›_",
   ]);
+});
+
+test("theme registry exposes origin as an available non-house fallback", () => {
+  const themes = listThemeDefinitions();
+  const origin = getThemeDefinition("origin");
+
+  assert.equal(themes.at(-1)?.id, "origin");
+  assert.equal(origin.displayName, "Origin");
+  assert.equal(origin.animal, "Terminal");
+  assert.equal(origin.availability, "available");
+  assert.equal(origin.paletteLabel, "neutral / slate");
+  assert.equal(origin.welcome.title, "Welcome to expecto");
+  assert.match(origin.welcome.subtitle, /classic interface/i);
 });

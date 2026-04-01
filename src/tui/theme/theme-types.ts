@@ -3,6 +3,7 @@ export const THEME_IDS = [
   "gryffindor",
   "ravenclaw",
   "slytherin",
+  "origin",
 ] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];

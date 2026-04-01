@@ -722,6 +722,10 @@ test("runInteractiveTui reopens the picker when /theme is executed", async () =>
   await waitFor(() => app?.latestState().themePicker?.reason === "command", "expected /theme to reopen picker");
 
   assert.equal(app?.latestState().themePicker?.selectedThemeId, "hufflepuff");
+  assert.deepEqual(
+    app?.latestState().themePicker?.themeIds,
+    ["hufflepuff", "gryffindor", "ravenclaw", "slytherin", "origin"],
+  );
 
   app?.exit();
   await runPromise;
