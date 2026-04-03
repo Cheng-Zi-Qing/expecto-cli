@@ -14,6 +14,7 @@ const userPromptReceivedEventType = "user_prompt_received";
 const sessionStateChangedEventType = "session_state_changed";
 const conversationClearedEventType = "conversation_cleared";
 const promptInterruptedEventType = "prompt_interrupted";
+const commandEffectEventType = "command_effect";
 
 const interactionEventTypeValues = [
   assistantResponseStartedEventType,
@@ -28,6 +29,7 @@ const interactionEventTypeValues = [
   sessionStateChangedEventType,
   conversationClearedEventType,
   promptInterruptedEventType,
+  commandEffectEventType,
 ] as const;
 
 export const interactionEventTypeSchema = z.enum(interactionEventTypeValues);
@@ -214,6 +216,14 @@ export const sessionStateChangedPayloadSchema = z
 
 export const conversationClearedPayloadSchema = z.object({}).strict();
 
+export const commandEffectKindSchema = z.enum(["open_theme_picker"]);
+
+export const commandEffectPayloadSchema = z
+  .object({
+    kind: commandEffectKindSchema,
+  })
+  .strict();
+
 export const promptInterruptedPayloadSchema = z
   .object({
     prompt: z.string(),
@@ -310,6 +320,11 @@ export const promptInterruptedEventSchema = buildSessionLevelEventSchema(
   promptInterruptedPayloadSchema,
 );
 
+export const commandEffectEventSchema = buildSessionLevelEventSchema(
+  commandEffectEventType,
+  commandEffectPayloadSchema,
+);
+
 export const interactionEventSchema = z.discriminatedUnion("eventType", [
   assistantResponseStartedEventSchema,
   assistantStreamChunkEventSchema,
@@ -323,6 +338,7 @@ export const interactionEventSchema = z.discriminatedUnion("eventType", [
   sessionStateChangedEventSchema,
   conversationClearedEventSchema,
   promptInterruptedEventSchema,
+  commandEffectEventSchema,
 ]);
 
 export type InteractionEventType = z.infer<typeof interactionEventTypeSchema>;
@@ -391,4 +407,7 @@ export type PromptInterruptedPayload = z.infer<typeof promptInterruptedPayloadSc
 export type SessionStateChangedEvent = z.infer<typeof sessionStateChangedEventSchema>;
 export type ConversationClearedEvent = z.infer<typeof conversationClearedEventSchema>;
 export type PromptInterruptedEvent = z.infer<typeof promptInterruptedEventSchema>;
+export type CommandEffectKind = z.infer<typeof commandEffectKindSchema>;
+export type CommandEffectPayload = z.infer<typeof commandEffectPayloadSchema>;
+export type CommandEffectEvent = z.infer<typeof commandEffectEventSchema>;
 export type InteractionEvent = z.infer<typeof interactionEventSchema>;

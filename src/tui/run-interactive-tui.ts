@@ -69,7 +69,7 @@ function createContextMetrics(
       context.loadedArtifacts.required.length +
       context.loadedArtifacts.optional.length,
     sessionSummary: context.sessionSummary ?? "",
-    conversation,
+    conversation: [...conversation],
   });
 }
 
@@ -323,9 +323,6 @@ export async function runInteractiveTui(
     ...(options.providerRunner ? { providerRunner: options.providerRunner } : {}),
     interruptController,
     onSystemLine: bridge.onSystemLine,
-    onOpenThemePicker: () => {
-      applyAction({ type: "open_theme_picker", reason: "command" });
-    },
     onInteractionEvent: bridge.onInteractionEvent,
   });
 

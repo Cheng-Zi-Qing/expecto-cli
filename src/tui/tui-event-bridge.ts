@@ -91,6 +91,13 @@ export function createTuiEventBridge(options: TuiEventBridgeOptions): TuiEventBr
       return;
     }
 
+    if (event.eventType === "command_effect") {
+      if (event.payload.kind === "open_theme_picker") {
+        dispatch({ type: "open_theme_picker", reason: "command" });
+      }
+      return;
+    }
+
     if (event.eventType === "conversation_cleared") {
       conversation.length = 0;
       assistantConversationEntryIndexByResponseId.clear();
