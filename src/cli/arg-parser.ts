@@ -12,7 +12,6 @@ type ContinueCommand = {
 
 type ResumeCommand = {
   kind: "resume";
-  session: string;
 };
 
 export type ParsedCliArgs = ParsedPromptArgs | ContinueCommand | ResumeCommand;
@@ -30,7 +29,6 @@ export type CliCommand =
     }
   | {
       kind: "resume";
-      session: string;
     };
 
 const RESERVED_LEGACY_FLAGS = new Set(["--continue", "--resume", "-p", "--print"]);
@@ -70,14 +68,11 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   }
 
   if (first === "--resume") {
-    if (third) {
-      throw new Error("--resume accepts only a single session id");
+    if (second) {
+      throw new Error("--resume does not accept extra arguments");
     }
 
-    return {
-      kind: "resume",
-      session: requireValue(first, second, "a session id"),
-    };
+    return { kind: "resume" };
   }
 
   let explicitMode: ExplicitMode | undefined;

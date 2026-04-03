@@ -35,9 +35,21 @@ function summarizeArtifact(document: ArtifactDocument): string {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   const heading = lines.find((line) => line.startsWith("#"));
-  const detail = lines.find((line) => !line.startsWith("#"));
+  const bodyLines = lines.filter((line) => !line.startsWith("#")).slice(0, 5);
 
-  return [heading, detail].filter((value) => value !== undefined).join("\n");
+  const parts: string[] = [];
+  if (heading) {
+    parts.push(heading);
+  }
+  parts.push(`type: ${document.kind}`);
+  if (document.status) {
+    parts.push(`status: ${document.status}`);
+  }
+  if (bodyLines.length > 0) {
+    parts.push(bodyLines.join("\n"));
+  }
+
+  return parts.join("\n");
 }
 
 export function resolveInstructionSet(

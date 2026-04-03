@@ -56,12 +56,11 @@ test("returns continue mode for --continue", () => {
   });
 });
 
-test("returns resume mode for --resume with a session id", () => {
-  const result = parseCliArgs(["--resume", "session-123"]);
+test("returns resume mode for --resume", () => {
+  const result = parseCliArgs(["--resume"]);
 
   assert.deepEqual(result, {
     kind: "resume",
-    session: "session-123",
   });
 });
 
@@ -69,8 +68,8 @@ test("throws when -p is provided without a prompt", () => {
   assert.throws(() => parseCliArgs(["-p"]), /requires a prompt/);
 });
 
-test("throws when --resume is provided without a session id", () => {
-  assert.throws(() => parseCliArgs(["--resume"]), /requires a session id/);
+test("throws when --resume is provided with extra arguments", () => {
+  assert.throws(() => parseCliArgs(["--resume", "session-123"]), /does not accept extra arguments/);
 });
 
 test("throws when multiple positional prompts are provided", () => {

@@ -19,7 +19,6 @@ export type SessionManagerOptions = {
   interruptController?: SessionInterruptController;
   maxTurnLimit?: number;
   onSystemLine?: RuntimeSessionHooks["onSystemLine"];
-  onOpenThemePicker?: RuntimeSessionHooks["onOpenThemePicker"];
   onInteractionEvent?: RuntimeSessionHooks["onInteractionEvent"];
 };
 
@@ -47,7 +46,6 @@ export class SessionManager {
     this.maxTurnLimit = options.maxTurnLimit;
     this.hooks = {
       ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
     };
   }

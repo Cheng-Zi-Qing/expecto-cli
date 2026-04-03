@@ -11,6 +11,8 @@ import {
   resolveInstructionSet,
   type ResolvedInstructionLayer,
 } from "./instruction-resolver.ts";
+import { resolveResumeTarget, type ResumeTarget } from "./resume.ts";
+import { SessionSnapshotStore } from "./session-snapshot-store.ts";
 
 export type SessionMode = "fast" | "balanced" | "strict";
 
@@ -29,6 +31,7 @@ export type BootstrapContext = {
   activeArtifacts: ActiveArtifactSet;
   loadedArtifacts: LoadedArtifactSet;
   sessionSummary?: string;
+  resumeTarget?: ResumeTarget;
 };
 
 export type BuildBootstrapContextInput = {
@@ -60,25 +63,64 @@ export async function buildBootstrapContext(
     optionalArtifacts: activeArtifacts.optional,
   });
 
+  const resumeTarget =
+    input.command.kind === "resume"
+      ? await resolveResumeTarget(new SessionSnapshotStore(projectRoot), {})
+      : undefined;
+
+  const resolvedActiveArtifacts = resumeTarget
+    ? resumeTarget.snapshot.activeArtifacts
+    : activeArtifacts;
+
+  const resolvedRequiredArtifacts = resumeTarget
+    ? (
+        await Promise.all(
+          resumeTarget.snapshot.activeArtifacts.required.map((artifact) =>
+            store.read(artifact.id).catch(() => null),
+          ),
+        )
+      ).filter((doc): doc is ArtifactDocument => doc !== null)
+    : requiredArtifacts;
+
+  const resolvedInstructionStack = resumeTarget
+    ? resolveInstructionSet({
+        mode: "balanced",
+        instructions,
+        requiredArtifacts: resolvedRequiredArtifacts,
+        optionalArtifacts: resolvedActiveArtifacts.optional,
+      })
+    : instructionStack;
+
+  const resolvedOptionalArtifacts = resumeTarget
+    ? (
+        await Promise.all(
+          resumeTarget.snapshot.activeArtifacts.optional.map((artifact) =>
+            store.read(artifact.id).catch(() => null),
+          ),
+        )
+      ).filter((doc): doc is ArtifactDocument => doc !== null)
+    : [];
+
   return {
     projectRoot,
     mode: "balanced",
     entry: input.command,
     instructions,
-    instructionStack: instructionStack.promptLayers,
+    instructionStack: resolvedInstructionStack.promptLayers,
     memory,
-    activeArtifacts,
+    activeArtifacts: resolvedActiveArtifacts,
     loadedArtifacts: {
-      required: requiredArtifacts,
-      optional: [],
+      required: resolvedRequiredArtifacts,
+      optional: resolvedOptionalArtifacts,
     },
     sessionSummary: renderSessionSummary({
       mode: "balanced",
       instructions,
       memory,
-      requiredArtifacts,
-      optionalArtifactRefs: activeArtifacts.optional,
-      optionalArtifacts: [],
+      requiredArtifacts: resolvedRequiredArtifacts,
+      optionalArtifactRefs: resolvedActiveArtifacts.optional,
+      optionalArtifacts: resolvedOptionalArtifacts,
     }),
+    ...(resumeTarget ? { resumeTarget } : {}),
   };
 }

@@ -77,7 +77,6 @@ export type RuntimeSessionState = "ready" | "streaming" | "interrupted" | "error
 
 export type RuntimeSessionHooks = {
   onSystemLine?: (line: string) => void;
-  onOpenThemePicker?: () => void;
   onInteractionEvent?: (event: InteractionEvent) => void;
 };
 
@@ -247,7 +246,7 @@ function promptFromEntry(entry: BootstrapContext["entry"]): string | undefined {
     case "continue":
       return undefined;
     case "resume":
-      return entry.session;
+      return undefined;
   }
 }
 
@@ -274,7 +273,6 @@ function buildTurnPayload(entry: BootstrapContext["entry"]): Record<string, unkn
       return {
         turnId: "turn-1",
         entryKind: entry.kind,
-        session: entry.session,
       };
   }
 }
@@ -310,7 +308,6 @@ export class RuntimeSession {
     this.maxTurnLimit = normalizeMaxTurnLimit(options.maxTurnLimit);
     this.hooks = {
       ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
       ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
     };
   }
@@ -355,6 +352,27 @@ export class RuntimeSession {
       this.activeTurnAbortController?.abort();
     });
 
+    const periodicSnapshotInterval = setInterval(() => {
+      const snapshotSummary = this.buildSnapshotSummary();
+      const compactedSummary = snapshotSummary
+        ? [
+            snapshotSummary.headline,
+            ...(snapshotSummary.currentTaskId ? [`current task: ${snapshotSummary.currentTaskId}`] : []),
+            ...(snapshotSummary.nextStep ? [`next step: ${snapshotSummary.nextStep}`] : []),
+          ].join("\n")
+        : undefined;
+
+      void this.snapshotStore.save({
+        id: this.createSnapshotId(),
+        sessionId: this.sessionId,
+        state: "executing",
+        activeArtifacts: this.context.activeArtifacts,
+        compactedSummary,
+        summary: snapshotSummary,
+        updatedAt: nowIsoString(),
+      });
+    }, 5 * 60 * 1000);
+
     try {
       switch (this.context.entry.kind) {
         case "interactive":
@@ -386,10 +404,15 @@ export class RuntimeSession {
         case "continue":
           this.renderEntryDetails();
           break;
-        case "resume":
+        case "resume": {
           this.renderEntryDetails();
-          await this.processPrompt(this.context.entry.session);
+          const resumeTarget = this.context.resumeTarget;
+          if (!resumeTarget) {
+            throw new Error("No snapshot found. Nothing to resume.");
+          }
+          await this.processPrompt(resumeTarget.summary);
           break;
+        }
       }
     } catch (error) {
       terminalState = "blocked";
@@ -404,23 +427,28 @@ export class RuntimeSession {
         },
       });
 
+      const snapshotSummary = this.buildSnapshotSummary();
+      const compactedSummary = snapshotSummary
+        ? [
+            snapshotSummary.headline,
+            ...(snapshotSummary.currentTaskId ? [`current task: ${snapshotSummary.currentTaskId}`] : []),
+            ...(snapshotSummary.nextStep ? [`next step: ${snapshotSummary.nextStep}`] : []),
+          ].join("\n")
+        : undefined;
+
       await this.snapshotStore.save({
         id: this.createSnapshotId(),
         sessionId: this.sessionId,
         state: terminalState,
-        activeArtifacts: [
-          ...this.context.activeArtifacts.required,
-          ...this.context.activeArtifacts.optional,
-        ],
-        activatedSkills: [],
-        toolHistory: [],
-        compactedSummary: this.context.sessionSummary,
-        summary: this.buildSnapshotSummary(),
+        activeArtifacts: this.context.activeArtifacts,
+        compactedSummary,
+        summary: snapshotSummary,
         updatedAt: nowIsoString(),
       });
 
       await this.closeInput?.();
       unsubscribeInterrupt?.();
+      clearInterval(periodicSnapshotInterval);
     }
 
     return {
@@ -1068,7 +1096,12 @@ export class RuntimeSession {
           });
           break;
         case "open_theme_picker":
-          this.hooks.onOpenThemePicker?.();
+          this.emitInteractionEvent({
+            eventType: "command_effect",
+            sessionId: this.sessionId,
+            timestamp: nowIsoString(),
+            payload: { kind: "open_theme_picker" },
+          });
           break;
         case "exit_session":
           shouldExit = true;

@@ -43,7 +43,6 @@ export type CliRoute =
       kind: "resume";
       bootstrapCommand: {
         kind: "resume";
-        session: string;
       };
       warnings: CliRouteWarning[];
     }
@@ -113,10 +112,7 @@ export function resolveCliRoute(input: RouteResolutionInput): CliRoute {
     if (parsed.kind === "resume") {
       return {
         kind: "resume",
-        bootstrapCommand: {
-          kind: "resume",
-          session: parsed.session,
-        },
+        bootstrapCommand: { kind: "resume" },
         warnings,
       };
     }
