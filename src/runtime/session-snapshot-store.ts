@@ -33,7 +33,23 @@ export class SessionSnapshotStore {
       "utf8",
     );
 
+    await this.pruneOldSnapshots(3);
+
     return parsed;
+  }
+
+  private async pruneOldSnapshots(maxCount: number): Promise<void> {
+    const all = await this.list();
+
+    if (all.length <= maxCount) {
+      return;
+    }
+
+    const { unlink } = await import("node:fs/promises");
+    const toDelete = all.slice(0, all.length - maxCount);
+    await Promise.all(
+      toDelete.map((s) => unlink(this.toSnapshotPath(s.id))),
+    );
   }
 
   async load(id: string): Promise<SessionSnapshot> {
@@ -46,9 +62,12 @@ export class SessionSnapshotStore {
       cwd: this.projectRoot,
       onlyFiles: true,
     });
-    const snapshots = await Promise.all(
-      snapshotPaths.map((path) => this.load(basename(path, ".json"))),
+    const results = await Promise.all(
+      snapshotPaths.map((path) =>
+        this.load(basename(path, ".json")).catch(() => null),
+      ),
     );
+    const snapshots = results.filter((s): s is SessionSnapshot => s !== null);
 
     return snapshots
       .filter((snapshot) => !sessionId || snapshot.sessionId === sessionId)

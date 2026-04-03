@@ -360,9 +360,8 @@ test("expecto --resume preserves legacy routing without consuming piped stdin", 
   const projectRoot = await makeProjectRoot();
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
-  let observedSession = "";
 
-  await runCli(["--resume", "session-123"], {
+  await runCli(["--resume"], {
     cwd: projectRoot,
     env: {},
     processEnv: {},
@@ -372,14 +371,10 @@ test("expecto --resume preserves legacy routing without consuming piped stdin", 
     stdinStream: makeUnreadableStdinStream(),
     runNativeSession: async (input) => {
       observedRouteKind = input.route.kind;
-      if (input.route.kind === "resume") {
-        observedSession = input.route.bootstrapCommand.session;
-      }
     },
   });
 
   assert.equal(observedRouteKind, "resume");
-  assert.equal(observedSession, "session-123");
 });
 
 test("expecto --continue ignores incomplete provider env on the legacy route", async () => {
@@ -409,7 +404,7 @@ test("expecto --resume ignores incomplete provider env on the legacy route", asy
   const homeDir = await makeEmptyHomeDir();
   let observedRouteKind = "";
 
-  await runCli(["--resume", "session-123"], {
+  await runCli(["--resume"], {
     cwd: projectRoot,
     env: {
       EXPECTO_PROVIDER: "openai",

@@ -36,7 +36,6 @@ export function createRuntimeSession(
     ...(options.interruptController ? { interruptController: options.interruptController } : {}),
     ...(options.maxTurnLimit !== undefined ? { maxTurnLimit: options.maxTurnLimit } : {}),
     ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-    ...(options.onOpenThemePicker ? { onOpenThemePicker: options.onOpenThemePicker } : {}),
     ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
   });
 }

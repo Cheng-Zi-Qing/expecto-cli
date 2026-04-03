@@ -146,25 +146,18 @@ test("session snapshot accepts active artifacts and session state", () => {
     id: "snapshot-1",
     sessionId: "session-1",
     state: "planning",
-    activeArtifacts: [
-      {
-        id: "plan",
-        kind: "plan",
-        path: currentAppPath("docs", "01-plan.md"),
-        title: "Plan",
-      },
-    ],
-    activatedSkills: ["planning-with-files"],
-    toolHistory: [
-      {
-        tool: "read",
-        success: true,
-        metadata: {
-          durationMs: 4,
-          sideEffects: [],
+    activeArtifacts: {
+      required: [
+        {
+          id: "plan",
+          kind: "plan",
+          path: currentAppPath("docs", "01-plan.md"),
+          title: "Plan",
         },
-      },
-    ],
+      ],
+      optional: [],
+      onDemand: [],
+    },
     compactedSummary: "Current planning summary",
     summary: {
       headline: "Planning auth refresh migration",

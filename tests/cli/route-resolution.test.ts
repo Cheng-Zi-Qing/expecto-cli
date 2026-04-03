@@ -101,7 +101,7 @@ test("legacy --continue preserves route under redirected output", () => {
 test("legacy --resume preserves route under redirected output", () => {
   const result = resolveCliRoute({
     ...baseInput(),
-    parsed: parseCliArgs(["--resume", "session-id"]),
+    parsed: parseCliArgs(["--resume"]),
     stdinIsTTY: true,
     stdoutIsTTY: false,
     hasStdinPayload: true,
@@ -113,7 +113,6 @@ test("legacy --resume preserves route under redirected output", () => {
   }
   assert.deepEqual(result.bootstrapCommand, {
     kind: "resume",
-    session: "session-id",
   });
 });
 

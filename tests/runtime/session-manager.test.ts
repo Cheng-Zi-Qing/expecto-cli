@@ -129,8 +129,8 @@ test("session manager persists a snapshot for the completed session", async () =
 
   assert.equal(snapshot?.sessionId, result.sessionId);
   assert.equal(snapshot?.state, "idle");
-  assert.equal(snapshot?.activeArtifacts.length, 2);
-  assert.match(snapshot?.compactedSummary ?? "", /required docs:/);
+  assert.equal(snapshot?.activeArtifacts.required.length, 2);
+  assert.match(snapshot?.compactedSummary ?? "", /Continue from the active workspace docs\./);
 });
 
 test("session manager persists blocked terminal state on runtime failure", async () => {

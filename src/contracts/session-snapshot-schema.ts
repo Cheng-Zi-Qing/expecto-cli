@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { artifactRefSchema } from "./artifact-schema.ts";
-import { toolResultSchema } from "./tool-result-schema.ts";
+import { activeArtifactSetSchema } from "./artifact-schema.ts";
 
 export const sessionStateSchema = z.enum([
   "idle",
@@ -29,9 +28,7 @@ export const sessionSnapshotSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
   state: sessionStateSchema,
-  activeArtifacts: z.array(artifactRefSchema),
-  activatedSkills: z.array(z.string().min(1)),
-  toolHistory: z.array(toolResultSchema),
+  activeArtifacts: activeArtifactSetSchema,
   compactedSummary: z.string().min(1).optional(),
   summary: sessionSnapshotSummarySchema.optional(),
   checkpoint: checkpointSchema.optional(),
