@@ -54,6 +54,22 @@ const commandRegistry: CommandDescriptor[] = [
     availability: "implemented",
   },
   {
+    id: "workspace.init",
+    category: "project",
+    name: "/init",
+    aliases: [],
+    description: "Initialize the .expecto-cli/docs/ workspace skeleton.",
+    availability: "implemented",
+  },
+  {
+    id: "workspace.write_artifact",
+    category: "project",
+    name: "/write_artifact",
+    aliases: [],
+    description: "Write an artifact through the structured ArtifactStore path.",
+    availability: "hidden",
+  },
+  {
     id: "debug.inspect",
     category: "debug",
     name: "/inspect",

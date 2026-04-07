@@ -68,7 +68,7 @@ test("buildBootstrapContext loads project instructions, memory index, and active
   assert.equal(context.instructionStack?.[2]?.path, "AGENTS.md");
   assert.match(context.sessionSummary ?? "", /T-001-auth/);
   assert.match(context.sessionSummary ?? "", /mode: balanced/);
-  assert.match(context.sessionSummary ?? "", /optional refs: T-001-2026-03-23/);
+  assert.match(context.sessionSummary ?? "", /\[optional\] T-001-2026-03-23/);
 });
 
 test("buildBootstrapContext tolerates missing optional instruction and memory files", async () => {

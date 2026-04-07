@@ -1,5 +1,8 @@
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import { resolveGitBranch } from "../core/git-branch.ts";
+import { ArtifactStore } from "../core/artifact-store.ts";
+import { ArtifactWorkspace } from "../core/artifact-workspace.ts";
+import { artifactWriteInputSchema } from "../contracts/artifact-schema.ts";
 import { createHelpSections, findCommandByInput } from "./command-registry.ts";
 import { parseSlashCommand } from "./command-parser.ts";
 
@@ -109,6 +112,55 @@ export async function executeBuiltinCommand(
               summary: "Read git branch",
               body: branch.detail,
             },
+          ],
+        };
+      }
+    case "workspace.init":
+      {
+        const workspace = new ArtifactWorkspace(context.projectRoot);
+        const result = await workspace.ensureInitialized();
+        const effects: CommandExecutionEffect[] = [];
+
+        for (const path of result.created) {
+          effects.push({ type: "system_message", line: `created: ${path}` });
+        }
+
+        for (const path of result.existing) {
+          effects.push({ type: "system_message", line: `exists:  ${path}` });
+        }
+
+        return { handled: true, effects };
+      }
+    case "workspace.write_artifact":
+      {
+        const rawArg = parsed.args.join(" ").trim();
+
+        let writeInput: unknown;
+        try {
+          writeInput = JSON.parse(rawArg);
+        } catch {
+          return {
+            handled: true,
+            effects: [{ type: "system_message", line: "write_artifact: argument must be valid JSON" }],
+          };
+        }
+
+        const parseResult = artifactWriteInputSchema.safeParse(writeInput);
+
+        if (!parseResult.success) {
+          return {
+            handled: true,
+            effects: [{ type: "system_message", line: `write_artifact: invalid input — ${parseResult.error.message}` }],
+          };
+        }
+
+        const store = new ArtifactStore(context.projectRoot);
+        const ref = await store.write(parseResult.data);
+
+        return {
+          handled: true,
+          effects: [
+            { type: "system_message", line: `artifact written: ${ref.title} (${ref.path})` },
           ],
         };
       }

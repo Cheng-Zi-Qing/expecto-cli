@@ -67,7 +67,8 @@ function createContextMetrics(
       context.instructions.length +
       context.memory.length +
       context.loadedArtifacts.required.length +
-      context.loadedArtifacts.optional.length,
+      context.loadedArtifacts.optional.length +
+      context.loadedArtifacts.onDemand.length,
     sessionSummary: context.sessionSummary ?? "",
     conversation: [...conversation],
   });

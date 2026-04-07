@@ -13,6 +13,8 @@ const legacyIdByCommandId: Record<CommandId, BuiltinCommandId> = {
   "session.theme": "theme",
   "session.exit": "exit",
   "project.branch": "branch",
+  "workspace.init": "init",
+  "workspace.write_artifact": "write_artifact",
   "debug.inspect": "inspect",
 };
 

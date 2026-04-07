@@ -316,11 +316,12 @@ test("reduceTuiState derives slash suggestions from visible implemented commands
       "session.theme",
       "session.exit",
       "project.branch",
+      "workspace.init",
     ],
   );
   assert.deepEqual(
     withSlashDraft.commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/init"],
   );
 });
 

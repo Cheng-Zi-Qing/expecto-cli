@@ -1,0 +1,510 @@
+<style>
+  :root {
+    --paper: #f2ede3;
+    --panel: #f7f2e8;
+    --ink: #2f2a24;
+    --muted: #6d675f;
+    --gray-border: #8d867c;
+    --gray-strong: #5f5951;
+    --gold: #b98b27;
+    --gold-soft: #d6bc7c;
+    --gold-bg: #f3ead0;
+    --blue: #7aa9d9;
+  }
+
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 24px;
+    margin-bottom: 20px;
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .hero-copy {
+    max-width: 760px;
+  }
+
+  .hero h2 {
+    margin: 0 0 8px;
+    color: var(--ink);
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
+  .hero .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--gray-border);
+    color: var(--muted);
+    background: rgba(255,255,255,0.56);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .signal strong {
+    color: var(--ink);
+  }
+
+  .option {
+    background: #fcfaf6;
+    border: 1px solid rgba(112, 102, 89, 0.18);
+  }
+
+  .option-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid rgba(112, 102, 89, 0.14);
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .option-meta h3 {
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .option-meta p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .tag {
+    align-self: start;
+    padding: 5px 8px;
+    border: 1px solid var(--gold);
+    color: #654d17;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: #f0e2ba;
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .screen {
+    margin: 16px;
+    border: 1px solid var(--gray-border);
+    background: var(--paper);
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .screen-main {
+    min-height: 420px;
+    padding: 18px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0), rgba(245,239,229,0.35)),
+      linear-gradient(90deg, rgba(201,161,62,0.07), rgba(201,161,62,0.07)) left 0 top 56px / 2px calc(100% - 76px) no-repeat,
+      var(--panel);
+  }
+
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .header-row .title {
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  .header-row .status {
+    color: var(--muted);
+  }
+
+  .stack {
+    display: grid;
+    gap: 14px;
+  }
+
+  .mono-line {
+    color: var(--gray-strong);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .mono-line .accent {
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  .exec {
+    display: grid;
+    gap: 6px;
+  }
+
+  .exec-title {
+    color: var(--gray-strong);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .exec-body {
+    border: 1px solid var(--gray-border);
+    padding: 10px 12px;
+    color: var(--muted);
+    background: #f4efe4;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .box {
+    border: 1px solid;
+  }
+
+  .box-head {
+    padding: 9px 11px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .box-body {
+    padding: 12px 14px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .gold-box {
+    border-color: rgba(165, 123, 29, 0.62);
+    background: var(--gold-bg);
+  }
+
+  .gold-box .box-head {
+    color: #6a5118;
+    background: transparent;
+  }
+
+  .gold-box .box-body {
+    color: var(--ink);
+  }
+
+  .assistant-head {
+    color: #76889d;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .rail-stack {
+    display: grid;
+    gap: 8px;
+  }
+
+  .rail-line {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .rail {
+    color: #76889d;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .body {
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .body strong {
+    color: var(--gold);
+  }
+
+  .body code {
+    color: #f6efe0;
+    background: #312a22;
+    padding: 2px 6px;
+    font-size: 13px;
+  }
+
+  .composer-wrap {
+    padding: 0 16px 16px;
+    background: var(--paper);
+  }
+
+  .composer {
+    border: 1px solid rgba(165, 123, 29, 0.62);
+    background: var(--gold-bg);
+  }
+
+  .composer-head {
+    padding: 9px 11px;
+    color: #6a5118;
+    background: transparent;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .composer-inner {
+    padding: 0 14px 14px;
+    display: grid;
+    gap: 10px;
+    background: var(--gold-bg);
+  }
+
+  .composer-line {
+    border: 1px solid rgba(165, 123, 29, 0.18);
+    padding: 12px 14px;
+    color: #7a6b57;
+    background: var(--gold-bg);
+    font-size: 15px;
+  }
+
+  .composer-status {
+    color: #776754;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .notes {
+    padding: 16px;
+    border-top: 1px solid rgba(112, 102, 89, 0.14);
+    display: grid;
+    gap: 6px;
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .notes p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .micro .header-row .title {
+    color: #a98022;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .micro .exec-title {
+    color: #756c60;
+  }
+
+  .micro .exec-body {
+    border-color: rgba(141, 134, 124, 0.38);
+    color: #847c72;
+    background: #f2ede4;
+  }
+
+  .micro .box-head,
+  .micro .composer-head {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+
+  .micro .assistant-head,
+  .micro .rail {
+    color: #8a928f;
+  }
+
+  .micro .rail-line {
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .micro .body code {
+    background: #363028;
+  }
+
+  .point-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+    font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  }
+
+  .point {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .point strong {
+    color: var(--ink);
+  }
+
+  @media (max-width: 1080px) {
+    .compare {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="hero">
+  <div class="hero-copy">
+    <h2>Expecto CLI · Session Screen A Micro-Tuning</h2>
+    <p class="subtitle">
+      This page does not change structure. It only shows the five micro-tuning ideas directly on the screen:
+      lighter assistant blue-gray, weaker execution box, unified input/composer label rhythm, a more linear timeline title,
+      and a slightly tighter assistant rail gap.
+    </p>
+  </div>
+  <div class="signal"><strong>Compare</strong> Current vs Micro-tuned</div>
+</div>
+
+<div class="compare">
+  <div class="option">
+    <div class="option-head">
+      <div class="option-meta">
+        <h3>Current</h3>
+        <p>The page you already said is very close. This is the baseline.</p>
+      </div>
+      <div class="tag">Baseline</div>
+    </div>
+
+    <div class="screen">
+      <div class="screen-main">
+        <div class="header-row">
+          <div class="title">Timeline</div>
+          <div class="status">Done</div>
+        </div>
+        <div class="stack">
+          <div class="mono-line"><span class="accent">branch:</span> feat/theme-system-init</div>
+          <div class="exec">
+            <div class="exec-title">Execution: Read git branch</div>
+            <div class="exec-body">Details hidden</div>
+          </div>
+          <div class="box gold-box">
+            <div class="box-head">Submitted Input</div>
+            <div class="box-body">hello</div>
+          </div>
+          <div>
+            <div class="assistant-head">Assistant:</div>
+            <div class="rail-stack">
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">Output stays gray and unboxed. The yellow is reserved for user intent and the bottom composer.</div>
+              </div>
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">The title is only highlighted text now, without another isolated label frame.</div>
+              </div>
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">Inline accents still use <strong>gold</strong> and <code>README.md</code> can remain neutral or cool-blue.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer">
+          <div class="composer-head">Composer</div>
+          <div class="composer-inner">
+            <div class="composer-line">Write a prompt</div>
+            <div class="composer-status">Status: Done</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <p>Good overall balance already.</p>
+      <p>Assistant blue-gray and execution block still carry a bit more presence than necessary.</p>
+    </div>
+  </div>
+
+  <div class="option micro selected">
+    <div class="option-head">
+      <div class="option-meta">
+        <h3>Micro-tuned</h3>
+        <p>Same layout, with only the small polish adjustments applied.</p>
+      </div>
+      <div class="tag">Preview</div>
+    </div>
+
+    <div class="screen">
+      <div class="screen-main">
+        <div class="header-row">
+          <div class="title">Timeline</div>
+          <div class="status">Done</div>
+        </div>
+        <div class="stack">
+          <div class="mono-line"><span class="accent">branch:</span> feat/theme-system-init</div>
+          <div class="exec">
+            <div class="exec-title">Execution: Read git branch</div>
+            <div class="exec-body">Details hidden</div>
+          </div>
+          <div class="box gold-box">
+            <div class="box-head">Submitted Input</div>
+            <div class="box-body">hello</div>
+          </div>
+          <div>
+            <div class="assistant-head">Assistant:</div>
+            <div class="rail-stack">
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">Output stays gray and unboxed. The yellow is reserved for user intent and the bottom composer.</div>
+              </div>
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">The title highlight is slightly flatter and less banner-like, while the rail gap is a little tighter.</div>
+              </div>
+              <div class="rail-line">
+                <div class="rail">│</div>
+                <div class="body">Inline accents still use <strong>gold</strong> and <code>README.md</code> can remain neutral or cool-blue.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer">
+          <div class="composer-head">Composer</div>
+          <div class="composer-inner">
+            <div class="composer-line">Write a prompt</div>
+            <div class="composer-status">Status: Done</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <p>Changes shown here:</p>
+      <div class="point-list">
+        <div class="point"><strong>1.</strong> Assistant blue-gray is toned down.</div>
+        <div class="point"><strong>2.</strong> Execution block is more obviously secondary.</div>
+        <div class="point"><strong>3.</strong> Input and composer label rhythm is more unified.</div>
+        <div class="point"><strong>4.</strong> Timeline title is flatter and more CLI-like.</div>
+        <div class="point"><strong>5.</strong> Rail gap is slightly tighter.</div>
+      </div>
+    </div>
+  </div>
+</div>

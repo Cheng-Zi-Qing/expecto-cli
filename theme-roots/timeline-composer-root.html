@@ -1,0 +1,480 @@
+<style>
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 24px;
+    margin-bottom: 20px;
+  }
+
+  .hero-copy {
+    max-width: 720px;
+  }
+
+  .hero h2 {
+    margin-bottom: 8px;
+  }
+
+  .hero .subtitle {
+    max-width: 660px;
+    margin-bottom: 0;
+  }
+
+  .signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(250, 243, 222, 0.9);
+    border: 1px solid rgba(188, 151, 54, 0.28);
+    color: #5e4b15;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .signal strong {
+    color: #2b2419;
+  }
+
+  .cards.visual-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .option.visual-card {
+    padding: 0;
+    overflow: hidden;
+    background: #fcfaf4;
+    border: 1px solid rgba(109, 97, 77, 0.14);
+  }
+
+  .visual-card.selected {
+    border-color: rgba(192, 149, 36, 0.95);
+    box-shadow: 0 18px 40px rgba(176, 143, 58, 0.18);
+  }
+
+  .visual-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 18px 10px;
+  }
+
+  .visual-meta {
+    min-width: 0;
+  }
+
+  .visual-meta h3 {
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+
+  .visual-meta p {
+    margin: 0;
+    color: #6b6152;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .tag {
+    flex: 0 0 auto;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(85, 76, 63, 0.12);
+    color: #6a604f;
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .tag.recommended {
+    color: #5a4508;
+    background: #f2dea1;
+    border-color: rgba(170, 129, 20, 0.28);
+  }
+
+  .shell {
+    margin: 0 18px;
+    padding: 16px;
+    border-radius: 22px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.92), rgba(244,236,220,0.92)),
+      radial-gradient(circle at top left, rgba(244,223,141,0.3), transparent 36%);
+    border: 1px solid rgba(129, 112, 78, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.85),
+      0 16px 30px rgba(92, 72, 32, 0.08);
+  }
+
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: 18px;
+    align-items: start;
+    min-height: 278px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8c7c68;
+    margin-bottom: 12px;
+  }
+
+  .title {
+    margin: 0;
+    color: #231d13;
+    font-size: 30px;
+    line-height: 1.05;
+  }
+
+  .sub {
+    margin: 8px 0 14px;
+    color: #534739;
+    font-size: 15px;
+  }
+
+  .meta-lines {
+    margin-top: 16px;
+    display: grid;
+    gap: 6px;
+    color: #827563;
+    font-size: 13px;
+  }
+
+  .badger {
+    margin: 12px 0 0;
+    font: 700 17px/1.03 "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+    letter-spacing: 0;
+    white-space: pre;
+    color: #2f2a24;
+  }
+
+  .g-m0 { color: #cfc8bf; }
+  .g-m1 { color: #a89f94; }
+  .g-m2 { color: #72695e; }
+  .g-shadow { color: #27231f; }
+  .g-chin { color: #d2a33a; }
+  .g-glow { color: #efd06b; }
+  .g-blue { color: #7fa8d6; }
+
+  .sidebar {
+    padding: 14px 14px 12px;
+    border-radius: 18px;
+    background: rgba(249, 244, 233, 0.96);
+    border: 1px solid rgba(132, 118, 86, 0.12);
+  }
+
+  .sidebar h4 {
+    margin: 0 0 10px;
+    color: #332a1e;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .sidebar p {
+    margin: 0 0 14px;
+    color: #66594a;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .highlight-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .token {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font: 600 12px/1.1 "SFMono-Regular", "JetBrains Mono", monospace;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(129, 112, 78, 0.12);
+  }
+
+  .token.command { color: #b18015; }
+  .token.path { color: #6a6d73; }
+  .token.shortcut { color: #4c88c6; }
+  .token.status { color: #8a6b1f; }
+
+  .composer-demo {
+    margin: 16px 18px 0;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(91, 78, 57, 0.16);
+    box-shadow: 0 12px 24px rgba(48, 37, 17, 0.07);
+    background: #c89d31;
+  }
+
+  .composer-bar {
+    padding: 10px 14px;
+    color: rgba(31, 25, 17, 0.92);
+    font-size: 12px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(239, 207, 112, 0.98), rgba(210, 163, 58, 0.98));
+  }
+
+  .composer-inner {
+    min-height: 92px;
+    padding: 14px;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .composer-line {
+    border-radius: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(78, 63, 38, 0.08);
+  }
+
+  .composer-placeholder {
+    color: #8c7c67;
+  }
+
+  .composer-status {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #7d6d56;
+  }
+
+  .composer-a .composer-inner {
+    background:
+      linear-gradient(180deg, rgba(252,247,238,0.98), rgba(238,228,208,0.98));
+  }
+
+  .composer-a .composer-line {
+    background: rgba(255,255,255,0.75);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  }
+
+  .composer-b .composer-inner {
+    background:
+      radial-gradient(circle at top left, rgba(255,244,198,0.52), transparent 34%),
+      linear-gradient(180deg, rgba(250,244,228,0.98), rgba(235,223,198,0.98));
+  }
+
+  .composer-b .composer-line {
+    background: rgba(255,250,239,0.82);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      inset 0 0 0 1px rgba(215,189,132,0.24);
+  }
+
+  .composer-c .composer-inner {
+    background:
+      linear-gradient(180deg, rgba(242,238,231,0.98), rgba(226,219,207,0.98));
+  }
+
+  .composer-c .composer-line {
+    background: rgba(250,250,248,0.68);
+    border-style: dashed;
+  }
+
+  .visual-notes {
+    padding: 16px 18px 18px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .visual-notes .label {
+    margin: 0;
+  }
+
+  .visual-notes ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #5f5447;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 1200px) {
+    .cards.visual-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="hero">
+  <div class="hero-copy">
+    <h2>Expecto CLI · Hufflepuff Visual Directions</h2>
+    <p class="subtitle">
+      This round only compares two things: the badger identity in the welcome area, and the inner treatment of the composer.
+      Output remains rail-only in all three options.
+    </p>
+  </div>
+  <div class="signal"><strong>Recommendation</strong> B balances recognizability, warmth, and terminal restraint.</div>
+</div>
+
+<div class="cards visual-grid">
+  <div class="option visual-card" data-choice="a_precision_pixel" onclick="toggleSelect(this)">
+    <div class="visual-head">
+      <div class="visual-meta">
+        <h3>A · Precision Pixel</h3>
+        <p>Sharper cheek geometry, cleaner mascot silhouette, brighter composer interior.</p>
+      </div>
+      <div class="tag">Crisp</div>
+    </div>
+    <div class="shell">
+      <div class="welcome-grid">
+        <div>
+          <div class="eyebrow">Expecto CLI</div>
+          <h3 class="title">Welcome back!</h3>
+          <p class="sub">Hufflepuff Badger is standing by</p>
+          <pre class="badger"><span class="g-m1">   ·  ░   ·</span>
+<span class="g-m2"> ░▒ </span><span class="g-shadow">▗▛██▖ ▗██▜▖</span><span class="g-blue"> ~</span>
+<span class="g-m1">  ░ </span><span class="g-shadow">▐██▙██ ██▟██▌</span>
+<span class="g-m2"> ░▒ </span><span class="g-shadow">▐██◦██ ██◦██▌</span><span class="g-blue"> ·</span>
+<span class="g-m0">   ░▒ </span><span class="g-chin">▝▜██▇▇██▛▘</span><span class="g-glow"> ›_</span></pre>
+          <div class="meta-lines">
+            <div>Sonnet 4.6 · API Usage Billing</div>
+            <div>~/Workspace/beta-agent</div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <h4>Tips</h4>
+          <p>Run <strong>/help</strong> to inspect available commands.</p>
+          <h4>Highlight sample</h4>
+          <div class="highlight-row">
+            <span class="token command">/theme</span>
+            <span class="token path">README.md</span>
+            <span class="token shortcut">Ctrl+C</span>
+            <span class="token status">ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="composer-demo composer-a">
+      <div class="composer-bar">Composer</div>
+      <div class="composer-inner">
+        <div class="composer-line composer-placeholder">Write a prompt</div>
+        <div class="composer-status">Status: Done</div>
+      </div>
+    </div>
+    <div class="visual-notes">
+      <p class="label">Read</p>
+      <ul>
+        <li>Strongest face readability at a glance.</li>
+        <li>Composer feels more app-like, slightly less calm.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="option visual-card selected" data-choice="b_warm_sentinel" onclick="toggleSelect(this)">
+    <div class="visual-head">
+      <div class="visual-meta">
+        <h3>B · Warm Sentinel</h3>
+        <p>Closest to your earlier preferred face, with controlled gray mist and sparse blue mystic accents.</p>
+      </div>
+      <div class="tag recommended">Recommended</div>
+    </div>
+    <div class="shell">
+      <div class="welcome-grid">
+        <div>
+          <div class="eyebrow">Expecto CLI</div>
+          <h3 class="title">Welcome back!</h3>
+          <p class="sub">Hufflepuff Badger is standing by</p>
+          <pre class="badger"><span class="g-m1">   ░ </span><span class="g-blue">·</span><span class="g-m1"> ░  · ░</span>
+<span class="g-m2"> ░▒ </span><span class="g-shadow">▗▛██▖ ▗██▜▖</span><span class="g-blue"> ~</span><span class="g-m2">▒░</span>
+<span class="g-m1">  ░ </span><span class="g-shadow">▐██▙▜█ █▛▟██▌</span><span class="g-m1"> ░</span>
+<span class="g-m2"> ░▒ </span><span class="g-shadow">▐██▛◦█ █◦▜██▌</span><span class="g-blue"> ·</span><span class="g-m2">▒░</span>
+<span class="g-m0">   ░▒ </span><span class="g-chin">▝▜██▇▇██▛▘</span><span class="g-glow"> ›_</span></pre>
+          <div class="meta-lines">
+            <div>Sonnet 4.6 · API Usage Billing</div>
+            <div>~/Workspace/beta-agent</div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <h4>Tips</h4>
+          <p>Run <strong>/help</strong> to inspect available commands.</p>
+          <h4>Highlight sample</h4>
+          <div class="highlight-row">
+            <span class="token command">/theme</span>
+            <span class="token path">README.md</span>
+            <span class="token shortcut">Ctrl+C</span>
+            <span class="token status">ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="composer-demo composer-b">
+      <div class="composer-bar">Composer</div>
+      <div class="composer-inner">
+        <div class="composer-line composer-placeholder">Write a prompt</div>
+        <div class="composer-status">Status: Done</div>
+      </div>
+    </div>
+    <div class="visual-notes">
+      <p class="label">Read</p>
+      <ul>
+        <li>Most balanced mascot: face keeps character, body stays airy instead of turning into a blob.</li>
+        <li>Composer inner panel has visible depth without looking like a web form.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="option visual-card" data-choice="c_crest_symbol" onclick="toggleSelect(this)">
+    <div class="visual-head">
+      <div class="visual-meta">
+        <h3>C · Crest Symbol</h3>
+        <p>Cleaner and more emblem-like, with a cooler inner well and softer role separation.</p>
+      </div>
+      <div class="tag">Minimal</div>
+    </div>
+    <div class="shell">
+      <div class="welcome-grid">
+        <div>
+          <div class="eyebrow">Expecto CLI</div>
+          <h3 class="title">Welcome back!</h3>
+          <p class="sub">Hufflepuff Badger is standing by</p>
+          <pre class="badger"><span class="g-m1">   ·   ·</span>
+<span class="g-m2"> ░ </span><span class="g-shadow">╭██╮ ╭██╮</span>
+<span class="g-m1">  </span><span class="g-shadow">│██╳╲╱╳██│</span><span class="g-blue"> ·</span>
+<span class="g-m2"> ░ </span><span class="g-shadow">│██◦██◦██│</span>
+<span class="g-m0">   </span><span class="g-chin">╰▜██▇▇██▛╯</span><span class="g-glow"> ›</span></pre>
+          <div class="meta-lines">
+            <div>Sonnet 4.6 · API Usage Billing</div>
+            <div>~/Workspace/beta-agent</div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <h4>Tips</h4>
+          <p>Run <strong>/help</strong> to inspect available commands.</p>
+          <h4>Highlight sample</h4>
+          <div class="highlight-row">
+            <span class="token command">/theme</span>
+            <span class="token path">README.md</span>
+            <span class="token shortcut">Ctrl+C</span>
+            <span class="token status">ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="composer-demo composer-c">
+      <div class="composer-bar">Composer</div>
+      <div class="composer-inner">
+        <div class="composer-line composer-placeholder">Write a prompt</div>
+        <div class="composer-status">Status: Done</div>
+      </div>
+    </div>
+    <div class="visual-notes">
+      <p class="label">Read</p>
+      <ul>
+        <li>Feels more polished and editorial.</li>
+        <li>Loses some of the “pet companion” feeling you asked for.</li>
+      </ul>
+    </div>
+  </div>
+</div>

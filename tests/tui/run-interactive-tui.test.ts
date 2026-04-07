@@ -1158,7 +1158,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/init"],
   );
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.id),
@@ -1169,6 +1169,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
       "session.theme",
       "session.exit",
       "project.branch",
+      "workspace.init",
     ],
   );
 

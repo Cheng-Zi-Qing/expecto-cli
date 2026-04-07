@@ -106,6 +106,7 @@ test("provider runner converts assistant-step input into a routed completion req
       loadedArtifacts: {
         required: [],
         optional: [],
+        onDemand: [],
       },
       sessionSummary: "required docs: none",
     },
@@ -173,6 +174,7 @@ test("provider runner uses message history when assistant-step input has no prom
       loadedArtifacts: {
         required: [],
         optional: [],
+        onDemand: [],
       },
       sessionSummary: "required docs: none",
     },
@@ -261,6 +263,7 @@ test("provider runner injects instruction stack as system messages before conver
       loadedArtifacts: {
         required: [],
         optional: [],
+        onDemand: [],
       },
       sessionSummary: "required docs: none",
     },

@@ -1,0 +1,278 @@
+<style>
+  .session-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-top: 8px;
+  }
+
+  .session-frame {
+    background: linear-gradient(180deg, #fbfaf6 0%, #f4efe5 100%);
+    border: 1px solid rgba(104, 95, 82, 0.12);
+    border-radius: 24px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.86),
+      0 18px 42px rgba(87, 71, 41, 0.08);
+    overflow: hidden;
+  }
+
+  .timeline-area {
+    min-height: 700px;
+    padding: 28px 28px 18px;
+    background:
+      radial-gradient(circle at top left, rgba(239,219,135,0.14), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,239,229,0.94));
+  }
+
+  .timeline-header {
+    margin-bottom: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .timeline-title {
+    margin: 0;
+    color: #1f1a12;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .timeline-status {
+    color: #8b7750;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .timeline-stack {
+    display: grid;
+    gap: 18px;
+  }
+
+  .line-block {
+    color: #73695c;
+    font: 600 13px/1.25 "SFMono-Regular", "JetBrains Mono", monospace;
+    letter-spacing: 0.02em;
+  }
+
+  .line-block .label {
+    color: #b8892c;
+  }
+
+  .user-card {
+    border: 1px solid rgba(95, 79, 52, 0.14);
+    border-radius: 18px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.64);
+    box-shadow: 0 10px 24px rgba(63, 50, 24, 0.05);
+  }
+
+  .user-card .card-head {
+    padding: 11px 14px;
+    color: #6f5b32;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(244,219,146,0.92), rgba(225,191,104,0.88));
+    border-bottom: 1px solid rgba(120, 94, 41, 0.12);
+  }
+
+  .user-card .card-body {
+    padding: 14px 16px 16px;
+    color: #2f2820;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .assistant-block {
+    display: grid;
+    gap: 8px;
+  }
+
+  .assistant-head {
+    color: #73869d;
+    font: 700 13px/1.2 "SFMono-Regular", "JetBrains Mono", monospace;
+    letter-spacing: 0.04em;
+  }
+
+  .assistant-rail {
+    display: grid;
+    gap: 10px;
+  }
+
+  .assistant-line {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .assistant-line .rail {
+    color: #73869d;
+    font: 700 14px/1.25 "SFMono-Regular", "JetBrains Mono", monospace;
+  }
+
+  .assistant-line .body {
+    color: #322b23;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .assistant-line .body strong {
+    color: #a77a1c;
+    font-weight: 700;
+  }
+
+  .assistant-line .body code {
+    color: #f6efe0;
+    background: #312a22;
+    border-radius: 8px;
+    padding: 2px 6px;
+    font: 600 14px/1.2 "SFMono-Regular", "JetBrains Mono", monospace;
+  }
+
+  .execution-block {
+    display: grid;
+    gap: 8px;
+  }
+
+  .execution-title {
+    color: #7e735f;
+    font: 600 13px/1.25 "SFMono-Regular", "JetBrains Mono", monospace;
+  }
+
+  .execution-box {
+    border-radius: 16px;
+    border: 1px solid rgba(128, 118, 100, 0.14);
+    background: rgba(249,246,240,0.84);
+    padding: 12px 14px;
+    color: #50463a;
+    font: 500 14px/1.5 "SFMono-Regular", "JetBrains Mono", monospace;
+    white-space: pre-wrap;
+  }
+
+  .composer-wrap {
+    padding: 0 18px 18px;
+    background: linear-gradient(180deg, rgba(244,239,229,0), rgba(244,239,229,0.98) 30%);
+  }
+
+  .composer-frame {
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid rgba(94, 80, 58, 0.14);
+    box-shadow: 0 12px 24px rgba(50, 40, 19, 0.06);
+    background: #c9a13e;
+  }
+
+  .composer-bar {
+    padding: 10px 14px;
+    color: rgba(31, 25, 17, 0.92);
+    font-size: 12px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, rgba(239, 210, 123, 0.98), rgba(210, 169, 77, 0.98));
+  }
+
+  .composer-inner {
+    min-height: 116px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+    background:
+      radial-gradient(circle at top left, rgba(255,244,198,0.48), transparent 34%),
+      linear-gradient(180deg, rgba(250,244,229,0.98), rgba(236,225,202,0.98));
+  }
+
+  .composer-line {
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: #8d7f6d;
+    background: rgba(255,250,240,0.84);
+    border: 1px solid rgba(92, 73, 44, 0.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.9),
+      inset 0 0 0 1px rgba(215,189,132,0.2);
+    font-size: 16px;
+  }
+
+  .composer-status {
+    color: #7f6f5a;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 900px) {
+    .timeline-area {
+      min-height: 620px;
+      padding: 22px 22px 16px;
+    }
+
+    .user-card .card-body,
+    .assistant-line .body,
+    .composer-line {
+      font-size: 15px;
+    }
+  }
+</style>
+
+<div class="session-shell">
+  <div class="session-frame">
+    <div class="timeline-area">
+      <div class="timeline-header">
+        <h3 class="timeline-title">Timeline</h3>
+        <div class="timeline-status">Hufflepuff Session</div>
+      </div>
+
+      <div class="timeline-stack">
+        <div class="line-block"><span class="label">branch:</span> feat/theme-system-init</div>
+
+        <div class="execution-block">
+          <div class="execution-title">Execution: Read git branch</div>
+          <div class="execution-box">Details hidden</div>
+        </div>
+
+        <div class="user-card">
+          <div class="card-head">Submitted Input</div>
+          <div class="card-body">hello</div>
+        </div>
+
+        <div class="assistant-block">
+          <div class="assistant-head">Assistant:</div>
+          <div class="assistant-rail">
+            <div class="assistant-line">
+              <div class="rail">│</div>
+              <div class="body">Timeline stays visually quiet. Input uses the Hufflepuff gold frame, while assistant output remains rail-only instead of getting boxed.</div>
+            </div>
+            <div class="assistant-line">
+              <div class="rail">│</div>
+              <div class="body">The key highlight tokens keep the approved contrast: <strong>/theme</strong>, <code>README.md</code>, and a cool blue accent only where it helps scanning.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="assistant-block">
+          <div class="assistant-head">Assistant:</div>
+          <div class="assistant-rail">
+            <div class="assistant-line">
+              <div class="rail">│</div>
+              <div class="body">Composer stays fixed at the bottom, with one warm outer shell and one lighter inner field. No extra panel clutter above it.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer-frame">
+        <div class="composer-bar">Composer</div>
+        <div class="composer-inner">
+          <div class="composer-line">Write a prompt</div>
+          <div class="composer-status">Status: Done</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

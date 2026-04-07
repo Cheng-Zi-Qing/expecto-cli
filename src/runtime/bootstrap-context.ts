@@ -19,6 +19,7 @@ export type SessionMode = "fast" | "balanced" | "strict";
 export type LoadedArtifactSet = {
   required: ArtifactDocument[];
   optional: ArtifactDocument[];
+  onDemand: ArtifactDocument[];
 };
 
 export type BootstrapContext = {
@@ -101,6 +102,16 @@ export async function buildBootstrapContext(
       ).filter((doc): doc is ArtifactDocument => doc !== null)
     : [];
 
+  const resolvedOnDemandArtifacts = resumeTarget
+    ? (
+        await Promise.all(
+          resumeTarget.snapshot.activeArtifacts.onDemand.map((artifact) =>
+            store.read(artifact.id).catch(() => null),
+          ),
+        )
+      ).filter((doc): doc is ArtifactDocument => doc !== null)
+    : [];
+
   return {
     projectRoot,
     mode: "balanced",
@@ -112,6 +123,7 @@ export async function buildBootstrapContext(
     loadedArtifacts: {
       required: resolvedRequiredArtifacts,
       optional: resolvedOptionalArtifacts,
+      onDemand: resolvedOnDemandArtifacts,
     },
     sessionSummary: renderSessionSummary({
       mode: "balanced",

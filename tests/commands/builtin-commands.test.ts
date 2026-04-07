@@ -26,6 +26,8 @@ test("listAllCommands exposes namespaced ids with category and availability meta
       "session.theme",
       "session.exit",
       "project.branch",
+      "workspace.init",
+      "workspace.write_artifact",
       "debug.inspect",
     ],
   );
@@ -54,7 +56,7 @@ test("listImplementedCommandsByCategory exposes only the first formal command se
       },
       {
         category: "project",
-        commands: ["/branch"],
+        commands: ["/branch", "/init"],
       },
     ],
   );
@@ -75,7 +77,7 @@ test("createHelpSections keeps visible implemented commands grouped by category"
       },
       {
         category: "project",
-        commands: ["/branch"],
+        commands: ["/branch", "/init"],
       },
     ],
   );
@@ -94,7 +96,7 @@ test("findCommandByInput resolves hidden /inspect without exposing it in visible
 test("builtin compatibility layer preserves legacy command ids for existing consumers", () => {
   assert.deepEqual(
     listBuiltinCommands().map((command) => command.id),
-    ["help", "clear", "status", "branch", "inspect", "theme", "exit"],
+    ["help", "clear", "status", "branch", "inspect", "theme", "exit", "init", "write_artifact"],
   );
 });
 

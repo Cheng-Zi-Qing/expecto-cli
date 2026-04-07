@@ -1,0 +1,310 @@
+<style>
+  .hero {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 980px;
+  }
+
+  .signal {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(245, 232, 211, 0.9);
+    border: 1px solid rgba(173, 126, 36, 0.18);
+    color: #7b4c12;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .split.preview-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    border-radius: 24px;
+    border: 1px solid rgba(95, 82, 60, 0.12);
+    background: #fcfaf5;
+    box-shadow: 0 18px 42px rgba(58, 43, 22, 0.08);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid rgba(95, 82, 60, 0.08);
+    display: grid;
+    gap: 8px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7b6f61;
+  }
+
+  .panel-head h3 {
+    margin: 0;
+    font-size: 24px;
+    color: #35251f;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #5a4e40;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  .panel-body {
+    padding: 18px;
+    display: grid;
+    gap: 16px;
+  }
+
+  .shell {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(92, 77, 55, 0.14);
+    background: #f6f1e7;
+  }
+
+  .shell-head {
+    padding: 10px 14px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(39, 31, 23, 0.92);
+    background: linear-gradient(180deg, #ead5a1, #ca9a49);
+  }
+
+  .shell-body {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .welcome {
+    border-radius: 16px;
+    padding: 14px;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 244, 0.96), rgba(247, 238, 225, 0.96)),
+      radial-gradient(circle at top left, rgba(145, 48, 41, 0.08), transparent 34%);
+    border: 1px solid rgba(92, 77, 55, 0.11);
+  }
+
+  .welcome h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #241d15;
+  }
+
+  .welcome p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #5a4f43;
+  }
+
+  .glyph {
+    margin: 14px 0 0;
+    font: 700 20px/1.03 "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+    white-space: pre;
+    letter-spacing: 0;
+  }
+
+  .zoom .glyph {
+    margin: 0;
+    font-size: 30px;
+  }
+
+  .line {
+    display: block;
+  }
+
+  .g-mist { color: #8c847a; }
+  .g-gold { color: #d0a04a; }
+  .g-gold-dark { color: #b88533; }
+  .g-red { color: #8f2f29; }
+  .g-red-dark { color: #6b231e; }
+
+  .sample-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .token {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font: 600 12px/1.1 "SFMono-Regular", "JetBrains Mono", monospace;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(97, 82, 60, 0.12);
+  }
+
+  .token.command { color: #8f2f29; }
+  .token.path { color: #74695f; }
+  .token.shortcut { color: #b8862f; }
+  .token.status { color: #a3352e; }
+
+  .swatch-grid {
+    display: grid;
+    gap: 10px;
+  }
+
+  .swatch-row {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+    color: #6b5d50;
+  }
+
+  .swatches {
+    display: flex;
+    gap: 6px;
+  }
+
+  .swatch {
+    flex: 1 1 0;
+    min-height: 15px;
+    border-radius: 999px;
+  }
+
+  .note-box {
+    border-radius: 16px;
+    background: rgba(249, 245, 237, 0.97);
+    border: 1px solid rgba(100, 86, 66, 0.1);
+    padding: 12px 14px;
+  }
+
+  .note-box h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #66594b;
+  }
+
+  .note-box p {
+    margin: 0;
+    color: #594d40;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .zoom-box {
+    border-radius: 18px;
+    padding: 18px;
+    background:
+      linear-gradient(180deg, rgba(252, 248, 241, 0.95), rgba(244, 236, 220, 0.95)),
+      radial-gradient(circle at top left, rgba(152, 48, 42, 0.12), transparent 36%);
+    border: 1px solid rgba(120, 95, 60, 0.14);
+  }
+
+  @media (max-width: 1040px) {
+    .split.preview-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="hero">
+  <div class="signal">Gryffindor User Lion Draft</div>
+  <h2>Approved Lion Shape With House Palette</h2>
+  <p class="subtitle">
+    This preview keeps your lion glyph as the structure and only assigns the Gryffindor palette to it:
+    gold on the outer mane rhythm, crimson in the inner face mass, and muted ash around it so the mascot still belongs to the same TUI world as the eagle and serpent.
+  </p>
+</div>
+
+<div class="split preview-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Welcome Preview</div>
+      <h3>Gryffindor In Context</h3>
+      <p>This is your lion glyph sitting directly in the welcome layout with the house colors applied.</p>
+    </div>
+    <div class="panel-body">
+      <div class="shell">
+        <div class="shell-head">Gryffindor Preview</div>
+        <div class="shell-body">
+          <div class="welcome">
+            <h4>Welcome back!</h4>
+            <p>Gryffindor Lion is standing by</p>
+            <pre class="glyph"><span class="line"><span class="g-mist">   ░ · ░  · ░</span></span><span class="line"><span class="g-mist"> ░▒ </span><span class="g-gold">▗▞▓</span><span class="g-red">████</span><span class="g-gold">▓▚▖</span><span class="g-mist"> ~▒░</span></span><span class="line"><span class="g-mist">  ░ </span><span class="g-gold-dark">▐▓</span><span class="g-red">██▛▀▜██</span><span class="g-gold-dark">▓▌</span><span class="g-mist"> ░</span></span><span class="line"><span class="g-mist"> ░▒ </span><span class="g-gold-dark">▐▓</span><span class="g-red">██▌</span><span class="g-gold">▼</span><span class="g-red">▐██</span><span class="g-gold-dark">▓▌</span><span class="g-mist">·▒░</span></span><span class="line"><span class="g-mist">   ░▒ </span><span class="g-red-dark">▝▀████▀</span><span class="g-mist">▘ ›_</span></span></pre>
+            <div class="sample-row">
+              <span class="token command">/theme</span>
+              <span class="token path">README.md</span>
+              <span class="token shortcut">Ctrl+C</span>
+              <span class="token status">ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note-box">
+        <h4>Read</h4>
+        <p>The structure is entirely yours. I only used gold to emphasize the mane perimeter and crimson to load the inner face, so Gryffindor reads immediately without changing the glyph geometry.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel zoom">
+    <div class="panel-head">
+      <div class="eyebrow">Palette Focus</div>
+      <h3>Color Balance Check</h3>
+      <p>Use this side to judge whether the red-gold placement feels right on your lion.</p>
+    </div>
+    <div class="panel-body">
+      <div class="zoom-box">
+        <pre class="glyph"><span class="line"><span class="g-mist">   ░ · ░  · ░</span></span><span class="line"><span class="g-mist"> ░▒ </span><span class="g-gold">▗▞▓</span><span class="g-red">████</span><span class="g-gold">▓▚▖</span><span class="g-mist"> ~▒░</span></span><span class="line"><span class="g-mist">  ░ </span><span class="g-gold-dark">▐▓</span><span class="g-red">██▛▀▜██</span><span class="g-gold-dark">▓▌</span><span class="g-mist"> ░</span></span><span class="line"><span class="g-mist"> ░▒ </span><span class="g-gold-dark">▐▓</span><span class="g-red">██▌</span><span class="g-gold">▼</span><span class="g-red">▐██</span><span class="g-gold-dark">▓▌</span><span class="g-mist">·▒░</span></span><span class="line"><span class="g-mist">   ░▒ </span><span class="g-red-dark">▝▀████▀</span><span class="g-mist">▘ ›_</span></span></pre>
+      </div>
+      <div class="swatch-grid">
+        <div class="swatch-row">
+          <span>gold mane</span>
+          <div class="swatches">
+            <span class="swatch" style="background:#b88533"></span>
+            <span class="swatch" style="background:#d0a04a"></span>
+            <span class="swatch" style="background:#ebc77b"></span>
+          </div>
+        </div>
+        <div class="swatch-row">
+          <span>crimson face</span>
+          <div class="swatches">
+            <span class="swatch" style="background:#6b231e"></span>
+            <span class="swatch" style="background:#8f2f29"></span>
+            <span class="swatch" style="background:#ad4138"></span>
+          </div>
+        </div>
+        <div class="swatch-row">
+          <span>ash mist</span>
+          <div class="swatches">
+            <span class="swatch" style="background:#6f6860"></span>
+            <span class="swatch" style="background:#9a938a"></span>
+            <span class="swatch" style="background:#d8d0c4"></span>
+          </div>
+        </div>
+      </div>
+      <div class="note-box">
+        <h4>What To Tell Me</h4>
+        <p>You can answer very directly: this is final, more red, more gold, or archive this version like Ravenclaw and Slytherin.</p>
+      </div>
+    </div>
+  </div>
+</div>

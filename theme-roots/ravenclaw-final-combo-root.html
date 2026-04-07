@@ -1,0 +1,278 @@
+<style>
+  .hero {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 980px;
+  }
+
+  .signal {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(226, 234, 241, 0.86);
+    border: 1px solid rgba(86, 108, 133, 0.16);
+    color: #355779;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .split.preview-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    border-radius: 24px;
+    border: 1px solid rgba(95, 82, 60, 0.12);
+    background: #fcfaf5;
+    box-shadow: 0 18px 42px rgba(58, 43, 22, 0.08);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid rgba(95, 82, 60, 0.08);
+    display: grid;
+    gap: 8px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7b6f61;
+  }
+
+  .panel-head h3 {
+    margin: 0;
+    font-size: 24px;
+    color: #273446;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #5a4e40;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  .panel-body {
+    padding: 18px;
+    display: grid;
+    gap: 16px;
+  }
+
+  .shell {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(92, 77, 55, 0.14);
+    background: #f6f1e7;
+  }
+
+  .shell-head {
+    padding: 10px 14px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(39, 31, 23, 0.92);
+    background: linear-gradient(180deg, #dbe3ea, #90a7bb);
+  }
+
+  .shell-body {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .welcome {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(92, 77, 55, 0.11);
+  }
+
+  .welcome h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #241d15;
+  }
+
+  .welcome p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #5a4f43;
+  }
+
+  .glyph {
+    margin: 14px 0 0;
+    font: 700 20px/1.03 "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+    white-space: pre;
+    letter-spacing: 0;
+  }
+
+  .zoom .glyph {
+    margin: 0;
+    font-size: 28px;
+  }
+
+  .line {
+    display: block;
+  }
+
+  .g-blue { color: #2f70d8; }
+  .g-beak { color: #f2c84c; }
+  .g-magic { color: #7d7f86; }
+
+  .eye-stack {
+    position: relative;
+    display: inline-block;
+    width: 1ch;
+    height: 1em;
+    vertical-align: baseline;
+  }
+
+  .eye-frame {
+    color: #565c66;
+  }
+
+  .eye-pupil {
+    position: absolute;
+    left: 0.31ch;
+    top: 0.18em;
+    color: #eef1f4;
+    font-size: 0.58em;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .sample-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .token {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font: 600 12px/1.1 "SFMono-Regular", "JetBrains Mono", monospace;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(97, 82, 60, 0.12);
+  }
+
+  .token.command,
+  .token.status { color: #2f70d8; }
+  .token.path { color: #74695f; }
+  .token.shortcut { color: #f0bf3f; }
+
+  .note-box {
+    border-radius: 16px;
+    background: rgba(249, 245, 237, 0.97);
+    border: 1px solid rgba(100, 86, 66, 0.1);
+    padding: 12px 14px;
+  }
+
+  .note-box h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #66594b;
+  }
+
+  .note-box p {
+    margin: 0;
+    color: #594d40;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .zoom-box {
+    border-radius: 18px;
+    padding: 18px;
+    background:
+      linear-gradient(180deg, rgba(250, 252, 255, 0.95), rgba(236, 241, 246, 0.95)),
+      radial-gradient(circle at top left, rgba(99, 142, 214, 0.14), transparent 38%);
+    border: 1px solid rgba(92, 110, 136, 0.16);
+  }
+
+  @media (max-width: 1040px) {
+    .split.preview-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="hero">
+  <div class="signal">Ravenclaw Final Combo Draft</div>
+  <h2>Realistic Beak + Soft Black Ring White Dot Eye</h2>
+  <p class="subtitle">
+    This combines the two pieces you just chose:
+    the more realistic side-profile beak from your glyph, and the earlier softer eye treatment with a light black ring and white point.
+    This page is only for final combination checking.
+  </p>
+</div>
+
+<div class="split preview-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Welcome Preview</div>
+      <h3>Ravenclaw In Context</h3>
+      <p>Use this to judge whether the combined face now feels right as a final Ravenclaw mascot.</p>
+    </div>
+    <div class="panel-body">
+      <div class="shell">
+        <div class="shell-head">Ravenclaw Preview</div>
+        <div class="shell-body">
+          <div class="welcome">
+            <h4>Welcome back!</h4>
+            <p>Ravenclaw Eagle is standing by</p>
+            <pre class="glyph"><span class="line"><span class="g-magic">       ░ · ░  · ░</span></span><span class="line"><span class="g-magic">     ░▒  </span><span class="g-blue">▗▄████▄</span><span class="g-magic">  ~▒░</span></span><span class="line"><span class="g-magic">      ░ </span><span class="g-blue">▗████▛▀</span><span class="g-beak">▜▖</span><span class="g-magic">  ░</span></span><span class="line"><span class="g-magic">     ░▒ </span><span class="g-blue">▐████▌</span><span class="eye-stack"><span class="eye-frame">◉</span><span class="eye-pupil">•</span></span><span class="g-magic"> </span><span class="g-beak">◥▖</span><span class="g-magic">·▒░</span></span><span class="line"><span class="g-magic">       ░▒ </span><span class="g-blue">▝▀███▀</span><span class="g-magic">  ›_</span></span></pre>
+            <div class="sample-row">
+              <span class="token command">/theme</span>
+              <span class="token path">README.md</span>
+              <span class="token shortcut">Ctrl+C</span>
+              <span class="token status">ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note-box">
+        <h4>Locked Parts</h4>
+        <p>Beak geometry stays from your latest glyph. Eye styling goes back to the earlier softer black ring with a white point inside it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel zoom">
+    <div class="panel-head">
+      <div class="eyebrow">Detail View</div>
+      <h3>Face Read Check</h3>
+      <p>Use the zoom to confirm the eye-to-beak relationship before I stop touching Ravenclaw.</p>
+    </div>
+    <div class="panel-body">
+      <div class="zoom-box">
+        <pre class="glyph"><span class="line"><span class="g-magic">       ░ · ░  · ░</span></span><span class="line"><span class="g-magic">     ░▒  </span><span class="g-blue">▗▄████▄</span><span class="g-magic">  ~▒░</span></span><span class="line"><span class="g-magic">      ░ </span><span class="g-blue">▗████▛▀</span><span class="g-beak">▜▖</span><span class="g-magic">  ░</span></span><span class="line"><span class="g-magic">     ░▒ </span><span class="g-blue">▐████▌</span><span class="eye-stack"><span class="eye-frame">◉</span><span class="eye-pupil">•</span></span><span class="g-magic"> </span><span class="g-beak">◥▖</span><span class="g-magic">·▒░</span></span><span class="line"><span class="g-magic">       ░▒ </span><span class="g-blue">▝▀███▀</span><span class="g-magic">  ›_</span></span></pre>
+      </div>
+      <div class="note-box">
+        <h4>Next Step</h4>
+        <p>If this looks right, I will treat Ravenclaw as locked and move to the serpent redesign only.</p>
+      </div>
+    </div>
+  </div>
+</div>

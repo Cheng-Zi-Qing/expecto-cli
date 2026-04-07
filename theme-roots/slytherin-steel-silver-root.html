@@ -1,0 +1,226 @@
+<style>
+  .hero {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 980px;
+  }
+
+  .signal {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(221, 236, 223, 0.88);
+    border: 1px solid rgba(73, 114, 82, 0.16);
+    color: #356645;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .split.preview-grid {
+    display: grid;
+    grid-template-columns: 1.04fr 0.96fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel {
+    border-radius: 24px;
+    border: 1px solid rgba(95, 82, 60, 0.12);
+    background: #fcfaf5;
+    box-shadow: 0 18px 42px rgba(58, 43, 22, 0.08);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid rgba(95, 82, 60, 0.08);
+    display: grid;
+    gap: 8px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7b6f61;
+  }
+
+  .panel-head h3 {
+    margin: 0;
+    font-size: 24px;
+    color: #263427;
+  }
+
+  .panel-head p {
+    margin: 0;
+    color: #5a4e40;
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  .panel-body {
+    padding: 18px;
+    display: grid;
+    gap: 16px;
+  }
+
+  .frame {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(92, 77, 55, 0.14);
+    background: #f6f1e7;
+  }
+
+  .frame-head {
+    padding: 10px 14px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(39, 31, 23, 0.92);
+    background: linear-gradient(180deg, #d8dfda, #98ae9e);
+  }
+
+  .frame-body {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .welcome {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(92, 77, 55, 0.11);
+  }
+
+  .welcome h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #241d15;
+  }
+
+  .welcome p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #5a4f43;
+  }
+
+  .glyph {
+    margin: 14px 0 0;
+    font: 700 16px/1.18 "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+    white-space: pre;
+    letter-spacing: 0;
+  }
+
+  .zoom .glyph {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .g-bg { color: #8a908d; }
+  .g-deep { color: #165517; }
+  .g-main { color: #2f7a38; }
+  .g-silver { color: #98a3ae; }
+  .g-white { color: #ffffff; }
+
+  .note-box {
+    border-radius: 16px;
+    background: rgba(249, 245, 237, 0.97);
+    border: 1px solid rgba(100, 86, 66, 0.1);
+    padding: 12px 14px;
+  }
+
+  .note-box h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #66594b;
+  }
+
+  .note-box p {
+    margin: 0;
+    color: #594d40;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 1040px) {
+    .split.preview-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .zoom .glyph {
+      font-size: 18px;
+    }
+  }
+</style>
+
+<div class="hero">
+  <div class="signal">Slytherin Locked Draft</div>
+  <h2>Compact Serpent A With Emerald Body And White Fangs</h2>
+  <p class="subtitle">
+    This stores the replacement Slytherin direction selected after the hierarchy review.
+    It keeps the compact five-line serpent, uses deep green plus emerald for the body, silver for the facial structure, and white for the fangs.
+  </p>
+</div>
+
+<div class="split preview-grid">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Welcome Preview</div>
+      <h3>Slytherin In Context</h3>
+      <p>This is the archived welcome composition for the current Slytherin mascot direction.</p>
+    </div>
+    <div class="panel-body">
+      <div class="frame">
+        <div class="frame-head">Slytherin Preview</div>
+        <div class="frame-body">
+          <div class="welcome">
+            <h4>Welcome back!</h4>
+            <p>Slytherin Serpent is standing by</p>
+            <pre class="glyph"><span class="g-bg">       ░ · ░  · ░
+     ░▒ </span><span class="g-deep">▗▄▓</span><span class="g-main">████</span><span class="g-deep">▓▄▖</span><span class="g-bg"> ~▒░
+      ░ </span><span class="g-deep">▐▓</span><span class="g-main">█</span><span class="g-silver">▚▀▀▞</span><span class="g-main">█</span><span class="g-deep">▓▌</span><span class="g-bg"> ░
+     ░▒ </span><span class="g-deep">▐▓▌</span><span class="g-main">◥██◤</span><span class="g-deep">▐▓▌</span><span class="g-bg"> ·▒░
+       ░▒ </span><span class="g-deep">▝▀▓</span><span class="g-white">▼▼</span><span class="g-deep">▓▀▘</span><span class="g-bg">  ›_</span></pre>
+          </div>
+        </div>
+      </div>
+      <div class="note-box">
+        <h4>Locked Parts</h4>
+        <p>The selected A treatment keeps the house green fully saturated while reserving silver for the facial structure and pure white for the fangs.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel zoom">
+    <div class="panel-head">
+      <div class="eyebrow">Mascot Focus</div>
+      <h3>Shape Reference</h3>
+      <p>Use this zoomed view as the stable reference for the current Slytherin mascot path.</p>
+    </div>
+    <div class="panel-body">
+      <pre class="glyph"><span class="g-bg">      ░ · ░  · ░
+    ░▒ </span><span class="g-deep">▗▄▓</span><span class="g-main">████</span><span class="g-deep">▓▄▖</span><span class="g-bg"> ~▒░
+     ░ </span><span class="g-deep">▐▓</span><span class="g-main">█</span><span class="g-silver">▚▀▀▞</span><span class="g-main">█</span><span class="g-deep">▓▌</span><span class="g-bg"> ░
+    ░▒ </span><span class="g-deep">▐▓▌</span><span class="g-main">◥██◤</span><span class="g-deep">▐▓▌</span><span class="g-bg"> ·▒░
+      ░▒ </span><span class="g-deep">▝▀▓</span><span class="g-white">▼▼</span><span class="g-deep">▓▀▘</span><span class="g-bg">  ›_</span></pre>
+      <div class="note-box">
+        <h4>Archive Intent</h4>
+        <p>This file now records the approved replacement for the previous long-form serpent scheme and serves as the retained root reference in <code>theme-roots/</code>.</p>
+      </div>
+    </div>
+  </div>
+</div>

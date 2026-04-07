@@ -27,6 +27,11 @@ const baselineDocuments = {
   },
 };
 
+export type WorkspaceInitResult = {
+  created: string[];
+  existing: string[];
+};
+
 export class ArtifactWorkspace {
   readonly projectRoot: string;
   private readonly store: ArtifactStore;
@@ -36,25 +41,40 @@ export class ArtifactWorkspace {
     this.store = new ArtifactStore(this.projectRoot);
   }
 
-  async ensureInitialized(): Promise<void> {
+  async ensureInitialized(): Promise<WorkspaceInitResult> {
     await Promise.all([
       mkdir(join(this.projectRoot, docsRoot, "tasks"), { recursive: true }),
       mkdir(join(this.projectRoot, docsRoot, "summaries"), { recursive: true }),
     ]);
 
-    await this.ensureDocument("requirements", baselineDocuments.requirements.content);
-    await this.ensureDocument("plan", baselineDocuments.plan.content);
-    await this.ensureDocument("finding", baselineDocuments.finding.content);
+    const results = await Promise.all([
+      this.ensureDocument("requirements", baselineDocuments.requirements.content),
+      this.ensureDocument("plan", baselineDocuments.plan.content),
+      this.ensureDocument("finding", baselineDocuments.finding.content),
+    ]);
+
+    const created: string[] = [];
+    const existing: string[] = [];
+
+    for (const result of results) {
+      if (result.created) {
+        created.push(result.path);
+      } else {
+        existing.push(result.path);
+      }
+    }
+
+    return { created, existing };
   }
 
-  async ensureDocument(
+  private async ensureDocument(
     kind: keyof typeof baselineDocuments,
     fallbackContent: string,
-  ): Promise<void> {
+  ): Promise<{ path: string; created: boolean }> {
     const document = baselineDocuments[kind];
     try {
       await readFile(join(this.projectRoot, document.path), "utf8");
-      return;
+      return { path: document.path, created: false };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
@@ -67,5 +87,7 @@ export class ArtifactWorkspace {
       title: document.title,
       content: fallbackContent,
     });
+
+    return { path: document.path, created: true };
   }
 }

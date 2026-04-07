@@ -5,6 +5,8 @@ export type CommandId =
   | "session.theme"
   | "session.exit"
   | "project.branch"
+  | "workspace.init"
+  | "workspace.write_artifact"
   | "debug.inspect";
 
 export type CommandCategory = "session" | "project" | "debug";
@@ -34,7 +36,9 @@ export type BuiltinCommandId =
   | "theme"
   | "exit"
   | "branch"
-  | "inspect";
+  | "inspect"
+  | "init"
+  | "write_artifact";
 
 export type BuiltinCommand = {
   id: BuiltinCommandId;
