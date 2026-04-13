@@ -1,4 +1,4 @@
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { execa } from "execa";
@@ -21,6 +21,11 @@ import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
 import { createTuiEventBridge } from "./tui-event-bridge.ts";
 import { QueuedInteractiveInput } from "./queued-interactive-input.ts";
 import type { ContextMetrics, TuiAction, TuiState } from "./tui-types.ts";
+import { createProtocolEmitter } from "../protocol/protocol-emitter.ts";
+import { createProtocolTransport, writeEventToTransport } from "../protocol/protocol-transport.ts";
+import { createAuditWriter } from "../protocol/audit-writer.ts";
+import { currentAppPath } from "../core/brand.ts";
+import type { CommandExecutionEffect } from "../commands/command-executor.ts";
 
 export type RunInteractiveTuiOptions = {
   createApp: CreateInteractiveTuiApp;
@@ -315,6 +320,35 @@ export async function runInteractiveTui(
 
   await app.start();
 
+  const transport = createProtocolTransport();
+  const auditWriter = createAuditWriter(join(context.projectRoot, currentAppPath("state")));
+  const emitter = createProtocolEmitter({
+    onEvent: (event) => {
+      writeEventToTransport(transport, event);
+      void auditWriter.write(event);
+
+      // Transitional bridge: dispatch domain events to the TUI event bridge
+      // so the UI stays functional. Task 12 will migrate to ProtocolConsumer.
+      const interactionEvent = {
+        eventType: event.eventType,
+        timestamp: event.timestamp,
+        payload: event.payload,
+        ...(event.causation ? { requestId: event.causation.requestId, turnId: "" } : {}),
+      };
+      bridge.onInteractionEvent(interactionEvent as Parameters<typeof bridge.onInteractionEvent>[0]);
+    },
+  });
+
+  const handleLocalEffect = (effect: CommandExecutionEffect): void => {
+    if (effect.type === "open_theme_picker") {
+      applyAction({ type: "open_theme_picker", reason: "command" });
+    }
+    if (effect.type === "exit_session") {
+      interruptController.interruptCurrentTurn();
+      queuedInput.close();
+    }
+  };
+
   const manager = new SessionManager({
     write: options.write ?? noopWrite,
     readLine: () => queuedInput.readLine(),
@@ -322,8 +356,8 @@ export async function runInteractiveTui(
     ...(options.assistantStep ? { assistantStep: options.assistantStep } : {}),
     ...(options.providerRunner ? { providerRunner: options.providerRunner } : {}),
     interruptController,
-    onSystemLine: bridge.onSystemLine,
-    onInteractionEvent: bridge.onInteractionEvent,
+    emitFact: emitter.emit,
+    onLocalEffect: handleLocalEffect,
   });
 
   try {
