@@ -4,10 +4,11 @@ import type { ProviderRunner } from "../providers/provider-runner.ts";
 import type {
   AssistantStepInput,
   AssistantStepResult,
-  RuntimeSessionHooks,
   RuntimeSessionResult,
 } from "./runtime-session.ts";
 import type { SessionInterruptController } from "./session-interrupt.ts";
+import type { DomainFact } from "../protocol/domain-event-schema.ts";
+import type { CommandExecutionEffect } from "../commands/command-executor.ts";
 import { createRuntimeSession } from "./session-factory.ts";
 
 export type SessionManagerOptions = {
@@ -18,8 +19,8 @@ export type SessionManagerOptions = {
   providerRunner?: ProviderRunner;
   interruptController?: SessionInterruptController;
   maxTurnLimit?: number;
-  onSystemLine?: RuntimeSessionHooks["onSystemLine"];
-  onInteractionEvent?: RuntimeSessionHooks["onInteractionEvent"];
+  emitFact?: (fact: DomainFact) => void;
+  onLocalEffect?: (effect: CommandExecutionEffect) => void;
 };
 
 function defaultWrite(chunk: string): void {
@@ -34,7 +35,8 @@ export class SessionManager {
   private readonly providerRunner: ProviderRunner | undefined;
   private readonly interruptController: SessionInterruptController | undefined;
   private readonly maxTurnLimit: number | undefined;
-  private readonly hooks: RuntimeSessionHooks;
+  private readonly emitFact: ((fact: DomainFact) => void) | undefined;
+  private readonly onLocalEffect: ((effect: CommandExecutionEffect) => void) | undefined;
 
   constructor(options: SessionManagerOptions = {}) {
     this.write = options.write ?? defaultWrite;
@@ -44,10 +46,8 @@ export class SessionManager {
     this.providerRunner = options.providerRunner;
     this.interruptController = options.interruptController;
     this.maxTurnLimit = options.maxTurnLimit;
-    this.hooks = {
-      ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
-    };
+    this.emitFact = options.emitFact;
+    this.onLocalEffect = options.onLocalEffect;
   }
 
   async run(context: BootstrapContext): Promise<RuntimeSessionResult> {
@@ -59,7 +59,8 @@ export class SessionManager {
       ...(assistantStep ? { assistantStep } : {}),
       ...(this.interruptController ? { interruptController: this.interruptController } : {}),
       ...(this.maxTurnLimit !== undefined ? { maxTurnLimit: this.maxTurnLimit } : {}),
-      ...this.hooks,
+      ...(this.emitFact ? { emitFact: this.emitFact } : {}),
+      ...(this.onLocalEffect ? { onLocalEffect: this.onLocalEffect } : {}),
     });
 
     return session.run();
