@@ -325,7 +325,7 @@ export class RuntimeSession {
     try {
       switch (this.context.entry.kind) {
         case "interactive":
-          this.renderEntryDetails();
+
 
           if (this.context.entry.initialPrompt) {
             const initialPrompt = normalizeInteractiveCommandInput(
@@ -347,14 +347,14 @@ export class RuntimeSession {
           }
           break;
         case "print":
-          this.renderEntryDetails();
+
           await this.processInput(this.context.entry.prompt);
           break;
         case "continue":
-          this.renderEntryDetails();
+
           break;
         case "resume": {
-          this.renderEntryDetails();
+
           const resumeTarget = this.context.resumeTarget;
           if (!resumeTarget) {
             throw new Error("No snapshot found. Nothing to resume.");
@@ -407,17 +407,6 @@ export class RuntimeSession {
     };
   }
 
-  private renderEntryDetails(): void {
-    this.emitFact({
-      eventType: "session.entry_rendered",
-      sessionId: this.sessionId,
-      timestamp: nowIsoString(),
-      payload: {
-        mode: this.context.mode,
-        entryKind: this.context.entry.kind,
-      },
-    });
-  }
 
   private createSnapshotId(): string {
     return `snapshot-${this.sessionId}-${Date.now()}`;
