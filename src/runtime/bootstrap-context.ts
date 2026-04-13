@@ -27,6 +27,7 @@ export type BootstrapContext = {
   entry: CliCommand;
   instructions: LoadedTextDocument[];
   instructionStack?: ResolvedInstructionLayer[];
+  degradedArtifactIds: string[];
   memory: LoadedTextDocument[];
   activeArtifacts: ActiveArtifactSet;
   loadedArtifacts: LoadedArtifactSet;
@@ -82,15 +83,6 @@ export async function buildBootstrapContext(
       ).filter((doc): doc is ArtifactDocument => doc !== null)
     : requiredArtifacts;
 
-  const resolvedInstructionStack = resumeTarget
-    ? resolveInstructionSet({
-        mode: "balanced",
-        instructions,
-        requiredArtifacts: resolvedRequiredArtifacts,
-        optionalArtifacts: resolvedActiveArtifacts.optional,
-      })
-    : instructionStack;
-
   const resolvedOptionalArtifacts = resumeTarget
     ? (
         await Promise.all(
@@ -101,26 +93,49 @@ export async function buildBootstrapContext(
       ).filter((doc): doc is ArtifactDocument => doc !== null)
     : [];
 
+  const sessionSummary = renderSessionSummary({
+    mode: "balanced",
+    instructions,
+    memory,
+    requiredArtifacts: resolvedRequiredArtifacts,
+    optionalArtifactRefs: resolvedActiveArtifacts.optional,
+    optionalArtifacts: resolvedOptionalArtifacts,
+  });
+
+  const stateLayerContent = resumeTarget
+    ? resumeTarget.summary
+    : sessionSummary;
+
+  const resolvedInstructionStack = resumeTarget
+    ? resolveInstructionSet({
+        mode: "balanced",
+        instructions,
+        requiredArtifacts: resolvedRequiredArtifacts,
+        optionalArtifacts: resolvedActiveArtifacts.optional,
+        sessionSummary: stateLayerContent,
+      })
+    : resolveInstructionSet({
+        mode: "balanced",
+        instructions,
+        requiredArtifacts,
+        optionalArtifacts: activeArtifacts.optional,
+        sessionSummary: stateLayerContent,
+      });
+
   return {
     projectRoot,
     mode: "balanced",
     entry: input.command,
     instructions,
     instructionStack: resolvedInstructionStack.promptLayers,
+    degradedArtifactIds: resolvedInstructionStack.degradedArtifactIds,
     memory,
     activeArtifacts: resolvedActiveArtifacts,
     loadedArtifacts: {
       required: resolvedRequiredArtifacts,
       optional: resolvedOptionalArtifacts,
     },
-    sessionSummary: renderSessionSummary({
-      mode: "balanced",
-      instructions,
-      memory,
-      requiredArtifacts: resolvedRequiredArtifacts,
-      optionalArtifactRefs: resolvedActiveArtifacts.optional,
-      optionalArtifacts: resolvedOptionalArtifacts,
-    }),
+    sessionSummary,
     ...(resumeTarget ? { resumeTarget } : {}),
   };
 }

@@ -410,7 +410,9 @@ export class RuntimeSession {
           if (!resumeTarget) {
             throw new Error("No snapshot found. Nothing to resume.");
           }
-          await this.processPrompt(resumeTarget.summary);
+          if (this.readLine) {
+            await this.runInteractiveLoop();
+          }
           break;
         }
       }

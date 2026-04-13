@@ -7,7 +7,8 @@ export type ResolvedInstructionLayerKind =
   | "identity"
   | "mode"
   | "project_instruction"
-  | "artifact_summary";
+  | "artifact_summary"
+  | "session_state";
 
 export type ResolvedInstructionLayer = {
   id: string;
@@ -22,11 +23,14 @@ export type ResolveInstructionSetInput = {
   instructions: LoadedTextDocument[];
   requiredArtifacts: ArtifactDocument[];
   optionalArtifacts: ArtifactRef[];
+  sessionSummary?: string;
+  artifactBudgetLines?: number;
 };
 
 export type ResolvedInstructionSet = {
   promptLayers: ResolvedInstructionLayer[];
   optionalArtifactRefs: ArtifactRef[];
+  degradedArtifactIds: string[];
 };
 
 function summarizeArtifact(document: ArtifactDocument): string {
@@ -52,9 +56,48 @@ function summarizeArtifact(document: ArtifactDocument): string {
   return parts.join("\n");
 }
 
+function countLines(content: string): number {
+  return content.split("\n").length;
+}
+
+function makeArtifactRef(artifact: ArtifactDocument): string {
+  return `[ref] ${artifact.title} (path: ${artifact.path})`;
+}
+
 export function resolveInstructionSet(
   input: ResolveInstructionSetInput,
 ): ResolvedInstructionSet {
+  const budget = input.artifactBudgetLines;
+  let usedLines = 0;
+  const degradedArtifactIds: string[] = [];
+
+  const artifactLayers: ResolvedInstructionLayer[] = input.requiredArtifacts.map((artifact) => {
+    const summary = summarizeArtifact(artifact);
+    const summaryLines = countLines(summary);
+
+    if (budget !== undefined && usedLines + summaryLines > budget) {
+      degradedArtifactIds.push(artifact.id);
+      const refContent = makeArtifactRef(artifact);
+      usedLines += countLines(refContent);
+      return {
+        id: `artifact:${artifact.id}`,
+        kind: "artifact_summary" as const,
+        title: artifact.title,
+        path: artifact.path,
+        content: refContent,
+      };
+    }
+
+    usedLines += summaryLines;
+    return {
+      id: `artifact:${artifact.id}`,
+      kind: "artifact_summary" as const,
+      title: artifact.title,
+      path: artifact.path,
+      content: summary,
+    };
+  });
+
   const promptLayers: ResolvedInstructionLayer[] = [
     {
       id: "runtime:identity",
@@ -75,17 +118,20 @@ export function resolveInstructionSet(
       path: document.path,
       content: document.content,
     })),
-    ...input.requiredArtifacts.map((artifact) => ({
-      id: `artifact:${artifact.id}`,
-      kind: "artifact_summary" as const,
-      title: artifact.title,
-      path: artifact.path,
-      content: summarizeArtifact(artifact),
-    })),
+    ...artifactLayers,
+    ...(input.sessionSummary
+      ? [{
+          id: "runtime:session_state",
+          kind: "session_state" as const,
+          title: "session-summary",
+          content: input.sessionSummary,
+        }]
+      : []),
   ];
 
   return {
     promptLayers,
     optionalArtifactRefs: input.optionalArtifacts,
+    degradedArtifactIds,
   };
 }

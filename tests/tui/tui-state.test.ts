@@ -316,11 +316,12 @@ test("reduceTuiState derives slash suggestions from visible implemented commands
       "session.theme",
       "session.exit",
       "project.branch",
+      "debug.stack",
     ],
   );
   assert.deepEqual(
     withSlashDraft.commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/stack"],
   );
 });
 
@@ -347,7 +348,7 @@ test("reduceTuiState keeps prefix-only slash filtering and hides the menu once w
   assert.equal(withStatusPrefix.commandMenu.visible, true);
   assert.deepEqual(
     withStatusPrefix.commandMenu.items.map((item) => item.name),
-    ["/status"],
+    ["/status", "/stack"],
   );
   assert.doesNotMatch(
     withStatusPrefix.commandMenu.items.map((item) => item.name).join(" "),

@@ -107,6 +107,7 @@ test("provider runner converts assistant-step input into a routed completion req
         required: [],
         optional: [],
       },
+      degradedArtifactIds: [],
       sessionSummary: "required docs: none",
     },
   });
@@ -174,6 +175,7 @@ test("provider runner uses message history when assistant-step input has no prom
         required: [],
         optional: [],
       },
+      degradedArtifactIds: [],
       sessionSummary: "required docs: none",
     },
   });
@@ -262,6 +264,7 @@ test("provider runner injects instruction stack as system messages before conver
         required: [],
         optional: [],
       },
+      degradedArtifactIds: [],
       sessionSummary: "required docs: none",
     },
   });

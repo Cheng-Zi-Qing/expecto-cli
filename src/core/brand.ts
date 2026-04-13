@@ -5,8 +5,9 @@ export const CURRENT_APP_DIR = ".expecto-cli";
 export const RUNTIME_IDENTITY_TITLE = "expecto-cli-identity";
 export const RUNTIME_IDENTITY_CONTENT =
   `You are ${PRODUCT_DISPLAY_NAME}, a CLI-first coding assistant with a Markdown-driven workspace.`;
-export const DEFAULT_ASSISTANT_IDENTITY =
-  `You are ${PRODUCT_DISPLAY_NAME}, a CLI-first coding assistant. Follow the user request directly.`;
+
+/** @deprecated Use RUNTIME_IDENTITY_CONTENT via the instruction stack instead. */
+export const DEFAULT_ASSISTANT_IDENTITY = RUNTIME_IDENTITY_CONTENT;
 
 function joinAppPath(appDir: string, segments: readonly string[]): string {
   return [appDir, ...segments].join("/");

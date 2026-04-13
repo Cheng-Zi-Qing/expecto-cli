@@ -117,6 +117,31 @@ export async function executeBuiltinCommand(
         handled: false,
         effects: [],
       };
+    case "debug.stack":
+      {
+        const stack = context.instructionStack ?? [];
+        const degraded = new Set(context.degradedArtifactIds);
+
+        if (stack.length === 0) {
+          return {
+            handled: true,
+            effects: [{ type: "system_message", line: "instruction stack is empty" }],
+          };
+        }
+
+        const effects: CommandExecutionEffect[] = stack.map((layer) => {
+          const lineCount = layer.content.split("\n").length;
+          const pathSuffix = layer.path ? ` — ${layer.path}` : "";
+          const artifactId = layer.id.startsWith("artifact:") ? layer.id.slice("artifact:".length) : undefined;
+          const degradedSuffix = artifactId && degraded.has(artifactId) ? "  [degraded]" : "";
+          return {
+            type: "system_message" as const,
+            line: `[${layer.kind}]  ${layer.title}${pathSuffix}  (${lineCount} lines)${degradedSuffix}`,
+          };
+        });
+
+        return { handled: true, effects };
+      }
     case "session.theme":
       return {
         handled: true,

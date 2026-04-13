@@ -184,6 +184,32 @@ test("buildBootstrapContext loads resumeTarget when kind is resume and snapshot 
   assert.match(context.resumeTarget.summary, /compacted summary: auth work in progress/);
 });
 
+test("buildBootstrapContext uses resumeTarget.summary as session_state layer content in resume mode", async () => {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { buildBootstrapContext } = await import("../../src/runtime/bootstrap-context.ts");
+  const { currentAppPath } = await import("../../src/core/brand.ts");
+
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-resume-state-"));
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "01-plan.md")), "# Plan\n");
+
+  const store = new SessionSnapshotStore(projectRoot);
+  await store.save(makeSnapshot({ sessionId: "session-state-test", compactedSummary: "auth checkpoint" }));
+
+  const context = await buildBootstrapContext({
+    command: { kind: "resume" },
+    cwd: projectRoot,
+  });
+
+  const stateLayer = context.instructionStack?.find((layer) => layer.kind === "session_state");
+  assert.ok(stateLayer, "session_state layer should exist");
+  assert.match(stateLayer.content, /session: session-state-test/, "state layer should contain resume target summary");
+  assert.match(stateLayer.content, /compacted summary: auth checkpoint/);
+});
+
 test("buildBootstrapContext sets resumeTarget to undefined when no snapshot exists", async () => {
   const { mkdtemp, mkdir } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");

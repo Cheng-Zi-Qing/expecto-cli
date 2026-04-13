@@ -61,6 +61,14 @@ const commandRegistry: CommandDescriptor[] = [
     description: "Open the saved execution log for a completed tool run.",
     availability: "hidden",
   },
+  {
+    id: "debug.stack",
+    category: "debug",
+    name: "/stack",
+    aliases: [],
+    description: "Show the current instruction stack layers.",
+    availability: "implemented",
+  },
 ];
 
 const orderedCategories: CommandCategory[] = ["session", "project", "debug"];

@@ -1158,7 +1158,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/stack"],
   );
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.id),
@@ -1169,6 +1169,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
       "session.theme",
       "session.exit",
       "project.branch",
+      "debug.stack",
     ],
   );
 
@@ -1177,7 +1178,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/status"],
+    ["/status", "/stack"],
   );
 
   app?.setDraft("/status details");
@@ -1240,11 +1241,11 @@ test("runInteractiveTui submits the exact typed slash draft locally even when a 
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/status"],
+    ["/status", "/stack"],
   );
 
   app?.moveSelectionDown();
-  assert.equal(app?.latestState().commandMenu.selectedIndex, 0);
+  assert.equal(app?.latestState().commandMenu.selectedIndex, 1);
 
   app?.submit("/sta");
 

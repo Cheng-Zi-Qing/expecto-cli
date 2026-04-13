@@ -48,7 +48,7 @@ export async function runNativeSession(
   });
 
   let interactiveInput: InteractiveInput | undefined;
-  if (route.kind === "native_repl") {
+  if (route.kind === "native_repl" || route.kind === "resume") {
     const factory = createInteractiveInput ?? createTerminalInteractiveInput;
     interactiveInput = factory();
   }
@@ -68,7 +68,7 @@ export async function runNativeSession(
 
   const terminalError = presenter.consumeTerminalError();
 
-  if (terminalError && route.kind !== "native_repl") {
+  if (terminalError && route.kind !== "native_repl" && route.kind !== "resume") {
     throw terminalError;
   }
 }

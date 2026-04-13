@@ -61,7 +61,7 @@ test("buildBootstrapContext loads project instructions, memory index, and active
   assert.deepEqual(context.activeArtifacts.optional.map((artifact) => artifact.kind), ["summary"]);
   assert.deepEqual(
     context.instructionStack?.map((layer) => layer.kind),
-    ["identity", "mode", "project_instruction", "artifact_summary", "artifact_summary", "artifact_summary"],
+    ["identity", "mode", "project_instruction", "artifact_summary", "artifact_summary", "artifact_summary", "session_state"],
   );
   assert.equal(context.instructionStack?.[0]?.title, "expecto-cli-identity");
   assert.equal(context.instructionStack?.[1]?.title, "mode-balanced");
@@ -91,7 +91,7 @@ test("buildBootstrapContext tolerates missing optional instruction and memory fi
   assert.deepEqual(context.loadedArtifacts.optional, []);
   assert.deepEqual(
     context.instructionStack?.map((layer) => layer.kind),
-    ["identity", "mode", "artifact_summary", "artifact_summary"],
+    ["identity", "mode", "artifact_summary", "artifact_summary", "session_state"],
   );
   assert.match(context.sessionSummary ?? "", /mode: balanced/);
 });

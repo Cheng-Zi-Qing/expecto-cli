@@ -23,6 +23,7 @@ function makeContext(entry: BootstrapContext["entry"]): BootstrapContext {
       required: [],
       optional: [],
     },
+    degradedArtifactIds: [],
     sessionSummary: "",
   };
 }
@@ -81,6 +82,58 @@ test("runNativeSession enters line-based REPL only for native_repl routes", asyn
   assert.equal(interactiveCalls.length, 1);
   assert.equal(typeof observedOptions?.readLine, "function");
   assert.equal(typeof observedOptions?.closeInput, "function");
+});
+
+test("runNativeSession creates interactive input for resume routes", async () => {
+  const interactiveCalls: string[] = [];
+  let observedOptions: SessionManagerOptions | undefined;
+
+  const createSessionManager = (options: SessionManagerOptions) => {
+    observedOptions = options;
+    return {
+      run: async () => ({
+        sessionId: "session-resume",
+        state: "ready",
+        turnCount: 0,
+      }),
+    };
+  };
+
+  const createInteractiveInput = () => {
+    interactiveCalls.push("called");
+    return {
+      readLine: async () => null,
+      close: () => {},
+    };
+  };
+
+  const resumeRoute: CliRoute = {
+    kind: "resume",
+    bootstrapCommand: { kind: "resume" },
+    warnings: [],
+  };
+  await runNativeSession({
+    context: {
+      ...makeContext({ kind: "resume" }),
+      resumeTarget: {
+        snapshot: {
+          id: "snapshot-1",
+          sessionId: "session-resume",
+          state: "executing",
+          activeArtifacts: { required: [], optional: [], onDemand: [] },
+          updatedAt: "2026-04-13T00:00:00.000Z",
+        },
+        summary: "session: session-resume",
+      },
+    },
+    route: resumeRoute,
+    createSessionManager,
+    createInteractiveInput,
+  });
+
+  assert.equal(interactiveCalls.length, 1, "interactive input should be created for resume route");
+  assert.equal(typeof observedOptions?.readLine, "function", "readLine should be passed to session manager");
+  assert.equal(typeof observedOptions?.closeInput, "function", "closeInput should be passed to session manager");
 });
 
 test("runNativeSession surfaces presenter output from system and interaction events", async () => {

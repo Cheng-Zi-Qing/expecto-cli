@@ -29,6 +29,7 @@ function createContext(
       required: [],
       optional: [],
     },
+    degradedArtifactIds: [],
     sessionSummary,
   };
 }
@@ -66,6 +67,12 @@ test("executeBuiltinCommand renders grouped help from visible registry sections"
     {
       type: "system_message",
       line: "/branch    Show the current git branch for the project root.",
+    },
+    { type: "system_message", line: "" },
+    { type: "system_message", line: "Debug" },
+    {
+      type: "system_message",
+      line: "/stack    Show the current instruction stack layers.",
     },
   ]);
   assert.ok(
