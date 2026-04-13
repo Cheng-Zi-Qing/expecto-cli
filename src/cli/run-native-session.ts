@@ -65,6 +65,7 @@ export async function runNativeSession(
     onEvent: (event) => {
       writeEventToTransport(transport, event);
       void auditWriter.write(event);
+      presenter.onDomainEvent(event);
     },
   });
 

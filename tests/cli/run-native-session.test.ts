@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import type { CliRoute } from "../../src/cli/route-resolution.ts";
 import type { BootstrapContext } from "../../src/runtime/bootstrap-context.ts";
-import type { InteractionEvent } from "../../src/contracts/interaction-event-schema.ts";
 import type { SessionManagerOptions } from "../../src/runtime/session-manager.ts";
 import { runNativeSession } from "../../src/cli/run-native-session.ts";
 
@@ -136,40 +135,37 @@ test("runNativeSession creates interactive input for resume routes", async () =>
   assert.equal(typeof observedOptions?.closeInput, "function", "closeInput should be passed to session manager");
 });
 
-test("runNativeSession surfaces presenter output from system and interaction events", async () => {
+test("runNativeSession surfaces presenter output from domain events emitted via emitFact", async () => {
   let stdout = "";
   let stderr = "";
 
   const createSessionManager = (options: SessionManagerOptions) => ({
     run: async () => {
-      const baseEvent = {
-        timestamp: "2024-01-01T00:00:00.000Z",
-        sessionId: "session-2",
-        turnId: "turn-1",
-        requestId: "request-1",
-      } as const;
+      const now = "2024-01-01T00:00:00.000Z";
 
-      options.write?.("legacy direct write");
-      options.onSystemLine?.("system line");
-      options.onInteractionEvent?.({
-        ...baseEvent,
-        eventType: "assistant_stream_chunk",
+      options.emitFact?.({
+        eventType: "assistant.stream_chunk",
+        sessionId: "session-2",
+        timestamp: now,
+        causation: { requestId: "request-1" },
         payload: {
           responseId: "response-1",
           channel: "output_text",
           format: "markdown",
           delta: "hello",
         },
-      } satisfies InteractionEvent);
-      options.onInteractionEvent?.({
-        ...baseEvent,
-        eventType: "execution_item_chunk",
+      });
+      options.emitFact?.({
+        eventType: "execution.chunk",
+        sessionId: "session-2",
+        timestamp: now,
+        causation: { requestId: "request-1" },
         payload: {
           executionId: "exec-1",
           stream: "stderr",
           output: "oops",
         },
-      } satisfies InteractionEvent);
+      });
 
       return {
         sessionId: "session-2",
@@ -197,26 +193,25 @@ test("runNativeSession surfaces presenter output from system and interaction eve
     },
   });
 
-  assert.equal(stdout, "system line\nhello");
+  assert.equal(stdout, "hello");
   assert.equal(stderr, "oops");
 });
 
-test("runNativeSession rejects stream routes when the request completes with an error", async () => {
+test("runNativeSession rejects stream routes when the request fails", async () => {
   let stderr = "";
 
   const createSessionManager = (options: SessionManagerOptions) => ({
     run: async () => {
-      options.onInteractionEvent?.({
-        timestamp: "2024-01-01T00:00:00.000Z",
+      options.emitFact?.({
+        eventType: "request.failed",
         sessionId: "session-3",
-        turnId: "turn-1",
-        requestId: "request-1",
-        eventType: "request_completed",
+        timestamp: "2024-01-01T00:00:00.000Z",
+        causation: { requestId: "request-1" },
         payload: {
-          status: "error",
-          errorCode: "AGENT_LOOP_LIMIT_EXCEEDED",
+          code: "AGENT_LOOP_LIMIT_EXCEEDED",
+          message: "Agent loop limit exceeded",
         },
-      } satisfies InteractionEvent);
+      });
 
       return {
         sessionId: "session-3",

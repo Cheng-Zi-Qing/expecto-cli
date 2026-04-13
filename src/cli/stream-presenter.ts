@@ -7,7 +7,7 @@ import {
 
 export type StreamPresenter = Pick<
   ConsolePresenter,
-  "onSystemLine" | "onInteractionEvent" | "consumeTerminalError"
+  "onDomainEvent" | "consumeTerminalError"
 >;
 
 export type StreamPresenterOptions = {
