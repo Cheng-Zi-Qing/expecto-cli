@@ -9,6 +9,7 @@ import type { SessionInterruptController } from "./session-interrupt.ts";
 import { SessionSnapshotStore } from "./session-snapshot-store.ts";
 import type { CommandExecutionEffect } from "../commands/command-executor.ts";
 import { executeBuiltinCommand } from "../commands/command-executor.ts";
+import type { ThemeSpellLabels } from "../tui/theme/theme-types.ts";
 import type {
   AssistantUsageStats,
   ExecutionKind,
@@ -84,6 +85,7 @@ export type RuntimeSessionOptions = {
   maxTurnLimit?: number;
   emitFact?: (fact: DomainFact) => void;
   onLocalEffect?: (effect: CommandExecutionEffect) => void;
+  resolveSpellLabels?: () => ThemeSpellLabels;
 };
 
 const DEFAULT_MAX_TURN_LIMIT = 15;
@@ -242,6 +244,7 @@ export class RuntimeSession {
   private readonly maxTurnLimit: number;
   private readonly emitFact: (fact: DomainFact) => void;
   private readonly onLocalEffect: ((effect: CommandExecutionEffect) => void) | undefined;
+  private readonly resolveSpellLabels: (() => ThemeSpellLabels) | undefined;
   private readonly conversation: ProviderMessage[] = [];
   private activeTurnAbortController: AbortController | undefined;
   private builtInCommandRequestCount = 0;
@@ -260,6 +263,7 @@ export class RuntimeSession {
     this.maxTurnLimit = normalizeMaxTurnLimit(options.maxTurnLimit);
     this.emitFact = options.emitFact ?? (() => {});
     this.onLocalEffect = options.onLocalEffect;
+    this.resolveSpellLabels = options.resolveSpellLabels;
   }
 
   private buildSnapshotSummary(): SessionSnapshotSummary | undefined {
@@ -637,7 +641,7 @@ export class RuntimeSession {
   }
 
   private async processInput(input: string): Promise<boolean> {
-    const commandResult = await executeBuiltinCommand(input, this.context);
+    const commandResult = await executeBuiltinCommand(input, this.context, this.resolveSpellLabels?.());
 
     if (commandResult.handled) {
       return this.applyCommandEffects(

@@ -1,4 +1,5 @@
 import type { ThemeDefinition } from "../theme-types.ts";
+import { HOUSE_SPELL_LABELS } from "../spell-labels.ts";
 
 export const ravenclawTheme: ThemeDefinition = {
   id: "ravenclaw",
@@ -78,7 +79,7 @@ export const ravenclawTheme: ThemeDefinition = {
   },
   sample: {
     tipTitle: "Tips",
-    tipText: "Run /help to inspect available commands.",
+    tipText: "Cast /help (Lumos) to see your spellbook.",
     highlightTitle: "Highlights",
     highlightTokens: [
       { kind: "command", text: "/theme" },
@@ -91,4 +92,5 @@ export const ravenclawTheme: ThemeDefinition = {
     user: "Eagle Prompt",
     assistant: "Eagle Reply",
   },
+  spells: HOUSE_SPELL_LABELS,
 };

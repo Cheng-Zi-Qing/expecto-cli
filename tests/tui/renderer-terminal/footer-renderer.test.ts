@@ -7,6 +7,10 @@ import { getThemeDefinition } from "../../../src/tui/theme/theme-registry.ts";
 
 function createFooter(overrides: Partial<TuiFooterView> = {}): TuiFooterView {
   return {
+    labels: {
+      composerTitle: "Room of Requirement",
+      themePickerTitle: "Sorting Hat",
+    },
     composer: {
       value: "",
       locked: false,
@@ -20,7 +24,7 @@ function createFooter(overrides: Partial<TuiFooterView> = {}): TuiFooterView {
 
 test("renderFooter emits a dark composer line and concise status line", () => {
   const footer = renderFooter(createFooter(), { width: 80, composerHeight: 4 });
-  assert.match(footer.lines.join("\n"), /╭ Composer/);
+  assert.match(footer.lines.join("\n"), /╭ Room of Requirement/);
   assert.match(footer.lines.join("\n"), /Write a prompt/);
   assert.match(footer.lines.join("\n"), /╰ Status: Thinking/);
   assert.equal(footer.composerBodyTop, 1);
@@ -62,7 +66,7 @@ test("renderFooter keeps explicit Composer and Status frame chrome", () => {
   const footer = renderFooter(createFooter(), { width: 32, composerHeight: 2 });
   const output = footer.lines.join("\n");
 
-  assert.match(output, /^╭ Composer .*╮$/m);
+  assert.match(output, /^╭ Room of Requirement .*╮$/m);
   assert.match(output, /^╰ Status: Thinking .*╯$/m);
   assert.doesNotMatch(output, /^Status: Thinking$/m);
 });
@@ -93,7 +97,7 @@ test("renderFooter renders theme picker controls instead of the normal composer 
 
   const output = footer.lines.join("\n");
 
-  assert.match(output, /Theme Picker/);
+  assert.match(output, /Sorting Hat/);
   assert.match(output, /Use ↑↓ to move/);
   assert.match(output, /Enter apply/);
   assert.match(output, /Required before entering the Room of Requirement/);
@@ -114,7 +118,7 @@ test("renderFooter applies the Hufflepuff emphasis panel styling to the composer
 
   const output = footer.lines.join("\n");
 
-  assert.match(output, /\u001b\[[0-9;]*m╭\u001b\[0m\u001b\[[0-9;]*m Composer /);
+  assert.match(output, /\u001b\[[0-9;]*m╭\u001b\[0m\u001b\[[0-9;]*m Room of Requirement /);
   assert.match(output, /\u001b\[[0-9;]*48;2;243;234;208mWrite a prompt\s+\u001b\[0m/);
   assert.match(output, /\u001b\[[0-9;]*48;2;243;234;208m Status: Thinking /);
 });

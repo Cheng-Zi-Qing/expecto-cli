@@ -189,17 +189,18 @@ function replaceTimelineItem(
   };
 }
 
-function createWelcomeCard(input: CreateInitialTuiStateInput): TimelineItem {
+function createWelcomeCard(input: CreateInitialTuiStateInput, activeThemeId: ThemeId): TimelineItem {
+  const spells = getThemeDefinition(activeThemeId).spells;
   return {
     id: "welcome",
     kind: "welcome",
     summary: `${PRODUCT_DISPLAY_NAME} is ready in ${input.projectLabel} on ${input.branchLabel}.`,
     body: [
-      "Enter send",
+      spells.hintEnter,
       "Alt+Enter newline",
-      "Ctrl+C interrupt",
+      spells.hintInterrupt,
       "Ctrl+J newline",
-      "/help commands",
+      `/help ${spells.commandHelp}`,
     ].join("\n"),
     collapsed: false,
   };
@@ -556,7 +557,7 @@ export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiSta
     runtimeState: "ready",
     activeRequestLedger: null,
     commandMenu: createEmptyCommandMenu(),
-    timeline: [createWelcomeCard(input)],
+    timeline: [createWelcomeCard(input, activeThemeId)],
     selectedTimelineIndex: 0,
     draft: "",
     draftAttachments: [],

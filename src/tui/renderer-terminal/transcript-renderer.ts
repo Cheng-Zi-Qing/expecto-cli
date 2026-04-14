@@ -660,7 +660,7 @@ function renderThemePickerPreviewLines(
 
 function buildThemePickerApplyLine(overlay: TuiThemePickerOverlayView): string {
   const availabilityLabel = overlay.reason === "first_launch"
-    ? "Required before entering the Room of Requirement"
+    ? `Required before entering the ${overlay.labels.composerTitle}`
     : "Press /theme any time";
 
   return `  [ Enter ] apply · ${availabilityLabel}`;
@@ -934,7 +934,7 @@ export function renderThemePickerOverlay(
   ];
 
   const output = [
-    renderStyledFrameLine(normalizedWidth, "╭", "╮", " 🧙 Sorting Hat ", outerBorderStyle, outerBorderStyle),
+    renderStyledFrameLine(normalizedWidth, "╭", "╮", ` 🧙 ${overlay.labels.themePickerTitle} `, outerBorderStyle, outerBorderStyle),
   ];
 
   for (const line of bodyLines) {

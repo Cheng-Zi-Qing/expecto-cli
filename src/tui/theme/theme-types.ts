@@ -55,6 +55,30 @@ export type ThemeConversationLabels = {
   assistant: string;
 };
 
+export type ThemeSpellLabels = {
+  readonly composerTitle: string;
+  readonly timelineTitle: string;
+  readonly themePickerTitle: string;
+  readonly statusStreaming: string;
+  readonly statusToolRunning: string;
+  readonly statusInterrupted: string;
+  readonly statusError: string;
+  readonly statusIdle: string;
+  readonly statusReady: string;
+  readonly hintEnter: string;
+  readonly hintInterrupt: string;
+  readonly commandExit: string;
+  readonly commandHelp: string;
+  readonly commandClear: string;
+  readonly commandCompact: string;
+  readonly commandLog: string;
+  readonly commandTrace: string;
+  readonly commandTheme: string;
+  readonly userInputLabel: string;
+  readonly assistantStreamLabel: string;
+  readonly modeSwitchLabel: string;
+};
+
 export type ThemePalette = {
   text: {
     heading: string;
@@ -95,6 +119,7 @@ export type ThemeDefinition = {
   welcome: ThemeWelcomeAsset;
   sample: ThemeSampleAsset;
   conversation: ThemeConversationLabels;
+  spells: ThemeSpellLabels;
 };
 
 export function isThemeId(value: string): value is ThemeId {

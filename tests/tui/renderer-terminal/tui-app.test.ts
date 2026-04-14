@@ -125,7 +125,7 @@ test("createTerminalTuiApp keeps sticky main-screen chrome with rail-only assist
   assert.match(plainOutput, /│ assistant: inspect auth flow/);
   assert.doesNotMatch(plainOutput, /╭ Assistant:/);
   assert.doesNotMatch(plainOutput, /assistant: inspect auth flow.* │/);
-  assert.match(plainOutput, /╭ Composer/);
+  assert.match(plainOutput, /╭ Room of Requirement/);
   assert.match(plainOutput, /╰ Status:/);
 
   await app.close();

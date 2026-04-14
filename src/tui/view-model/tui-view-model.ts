@@ -1,4 +1,5 @@
 import { getThemeDefinition } from "../theme/theme-registry.ts";
+import type { ThemeSpellLabels } from "../theme/theme-types.ts";
 import type { TuiRuntimeState, TuiState } from "../tui-types.ts";
 import { buildTimelineCards } from "./timeline-blocks.ts";
 import type {
@@ -8,20 +9,20 @@ import type {
   TuiViewModel,
 } from "./tui-view-types.ts";
 
-function displayRuntimeState(runtimeState: TuiRuntimeState): string {
+function displayRuntimeState(runtimeState: TuiRuntimeState, spells: ThemeSpellLabels): string {
   switch (runtimeState) {
     case "streaming":
-      return "Thinking";
+      return spells.statusStreaming;
     case "tool_running":
-      return "Running tool";
+      return spells.statusToolRunning;
     case "interrupted":
-      return "Interrupted";
+      return spells.statusInterrupted;
     case "error":
-      return "Needs attention";
+      return spells.statusError;
     case "idle":
-      return "Idle";
+      return spells.statusIdle;
     case "ready":
-      return "Done";
+      return spells.statusReady;
   }
 }
 
@@ -35,6 +36,10 @@ export function buildTuiFooterView(
       id: theme.id,
       palette: theme.palette,
     },
+    labels: {
+      composerTitle: theme.spells.composerTitle,
+      themePickerTitle: theme.spells.themePickerTitle,
+    },
     composer: {
       value: state.draft,
       locked: state.inputLocked || state.themePicker !== null,
@@ -45,7 +50,7 @@ export function buildTuiFooterView(
           ? "Selection required"
           : state.themePicker?.reason === "command"
             ? "Theme preview"
-            : displayRuntimeState(state.runtimeState),
+            : displayRuntimeState(state.runtimeState, theme.spells),
     },
   };
 
@@ -94,17 +99,22 @@ export function buildTuiTranscriptView(
 }
 
 function buildOverlayView(
-  state: Pick<TuiState, "themePicker">,
+  state: Pick<TuiState, "themePicker" | "activeThemeId">,
 ): TuiOverlayView | null {
   if (state.themePicker === null) {
     return null;
   }
 
   const sampleTheme = getThemeDefinition(state.themePicker.selectedThemeId);
+  const activeTheme = getThemeDefinition(state.activeThemeId);
 
   return {
     kind: "theme_picker",
     reason: state.themePicker.reason,
+    labels: {
+      composerTitle: activeTheme.spells.composerTitle,
+      themePickerTitle: activeTheme.spells.themePickerTitle,
+    },
     entries: state.themePicker.themeIds.map((themeId) => {
       const theme = getThemeDefinition(themeId);
 

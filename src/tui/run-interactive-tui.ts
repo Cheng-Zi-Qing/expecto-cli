@@ -270,6 +270,10 @@ export async function runInteractiveTui(
         void inspectExecution(executionId, app);
       },
       onInterrupt: () => {
+        const spells = getThemeDefinition(state.activeThemeId).spells;
+        if (spells.hintInterrupt !== "Ctrl+C interrupt") {
+          applyAction({ type: "append_system_message", line: `${spells.hintInterrupt}!` });
+        }
         applyAction({ type: "mark_interrupt_intent" });
         interruptController.interruptCurrentTurn();
       },
@@ -369,6 +373,7 @@ export async function runInteractiveTui(
     interruptController,
     emitFact: emitter.emit,
     onLocalEffect: handleLocalEffect,
+    resolveSpellLabels: () => getThemeDefinition(state.activeThemeId).spells,
   });
 
   try {

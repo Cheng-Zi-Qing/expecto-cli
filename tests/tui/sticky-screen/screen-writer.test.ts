@@ -63,6 +63,10 @@ const composerSnapshot: ComposerSnapshot = {
   hidden: false,
   placeholder: "Type a prompt",
   statusLabel: "Done",
+  labels: {
+    composerTitle: "Room of Requirement",
+    themePickerTitle: "Sorting Hat",
+  },
 };
 
 const activeStatus: ActiveStatusSnapshot = {
@@ -122,6 +126,10 @@ test("screen writer redraws sticky footer using framed composer and status lines
 
   const footer = renderFooter(
     {
+      labels: {
+        composerTitle: "Room of Requirement",
+        themePickerTitle: "Sorting Hat",
+      },
       composer: {
         value: composerSnapshot.text,
         locked: composerSnapshot.locked,

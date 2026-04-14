@@ -62,6 +62,10 @@ function createThemePickerOverlay(
   return {
     kind: "theme_picker" as const,
     reason: "first_launch" as const,
+    labels: {
+      composerTitle: "Room of Requirement",
+      themePickerTitle: "Sorting Hat",
+    },
     entries: houseThemes.map((theme) => ({
       id: theme.id,
       displayName: theme.displayName,

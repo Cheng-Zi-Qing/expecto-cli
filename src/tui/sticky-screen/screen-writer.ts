@@ -10,6 +10,7 @@ export type ComposerSnapshot = {
   hidden: boolean;
   placeholder: string;
   statusLabel: string;
+  labels?: TuiFooterView["labels"];
   theme?: TuiFooterView["theme"];
   themePicker?: TuiFooterView["themePicker"];
 };
@@ -184,6 +185,7 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
     const footer = renderFooter(
       {
         ...(composerSnapshot.theme ? { theme: composerSnapshot.theme } : {}),
+        labels: composerSnapshot.labels ?? { composerTitle: "Composer", themePickerTitle: "Theme Picker" },
         composer: {
           value: composerValue,
           locked: composerSnapshot.locked,
