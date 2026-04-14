@@ -822,7 +822,7 @@ test("interactive console app keeps pending assistant placeholders out of scroll
 
   const latestChunk = screenWriter.timelineChunks.at(-1) ?? "";
 
-  assert.match(latestChunk, /Assistant/);
+  assert.match(latestChunk, /Badger Reply/);
   assert.match(latestChunk, /OK/);
   assert.doesNotMatch(latestChunk, /Reply with the exact text OK and nothing else\./);
   assert.doesNotMatch(latestChunk, /Thinking/);
