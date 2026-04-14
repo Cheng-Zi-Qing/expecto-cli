@@ -200,7 +200,7 @@ function createWelcomeCard(input: CreateInitialTuiStateInput, activeThemeId: The
       "Alt+Enter newline",
       spells.hintInterrupt,
       "Ctrl+J newline",
-      `/help ${spells.commandHelp}`,
+      `/help (${spells.commandHelp})`,
     ].join("\n"),
     collapsed: false,
   };

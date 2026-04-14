@@ -37,7 +37,7 @@ function buildHelpEffects(spellLabels?: ThemeSpellLabels): CommandExecutionEffec
     section.commands.forEach((command) => {
       const spellKey = COMMAND_SPELL_KEYS[command.name];
       const spellAnnotation =
-        spellLabels && spellKey && spellLabels[spellKey] !== command.name.slice(1)
+        spellLabels && spellKey && spellLabels[spellKey].toLowerCase() !== command.name.slice(1).toLowerCase()
           ? ` (${spellLabels[spellKey]})`
           : "";
       lines.push(`${command.name}${spellAnnotation}    ${command.description}`);

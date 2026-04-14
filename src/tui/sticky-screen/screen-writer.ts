@@ -2,6 +2,7 @@ import type { AnsiWriter } from "../renderer-terminal/ansi-writer.ts";
 import { renderFooter } from "../renderer-terminal/footer-renderer.ts";
 import { textDisplayWidth, wrapPlainText } from "../renderer-terminal/text-layout.ts";
 import type { TuiFooterView } from "../view-model/tui-view-types.ts";
+import { ORIGIN_SPELL_LABELS } from "../theme/spell-labels.ts";
 
 export type ComposerSnapshot = {
   text: string;
@@ -185,7 +186,7 @@ export function createScreenWriter(options: ScreenWriterOptions): ScreenWriter {
     const footer = renderFooter(
       {
         ...(composerSnapshot.theme ? { theme: composerSnapshot.theme } : {}),
-        labels: composerSnapshot.labels ?? { composerTitle: "Composer", themePickerTitle: "Theme Picker" },
+        labels: composerSnapshot.labels ?? { composerTitle: ORIGIN_SPELL_LABELS.composerTitle, themePickerTitle: ORIGIN_SPELL_LABELS.themePickerTitle },
         composer: {
           value: composerValue,
           locked: composerSnapshot.locked,
