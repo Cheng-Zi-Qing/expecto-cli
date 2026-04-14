@@ -6,6 +6,29 @@ import {
   reduceTuiState,
 } from "../../src/tui/tui-state.ts";
 import { deriveContextMetrics } from "../../src/tui/context-metrics.ts";
+import type { DomainEvent } from "../../src/protocol/domain-event-schema.ts";
+
+let testEventSequence = 0;
+
+function domainEvent(input: {
+  timestamp: string;
+  sessionId: string;
+  requestId?: string;
+  eventType: string;
+  payload: Record<string, unknown>;
+}): DomainEvent {
+  testEventSequence += 1;
+  return {
+    protocolVersion: "1.0",
+    eventId: `evt-${testEventSequence}`,
+    sessionId: input.sessionId,
+    eventType: input.eventType,
+    sequence: testEventSequence,
+    timestamp: input.timestamp,
+    ...(input.requestId ? { causation: { requestId: input.requestId } } : {}),
+    payload: input.payload,
+  };
+}
 
 test("createInitialTuiState starts with a welcome card and composer focus", () => {
   const state = createInitialTuiState({
@@ -461,50 +484,47 @@ test("reduceTuiState clears execution unread lines when a collapsed execution ca
   const withRequest = reduceTuiState(initial, {
     type: "start_request_lifecycle",
     requestId: "request-1",
-    turnId: "turn-1",
+    turnId: "1",
     startedAt: "2026-03-26T10:00:00.000Z",
   });
 
   const withWaveDeclared = reduceTuiState(
     reduceTuiState(withRequest, {
-      type: "project_interaction_event",
-      event: {
+      type: "project_domain_event",
+      event: domainEvent({
         timestamp: "2026-03-26T10:00:00.050Z",
         sessionId: "session-1",
-        turnId: "turn-1",
         requestId: "request-1",
-        eventType: "assistant_response_started",
+        eventType: "assistant.response_started",
         payload: {
           responseId: "response-1",
         },
-      },
+      }),
     }),
     {
-      type: "project_interaction_event",
-      event: {
+      type: "project_domain_event",
+      event: domainEvent({
         timestamp: "2026-03-26T10:00:00.090Z",
         sessionId: "session-1",
-        turnId: "turn-1",
         requestId: "request-1",
-        eventType: "assistant_response_completed",
+        eventType: "assistant.response_completed",
         payload: {
           responseId: "response-1",
           finishReason: "tool_calls",
           continuation: "awaiting_execution",
           plannedExecutionIds: ["exec-1"],
         },
-      },
+      }),
     },
   );
 
   const withExecutionStarted = reduceTuiState(withWaveDeclared, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:00:00.100Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-1",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "exec-1",
         executionKind: "command",
@@ -513,23 +533,22 @@ test("reduceTuiState clears execution unread lines when a collapsed execution ca
           source: "assistant",
         },
       },
-    },
+    }),
   });
 
   const withExecutionChunk = reduceTuiState(withExecutionStarted, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:00:00.200Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-1",
-      eventType: "execution_item_chunk",
+      eventType: "execution.chunk",
       payload: {
         executionId: "exec-1",
         stream: "stdout",
         output: "alpha\nbeta\n",
       },
-    },
+    }),
   });
 
   const executionCard = withExecutionChunk.timeline.find((item) => item.executionId === "exec-1");
@@ -568,56 +587,50 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
     startedAt: "2026-03-26T10:00:00.000Z",
   });
   const withAssistantStarted = reduceTuiState(withPromptRequest, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:00:00.050Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_response_started",
+      eventType: "assistant.response_started",
       payload: {
         responseId: "response-1",
       },
-    },
+    }),
   });
   const withPromptTerminal = reduceTuiState(withAssistantStarted, {
-    type: "project_interaction_event",
-    event: {
-      timestamp: "2026-03-26T10:00:00.090Z",
-      sessionId: "session-1",
-      turnId: "turn-1",
-      requestId: "request-turn-1",
-      eventType: "request_completed",
-      payload: {
-        status: "completed",
-      },
-    },
-  });
+    type: "project_domain_event",
+      event: domainEvent({
+        timestamp: "2026-03-26T10:00:00.090Z",
+        sessionId: "session-1",
+        requestId: "request-turn-1",
+        eventType: "request.succeeded",
+        payload: {},
+      }),
+    });
 
   const staleAssistantStream = reduceTuiState(withPromptTerminal, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:00:00.120Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_stream_chunk",
+      eventType: "assistant.stream_chunk",
       payload: {
         responseId: "response-1",
         channel: "output_text",
         format: "markdown",
         delta: "stale",
       },
-    },
+    }),
   });
   const staleExecutionStarted = reduceTuiState(staleAssistantStream, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:00:00.130Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "exec-stale",
         executionKind: "command",
@@ -626,7 +639,7 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
           source: "assistant",
         },
       },
-    },
+    }),
   });
 
   assert.equal(staleExecutionStarted.timeline.length, withPromptTerminal.timeline.length);
@@ -642,44 +655,41 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
         startedAt: "2026-03-26T10:10:00.000Z",
       }),
       {
-        type: "project_interaction_event",
-        event: {
+        type: "project_domain_event",
+        event: domainEvent({
           timestamp: "2026-03-26T10:10:00.010Z",
           sessionId: "session-1",
-          turnId: "turn-2",
           requestId: "request-turn-2",
-          eventType: "assistant_response_started",
+          eventType: "assistant.response_started",
           payload: {
             responseId: "response-2",
           },
-        },
+        }),
       },
     ),
     {
-      type: "project_interaction_event",
-      event: {
+      type: "project_domain_event",
+      event: domainEvent({
         timestamp: "2026-03-26T10:10:00.020Z",
         sessionId: "session-1",
-        turnId: "turn-2",
         requestId: "request-turn-2",
-        eventType: "assistant_response_completed",
+        eventType: "assistant.response_completed",
         payload: {
           responseId: "response-2",
           finishReason: "tool_calls",
           continuation: "awaiting_execution",
           plannedExecutionIds: ["exec-declared"],
         },
-      },
+      }),
     },
   );
   const withUndeclaredExecution = reduceTuiState(withPromptWave, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:10:00.030Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "exec-undeclared",
         executionKind: "command",
@@ -688,7 +698,7 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
           source: "assistant",
         },
       },
-    },
+    }),
   });
 
   assert.equal(
@@ -697,13 +707,12 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
   );
 
   const withBuiltinExecution = reduceTuiState(withPromptTerminal, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T10:30:00.000Z",
       sessionId: "session-1",
-      turnId: "turn-command-1",
       requestId: "request-command-1",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "execution-command-1",
         executionKind: "command",
@@ -712,7 +721,7 @@ test("reduceTuiState gates prompt lifecycle projections but still projects built
           source: "builtin_command",
         },
       },
-    },
+    }),
   });
 
   assert.equal(withBuiltinExecution.timeline.at(-1)?.kind, "execution");
@@ -750,18 +759,19 @@ test("reduceTuiState marks interrupt intent on an active request and unlocks onl
   assert.equal(withInterruptIntent.activeRequestLedger?.phase, "interrupting");
 
   const withTerminalEvent = reduceTuiState(withInterruptIntent, {
-    type: "project_interaction_event",
-    event: {
-      timestamp: "2026-03-26T11:00:00.200Z",
-      sessionId: "session-1",
-      turnId: "turn-1",
-      requestId: "request-turn-1",
-      eventType: "request_completed",
-      payload: {
-        status: "interrupted",
-      },
-    },
-  });
+    type: "project_domain_event",
+      event: domainEvent({
+        timestamp: "2026-03-26T11:00:00.200Z",
+        sessionId: "session-1",
+        requestId: "request-turn-1",
+        eventType: "request.failed",
+        payload: {
+          code: "INTERRUPTED",
+          message: "generation interrupted",
+          retryable: false,
+        },
+      }),
+    });
 
   assert.equal(withTerminalEvent.activeRequestLedger, null);
   assert.equal(withTerminalEvent.inputLocked, false);
@@ -789,47 +799,42 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
     startedAt: "2026-03-26T12:00:00.000Z",
   });
   assistantState = reduceTuiState(assistantState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:00:00.010Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_response_started",
+      eventType: "assistant.response_started",
       payload: {
         responseId: "response-1",
       },
-    },
+    }),
   });
   assistantState = reduceTuiState(assistantState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:00:00.020Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_stream_chunk",
+      eventType: "assistant.stream_chunk",
       payload: {
         responseId: "response-1",
         channel: "output_text",
         format: "markdown",
         delta: "first response",
       },
-    },
+    }),
   });
   assistantState = reduceTuiState(assistantState, {
-    type: "project_interaction_event",
-    event: {
-      timestamp: "2026-03-26T12:00:00.040Z",
-      sessionId: "session-1",
-      turnId: "turn-1",
-      requestId: "request-turn-1",
-      eventType: "request_completed",
-      payload: {
-        status: "completed",
-      },
-    },
-  });
+    type: "project_domain_event",
+      event: domainEvent({
+        timestamp: "2026-03-26T12:00:00.040Z",
+        sessionId: "session-1",
+        requestId: "request-turn-1",
+        eventType: "request.succeeded",
+        payload: {},
+      }),
+    });
   assistantState = reduceTuiState(assistantState, {
     type: "start_request_lifecycle",
     requestId: "request-turn-2",
@@ -837,33 +842,31 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
     startedAt: "2026-03-26T12:00:01.000Z",
   });
   assistantState = reduceTuiState(assistantState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:00:01.010Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "assistant_response_started",
+      eventType: "assistant.response_started",
       payload: {
         responseId: "response-1",
       },
-    },
+    }),
   });
   assistantState = reduceTuiState(assistantState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:00:01.020Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "assistant_stream_chunk",
+      eventType: "assistant.stream_chunk",
       payload: {
         responseId: "response-1",
         channel: "output_text",
         format: "markdown",
         delta: "second response",
       },
-    },
+    }),
   });
 
   const assistantCards = assistantState.timeline.filter((item) => item.kind === "assistant");
@@ -895,42 +898,39 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
     startedAt: "2026-03-26T12:10:00.000Z",
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:00.010Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_response_started",
+      eventType: "assistant.response_started",
       payload: {
         responseId: "response-1",
       },
-    },
+    }),
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:00.020Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "assistant_response_completed",
+      eventType: "assistant.response_completed",
       payload: {
         responseId: "response-1",
         finishReason: "tool_calls",
         continuation: "awaiting_execution",
         plannedExecutionIds: ["exec-1"],
       },
-    },
+    }),
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:00.030Z",
       sessionId: "session-1",
-      turnId: "turn-1",
       requestId: "request-turn-1",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "exec-1",
         executionKind: "command",
@@ -939,21 +939,18 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
           source: "assistant",
         },
       },
-    },
+    }),
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
-      timestamp: "2026-03-26T12:10:00.040Z",
-      sessionId: "session-1",
-      turnId: "turn-1",
-      requestId: "request-turn-1",
-      eventType: "request_completed",
-      payload: {
-        status: "completed",
-      },
-    },
-  });
+    type: "project_domain_event",
+      event: domainEvent({
+        timestamp: "2026-03-26T12:10:00.040Z",
+        sessionId: "session-1",
+        requestId: "request-turn-1",
+        eventType: "request.succeeded",
+        payload: {},
+      }),
+    });
   executionState = reduceTuiState(executionState, {
     type: "start_request_lifecycle",
     requestId: "request-turn-2",
@@ -961,42 +958,39 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
     startedAt: "2026-03-26T12:10:01.000Z",
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:01.010Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "assistant_response_started",
+      eventType: "assistant.response_started",
       payload: {
         responseId: "response-1",
       },
-    },
+    }),
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:01.020Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "assistant_response_completed",
+      eventType: "assistant.response_completed",
       payload: {
         responseId: "response-1",
         finishReason: "tool_calls",
         continuation: "awaiting_execution",
         plannedExecutionIds: ["exec-1"],
       },
-    },
+    }),
   });
   executionState = reduceTuiState(executionState, {
-    type: "project_interaction_event",
-    event: {
+    type: "project_domain_event",
+    event: domainEvent({
       timestamp: "2026-03-26T12:10:01.030Z",
       sessionId: "session-1",
-      turnId: "turn-2",
       requestId: "request-turn-2",
-      eventType: "execution_item_started",
+      eventType: "execution.started",
       payload: {
         executionId: "exec-1",
         executionKind: "command",
@@ -1005,7 +999,7 @@ test("reduceTuiState keeps assistant and execution cards request-scoped when ids
           source: "assistant",
         },
       },
-    },
+    }),
   });
 
   const executionCards = executionState.timeline.filter((item) => item.kind === "execution");

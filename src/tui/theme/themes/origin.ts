@@ -59,4 +59,8 @@ export const originTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Submitted Input",
+    assistant: "Assistant",
+  },
 };

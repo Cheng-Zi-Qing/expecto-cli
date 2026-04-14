@@ -50,6 +50,11 @@ export type ThemeSampleAsset = {
   highlightTokens: ThemeSampleToken[];
 };
 
+export type ThemeConversationLabels = {
+  user: string;
+  assistant: string;
+};
+
 export type ThemePalette = {
   text: {
     heading: string;
@@ -89,6 +94,7 @@ export type ThemeDefinition = {
   palette: ThemePalette;
   welcome: ThemeWelcomeAsset;
   sample: ThemeSampleAsset;
+  conversation: ThemeConversationLabels;
 };
 
 export function isThemeId(value: string): value is ThemeId {

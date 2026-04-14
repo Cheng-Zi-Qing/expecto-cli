@@ -1,4 +1,4 @@
-import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
+import type { DomainEvent } from "../protocol/domain-event-schema.ts";
 import type { CommandId } from "../commands/command-types.ts";
 import type { ForegroundRequestLedger } from "./request-ledger.ts";
 import type { ExecutionTranscriptBuffer } from "./execution-transcript-buffer.ts";
@@ -124,7 +124,7 @@ export type TuiAction =
       startedAt: string;
     }
   | { type: "mark_interrupt_intent" }
-  | { type: "project_interaction_event"; event: InteractionEvent }
+  | { type: "project_domain_event"; event: DomainEvent }
   | { type: "toggle_selected_item" }
   | { type: "set_draft"; draft: string }
   | { type: "add_draft_attachment"; id: string; content: string }

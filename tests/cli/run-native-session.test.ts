@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import type { CliRoute } from "../../src/cli/route-resolution.ts";
 import type { BootstrapContext } from "../../src/runtime/bootstrap-context.ts";
 import type { SessionManagerOptions } from "../../src/runtime/session-manager.ts";
 import { runNativeSession } from "../../src/cli/run-native-session.ts";
+import { currentAppPath } from "../../src/core/brand.ts";
 
 function makeContext(entry: BootstrapContext["entry"]): BootstrapContext {
   return {
@@ -240,4 +244,56 @@ test("runNativeSession rejects stream routes when the request fails", async () =
   );
 
   assert.match(stderr, /AGENT_LOOP_LIMIT_EXCEEDED/);
+});
+
+test("runNativeSession flushes emitted domain events to audit.jsonl before returning", async () => {
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-native-audit-"));
+
+  const createSessionManager = (options: SessionManagerOptions) => ({
+    run: async () => {
+      options.emitFact?.({
+        eventType: "session.started",
+        sessionId: "session-audit",
+        timestamp: "2024-01-01T00:00:00.000Z",
+        payload: {
+          mode: "balanced",
+          entryKind: "print",
+        },
+      });
+      options.emitFact?.({
+        eventType: "session.stopped",
+        sessionId: "session-audit",
+        timestamp: "2024-01-01T00:00:01.000Z",
+        payload: {
+          state: "idle",
+        },
+      });
+
+      return {
+        sessionId: "session-audit",
+        state: "idle",
+        turnCount: 0,
+      };
+    },
+  });
+
+  await runNativeSession({
+    context: {
+      ...makeContext({ kind: "print", prompt: "hello" }),
+      projectRoot,
+    },
+    route: {
+      kind: "stream_single",
+      bootstrapCommand: { kind: "print", prompt: "hello" },
+      warnings: [],
+    },
+    createSessionManager,
+  });
+
+  const content = await readFile(join(projectRoot, currentAppPath("state", "audit.jsonl")), "utf8");
+  const lines = content.trim().split("\n");
+
+  assert.equal(lines.length, 2);
+  assert.equal(JSON.parse(lines[0]!).event_type, "session.started");
+  assert.equal(JSON.parse(lines[1]!).event_type, "session.stopped");
 });

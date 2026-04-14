@@ -91,4 +91,8 @@ export const gryffindorTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Lion Prompt",
+    assistant: "Lion Reply",
+  },
 };

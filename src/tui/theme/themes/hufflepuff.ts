@@ -87,4 +87,8 @@ export const hufflepuffTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Badger Prompt",
+    assistant: "Badger Reply",
+  },
 };

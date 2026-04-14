@@ -46,20 +46,28 @@ export type TimelineCard = {
   blocks: TimelineCardBlock[];
 };
 
-const HEADER_LABELS: Record<TimelineItemKind, string> = {
+const STATIC_HEADER_LABELS: Record<Exclude<TimelineItemKind, "user" | "assistant">, string> = {
   welcome: "Welcome",
   system: "System",
-  user: "User",
-  assistant: "Assistant",
   execution: "Execution",
 };
 
-const getHeaderLabel = (kind: TimelineItemKind): string => {
-  const label = HEADER_LABELS[kind];
-  if (label === undefined) {
-    throw new Error(`Unknown timeline kind: ${kind}`);
+const getHeaderLabel = (
+  kind: TimelineItemKind,
+  activeThemeId: ThemeId,
+): string => {
+  const theme = getThemeDefinition(activeThemeId);
+
+  switch (kind) {
+    case "user":
+      return theme.conversation.user;
+    case "assistant":
+      return theme.conversation.assistant;
+    case "welcome":
+    case "system":
+    case "execution":
+      return STATIC_HEADER_LABELS[kind];
   }
-  return label;
 };
 
 const hasUsableText = (value: string | undefined): value is string => {
@@ -222,7 +230,7 @@ export const buildTimelineCards = (
       id: item.id,
       kind: item.kind,
       summary: item.summary,
-      headerLabel: getHeaderLabel(item.kind),
+      headerLabel: getHeaderLabel(item.kind, activeThemeId),
       selected: index === selectedIndex,
       collapsed,
       blocks: buildBlocks(item, collapsed, activeThemeId),

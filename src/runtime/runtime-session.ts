@@ -14,7 +14,7 @@ import type {
   ExecutionKind,
   ExecutionStatus,
   ExecutionStream,
-} from "../contracts/interaction-event-schema.ts";
+} from "../protocol/domain-event-payload-schema.ts";
 import type { DomainFact } from "../protocol/domain-event-schema.ts";
 
 export type RuntimeSessionResult = {
@@ -911,6 +911,7 @@ export class RuntimeSession {
       switch (effect.type) {
         case "system_message":
           writeLine(this.write, effect.line);
+          this.onLocalEffect?.(effect);
           break;
         case "execution_item":
           this.emitBuiltInExecutionItemEvents(interactionContext, executionIndex, effect);

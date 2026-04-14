@@ -91,4 +91,8 @@ export const slytherinTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Serpent Prompt",
+    assistant: "Serpent Reply",
+  },
 };

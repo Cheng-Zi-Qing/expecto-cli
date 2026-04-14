@@ -40,7 +40,7 @@ const createTimelineItem = (overrides: Partial<TimelineItem>): TimelineItem => (
   ...(overrides.collapsed !== undefined ? { collapsed: overrides.collapsed } : {}),
 });
 
-test("user cards render as submitted-input cards with distinct chrome", () => {
+test("user cards render the supplied title with distinct chrome", () => {
   const markup = renderTimelineCardMarkup(
     createCard({
       id: "user-1",
@@ -58,7 +58,7 @@ test("user cards render as submitted-input cards with distinct chrome", () => {
     createPalette(),
   );
 
-  assert.match(markup, /Submitted Input/);
+  assert.match(markup, /User/);
   assert.equal((markup.match(/Inspect auth flow/g) ?? []).length, 1);
   assert.match(markup, /#D6A93D-fg/);
   assert.match(markup, /#F2D16B-fg/);
@@ -258,6 +258,33 @@ test("timeline renderer returns content plus item start lines for scrolling", ()
   assert.ok(secondStartLine > firstStartLine);
   assert.match(rendered.content, /Inspect auth flow/);
   assert.match(rendered.content, /Found the session check\./);
+});
+
+test("house themes render themed user and assistant card titles in blessed markup", () => {
+  const rendered = renderTimelineItems(
+    [
+      createTimelineItem({
+        id: "user-themed",
+        kind: "user",
+        summary: "hello",
+        body: "hello",
+      }),
+      createTimelineItem({
+        id: "assistant-themed",
+        kind: "assistant",
+        summary: "hi there",
+        body: "hi there",
+      }),
+    ],
+    1,
+    createPalette(),
+  );
+  const plain = stripBlessedTags(rendered.content);
+
+  assert.match(plain, /Badger Prompt/);
+  assert.match(plain, /Badger Reply: hi there/);
+  assert.doesNotMatch(plain, /Submitted Input/);
+  assert.doesNotMatch(plain, /Assistant: hi there/);
 });
 
 test("welcome cards render the themed mascot block instead of the legacy placeholder body", () => {

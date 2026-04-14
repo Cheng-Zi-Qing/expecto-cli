@@ -14,7 +14,6 @@ import {
   wrapPlainText,
 } from "./text-layout.ts";
 
-const USER_HEADER_LABEL = "Submitted Input";
 const FRAME_SIDE_WIDTH = 4;
 const THEME_PICKER_COLUMN_GAP = 5;
 
@@ -746,7 +745,7 @@ function renderCard(
     };
 
     return [
-      renderStyledFrameLine(width, "╭", "╮", ` ${USER_HEADER_LABEL} `, borderStyle, frameInnerStyle),
+      renderStyledFrameLine(width, "╭", "╮", ` ${card.headerLabel} `, borderStyle, frameInnerStyle),
       ...bodyLines.map((line) => renderFilledBodyLine(line, width, borderStyle, contentStyle)),
       renderStyledFrameLine(width, "╰", "╯", "", borderStyle, frameInnerStyle),
     ];

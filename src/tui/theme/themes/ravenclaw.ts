@@ -87,4 +87,8 @@ export const ravenclawTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Eagle Prompt",
+    assistant: "Eagle Reply",
+  },
 };

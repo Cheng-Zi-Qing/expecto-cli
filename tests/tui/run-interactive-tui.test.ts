@@ -100,6 +100,14 @@ class FakeInteractiveTuiApp implements InteractiveTuiApp {
     this.handlers.onMoveSelectionDown();
   }
 
+  moveSelectionLeft(): void {
+    this.handlers.onMoveSelectionLeft?.();
+  }
+
+  moveSelectionRight(): void {
+    this.handlers.onMoveSelectionRight?.();
+  }
+
   interrupt(): void {
     this.handlers.onInterrupt();
   }
@@ -128,12 +136,16 @@ function renderTimelineLayout(state: TuiState): RenderedTimelineLayout {
   const palette = createRendererPalette({
     focus: state.focus,
     inputLocked: state.inputLocked,
+    themeId: state.themePicker?.selectedThemeId ?? state.activeThemeId,
   });
 
   return renderTimelineItems(
     state.timeline,
     state.selectedTimelineIndex,
     palette,
+    {
+      activeThemeId: state.themePicker?.selectedThemeId ?? state.activeThemeId,
+    },
   );
 }
 
@@ -177,6 +189,21 @@ function createReturningUserConfigStore(): UserConfigStore & {
   return createUserConfigStore({
     themeId: "hufflepuff",
   });
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
 }
 
 test("runInteractiveTui projects prompt submission, assistant output, and inspector toggles into renderer state", async () => {
@@ -231,9 +258,9 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
   );
   assert.equal(app?.latestState().inputLocked, false);
   assert.equal(app?.latestState().runtimeState, "ready");
-  assert.match(latestRenderedTimelineContent(app), /Submitted Input/);
+  assert.match(latestRenderedTimelineContent(app), /Badger Prompt/);
   assert.match(latestRenderedTimelineContent(app), /inspect auth flow/);
-  assert.match(latestRenderedTimelineContent(app), /Assistant/);
+  assert.match(latestRenderedTimelineContent(app), /Badger Reply/);
   assert.match(latestRenderedTimelineContent(app), /assistant: inspect auth flow/);
 
   const currentState = app?.latestState();
@@ -266,7 +293,7 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
 });
 
 test(
-  "runInteractiveTui keeps the rendered sessionId sourced from session_initialized events",
+  "runInteractiveTui keeps the rendered sessionId sourced from session.started events",
   { concurrency: false },
   async () => {
     const projectRoot = await makeProjectRoot();
@@ -306,7 +333,7 @@ test(
       await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
       await waitFor(
         () => app?.latestState().sessionId !== "pending-session",
-        "expected session_initialized to project a real sessionId before the session exits",
+        "expected session.started to project a real sessionId before the session exits",
       );
 
       const eventSessionId = app?.latestState().sessionId ?? "";
@@ -326,7 +353,7 @@ test(
 );
 
 test(
-  "runInteractiveTui folds assistant_stream_chunk text into context metrics",
+  "runInteractiveTui folds assistant.stream_chunk text into context metrics",
   { concurrency: false },
   async () => {
     const projectRoot = await makeProjectRoot();
@@ -346,56 +373,43 @@ test(
     const originalRun = SessionManager.prototype.run;
 
     SessionManager.prototype.run = async function patchedRun() {
-      const hooks = (this as unknown as {
-        hooks?: {
-          onInteractionEvent?: (event: Record<string, unknown>) => void;
-        };
-      }).hooks;
+      const emitFact = (this as unknown as {
+        emitFact?: (fact: Record<string, unknown>) => void;
+      }).emitFact;
 
       await streamReady;
 
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "session.started",
         timestamp: "2026-03-31T09:00:00.000Z",
         sessionId: "session-stream-test",
-        eventType: "session_initialized",
-        payload: {
-          sessionId: "session-stream-test",
-        },
+        payload: {},
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "session.state_changed",
         timestamp: "2026-03-31T09:00:00.010Z",
         sessionId: "session-stream-test",
-        eventType: "session_state_changed",
-        payload: {
-          state: "streaming",
-        },
+        payload: { state: "streaming" },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "user.prompt_received",
         timestamp: "2026-03-31T09:00:00.020Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "user_prompt_received",
-        payload: {
-          prompt: "chunk this",
-        },
+        causation: { requestId: "request-turn-1" },
+        payload: { prompt: "chunk this" },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "assistant.response_started",
         timestamp: "2026-03-31T09:00:00.030Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "assistant_response_started",
-        payload: {
-          responseId: "response-1",
-        },
+        causation: { requestId: "request-turn-1" },
+        payload: { responseId: "response-1" },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "assistant.stream_chunk",
         timestamp: "2026-03-31T09:00:00.040Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "assistant_stream_chunk",
+        causation: { requestId: "request-turn-1" },
         payload: {
           responseId: "response-1",
           channel: "output_text",
@@ -403,12 +417,11 @@ test(
           delta: chunkA,
         },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "assistant.stream_chunk",
         timestamp: "2026-03-31T09:00:00.050Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "assistant_stream_chunk",
+        causation: { requestId: "request-turn-1" },
         payload: {
           responseId: "response-1",
           channel: "output_text",
@@ -416,34 +429,25 @@ test(
           delta: chunkB,
         },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "assistant.response_completed",
         timestamp: "2026-03-31T09:00:00.060Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "assistant_response_completed",
-        payload: {
-          responseId: "response-1",
-          finishReason: "stop",
-        },
+        causation: { requestId: "request-turn-1" },
+        payload: { responseId: "response-1", finishReason: "stop" },
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "request.succeeded",
         timestamp: "2026-03-31T09:00:00.070Z",
         sessionId: "session-stream-test",
-        turnId: "turn-1",
-        requestId: "request-turn-1",
-        eventType: "request_completed",
-        payload: {
-          status: "completed",
-        },
+        causation: { requestId: "request-turn-1" },
+        payload: {},
       });
-      hooks?.onInteractionEvent?.({
+      emitFact?.({
+        eventType: "session.state_changed",
         timestamp: "2026-03-31T09:00:00.080Z",
         sessionId: "session-stream-test",
-        eventType: "session_state_changed",
-        payload: {
-          state: "ready",
-        },
+        payload: { state: "ready" },
       });
 
       return {
@@ -603,6 +607,119 @@ test("runInteractiveTui can force the first-launch picker for local testing even
       process.env.EXPECTO_FORCE_THEME_PICKER = previousForceThemePicker;
     }
   }
+});
+
+test("runInteractiveTui applies the selected theme before an async config save resolves", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const saveDeferred = createDeferred<void>();
+  let savedThemeId: UserConfig["themeId"] = null;
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: {
+      load: async () => ({
+        themeId: null,
+      }),
+      save: async (config) => {
+        savedThemeId = config.themeId;
+        await saveDeferred.promise;
+      },
+    },
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  try {
+    await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+    assert.equal(app?.latestState().themePicker?.reason, "first_launch");
+
+    app?.moveSelectionRight();
+    app?.toggleSelectedItem();
+
+    await waitFor(() => {
+      const state = app?.latestState();
+      return state?.activeThemeId === "gryffindor";
+    }, "expected selected theme to apply immediately");
+
+    assert.equal(app?.latestState().themePicker, null);
+    assert.equal(savedThemeId, "gryffindor");
+  } finally {
+    saveDeferred.resolve();
+    app?.exit();
+    await runPromise;
+  }
+});
+
+test("runInteractiveTui waits for an in-flight theme save before exiting", async () => {
+  const projectRoot = await makeProjectRoot();
+  const context = await buildBootstrapContext({
+    command: {
+      kind: "interactive",
+    },
+    cwd: projectRoot,
+  });
+  const saveDeferred = createDeferred<void>();
+  let saveStarted = false;
+  let saveFinished = false;
+  let app: FakeInteractiveTuiApp | undefined;
+
+  const runPromise = runInteractiveTui(context, {
+    providerLabel: "anthropic",
+    modelLabel: "claude-sonnet-4-20250514",
+    branchLabel: "main",
+    userConfigStore: {
+      load: async () => ({
+        themeId: null,
+      }),
+      save: async () => {
+        saveStarted = true;
+        await saveDeferred.promise;
+        saveFinished = true;
+      },
+    },
+    createApp: (input) => {
+      app = new FakeInteractiveTuiApp(input);
+      return app;
+    },
+    assistantStep: async (input) => ({
+      output: `assistant: ${input.prompt}`,
+    }),
+  });
+
+  await waitFor(() => app !== undefined, "expected interactive TUI app to be created");
+
+  app?.toggleSelectedItem();
+  await waitFor(() => saveStarted, "expected theme save to start");
+
+  app?.exit();
+
+  let resolved = false;
+  void runPromise.then(() => {
+    resolved = true;
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(resolved, false);
+  assert.equal(saveFinished, false);
+
+  saveDeferred.resolve();
+  await runPromise;
+
+  assert.equal(saveFinished, true);
 });
 
 test("runInteractiveTui ignores the removed legacy BETA_FORCE_THEME_PICKER override", async () => {
@@ -784,7 +901,7 @@ test("runInteractiveTui interrupts generation and restores the prompt draft", as
   await runPromise;
 });
 
-test("runInteractiveTui keeps input locked until request_completed arrives", async () => {
+test("runInteractiveTui keeps input locked until request terminal events arrive", async () => {
   const projectRoot = await makeProjectRoot();
   const context = await buildBootstrapContext({
     command: {
@@ -1465,7 +1582,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     );
   }, "expected real timeline items after submitting a prompt");
 
-  assert.match(latestRenderedTimelineContent(app), /Submitted Input/);
+  assert.match(latestRenderedTimelineContent(app), /Badger Prompt/);
   assert.match(latestRenderedTimelineContent(app), /assistant: ok/);
   assert.equal(app?.latestState().selectedTimelineIndex, 1);
 
@@ -1476,7 +1593,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     assert.ok(layout, "expected interactive TUI app to capture rendered timeline layout");
     const header = selectedRenderedHeaderText(layout);
     assert.match(header, /^> /);
-    assert.match(header, /Submitted Input/);
+    assert.match(header, /Badger Prompt/);
     assert.doesNotMatch(header, /inspect auth flow/);
   }
 
@@ -1487,7 +1604,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     assert.ok(layout, "expected interactive TUI app to capture rendered timeline layout");
     const header = selectedRenderedHeaderText(layout);
     assert.match(header, /^> /);
-    assert.match(header, /Assistant:/);
+    assert.match(header, /Badger Reply:/);
   }
 
   app?.moveSelectionUp();

@@ -79,7 +79,11 @@ export async function runNativeSession(
     emitFact: emitter.emit,
   });
 
-  await sessionManager.run(context);
+  try {
+    await sessionManager.run(context);
+  } finally {
+    await auditWriter.close();
+  }
 
   const terminalError = presenter.consumeTerminalError();
 
