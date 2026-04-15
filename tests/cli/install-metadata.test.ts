@@ -38,15 +38,15 @@ test("repository metadata uses the expecto app directory and project scaffold", 
   assert.match(gitignore, /^\.expecto-cli\/state\/$/m);
   assert.doesNotMatch(gitignore, new RegExp(`^\\${legacyWorkspaceDir}/state/$`, "m"));
 
-  await access(`${projectRoot}/.expecto-cli/docs/00-requirements.md`);
-  await access(`${projectRoot}/.expecto-cli/docs/01-plan.md`);
+  await access(`${projectRoot}/.expecto-cli/docs/specs/00-requirements.md`);
+  await access(`${projectRoot}/.expecto-cli/docs/specs/01-plan.md`);
   await access(`${projectRoot}/.expecto-cli/memory/INDEX.md`);
 });
 
 test("workspace docs and retained planning references no longer use the legacy beta brand", async () => {
   const markdownFiles = [
-    ".expecto-cli/docs/00-requirements.md",
-    ".expecto-cli/docs/01-plan.md",
+    ".expecto-cli/docs/specs/00-requirements.md",
+    ".expecto-cli/docs/specs/01-plan.md",
     ".expecto-cli/memory/INDEX.md",
     "plans/2026-03-23-v1-bootstrap-plan.md",
     "plans/2026-03-24-workspace-instruction-foundation-plan.md",

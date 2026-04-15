@@ -17,9 +17,9 @@ import type { UserConfig, UserConfigStore } from "../../src/cli/user-config.ts";
 
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "expecto-tui-"));
-  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
-  await writeFile(join(root, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
-  await writeFile(join(root, currentAppPath("docs", "01-plan.md")), "# Plan\n");
+  await mkdir(join(root, currentAppPath("docs", "specs")), { recursive: true });
+  await writeFile(join(root, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(root, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
   return root;
 }
 
@@ -1275,7 +1275,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
   assert.equal(app?.latestState().commandMenu.visible, true);
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/stack"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/init", "/stack"],
   );
   assert.deepEqual(
     app?.latestState().commandMenu.items.map((item) => item.id),
@@ -1286,6 +1286,7 @@ test("runInteractiveTui exposes slash command suggestions from the composer draf
       "session.theme",
       "session.exit",
       "project.branch",
+      "project.init",
       "debug.stack",
     ],
   );

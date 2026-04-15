@@ -12,13 +12,14 @@ const memoryRoot = currentAppPath("memory");
 
 async function makeProjectRoot(options: { includeAgents?: boolean; includeMemoryIndex?: boolean } = {}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "expecto-runtime-"));
-  await mkdir(join(root, docsRoot, "tasks"), { recursive: true });
+  await mkdir(join(root, docsRoot, "specs"), { recursive: true });
+  await mkdir(join(root, docsRoot, "tasks", "active"), { recursive: true });
   await mkdir(join(root, docsRoot, "summaries"), { recursive: true });
   await mkdir(join(root, memoryRoot), { recursive: true });
 
-  await writeFile(join(root, docsRoot, "00-requirements.md"), "# Requirements\n");
-  await writeFile(join(root, docsRoot, "01-plan.md"), "# Plan\n");
-  await writeFile(join(root, docsRoot, "tasks", "T-001-auth.md"), "# Task\n");
+  await writeFile(join(root, docsRoot, "specs", "00-requirements.md"), "# Requirements\n");
+  await writeFile(join(root, docsRoot, "specs", "01-plan.md"), "# Plan\n");
+  await writeFile(join(root, docsRoot, "tasks", "active", "T-001-auth.md"), "# Task\n");
   await writeFile(join(root, docsRoot, "summaries", "T-001-2026-03-23.md"), "# Summary\n");
   await writeFile(join(root, docsRoot, "findings.md"), "# Findings\n");
 

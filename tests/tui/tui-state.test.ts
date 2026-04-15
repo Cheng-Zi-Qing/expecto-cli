@@ -339,12 +339,13 @@ test("reduceTuiState derives slash suggestions from visible implemented commands
       "session.theme",
       "session.exit",
       "project.branch",
+      "project.init",
       "debug.stack",
     ],
   );
   assert.deepEqual(
     withSlashDraft.commandMenu.items.map((item) => item.name),
-    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/stack"],
+    ["/help", "/status", "/clear", "/theme", "/exit", "/branch", "/init", "/stack"],
   );
 });
 

@@ -1,6 +1,7 @@
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import type { ThemeSpellLabels } from "../tui/theme/theme-types.ts";
 import { resolveGitBranch } from "../core/git-branch.ts";
+import { ArtifactWorkspace } from "../core/artifact-workspace.ts";
 import { createHelpSections, findCommandByInput } from "./command-registry.ts";
 import { parseSlashCommand } from "./command-parser.ts";
 
@@ -130,6 +131,17 @@ export async function executeBuiltinCommand(
             },
           ],
         };
+      }
+    case "project.init":
+      {
+        const workspace = new ArtifactWorkspace(context.projectRoot);
+        const result = await workspace.ensureInitialized();
+        const effects: CommandExecutionEffect[] = result.files.map((file) => ({
+          type: "system_message" as const,
+          line: `${file.action === "created" ? "+" : "="} ${file.path}`,
+        }));
+        effects.unshift({ type: "system_message", line: "Workspace initialized" });
+        return { handled: true, effects };
       }
     case "debug.inspect":
       return {
