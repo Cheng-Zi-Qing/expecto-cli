@@ -60,9 +60,9 @@ const getHeaderLabel = (
 
   switch (kind) {
     case "user":
-      return theme.conversation.user;
+      return theme.spells.userInputLabel;
     case "assistant":
-      return theme.conversation.assistant;
+      return theme.spells.assistantStreamLabel;
     case "welcome":
     case "system":
     case "execution":

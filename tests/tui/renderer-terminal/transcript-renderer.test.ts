@@ -357,8 +357,8 @@ test("renderTranscript maps user and assistant headers through the active house 
 
   const output = stripAnsi(renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n"));
 
-  assert.match(output, /╭ Badger Prompt/);
-  assert.match(output, /^Badger Reply:\s*$/m);
+  assert.match(output, /╭ Prior Incantato/);
+  assert.match(output, /^Revelio:\s*$/m);
   assert.doesNotMatch(output, /Submitted Input/);
   assert.doesNotMatch(output, /^Assistant:\s*$/m);
 });
@@ -483,7 +483,7 @@ test("renderTranscript uses the Hufflepuff user-card fill and muted secondary ch
   const output = renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n");
 
   assert.match(output, /\u001b\[[0-9;]*48;2;251;246;234mhello\s+\u001b\[0m/);
-  assert.match(output, /\u001b\[1;38;2;138;146;143mBadger Reply:\s*\u001b\[0m/);
+  assert.match(output, /\u001b\[1;38;2;138;146;143mRevelio:\s*\u001b\[0m/);
   assert.match(output, /\u001b\[1;38;2;117;108;96mExecution: Read git branch/);
   assert.match(output, /\u001b\[2;38;2;122;116;108mDetails hidden\u001b\[0m/);
 });

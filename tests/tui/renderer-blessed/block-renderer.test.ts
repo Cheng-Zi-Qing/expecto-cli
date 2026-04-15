@@ -281,8 +281,8 @@ test("house themes render themed user and assistant card titles in blessed marku
   );
   const plain = stripBlessedTags(rendered.content);
 
-  assert.match(plain, /Badger Prompt/);
-  assert.match(plain, /Badger Reply: hi there/);
+  assert.match(plain, /Prior Incantato/);
+  assert.match(plain, /Revelio: hi there/);
   assert.doesNotMatch(plain, /Submitted Input/);
   assert.doesNotMatch(plain, /Assistant: hi there/);
 });

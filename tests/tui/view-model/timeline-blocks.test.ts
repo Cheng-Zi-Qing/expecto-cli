@@ -222,8 +222,8 @@ test("house themes map user and assistant card titles away from the generic labe
   const assistantCard = cards[1];
   assert.ok(userCard);
   assert.ok(assistantCard);
-  assert.equal(userCard.headerLabel, "Badger Prompt");
-  assert.equal(assistantCard.headerLabel, "Badger Reply");
+  assert.equal(userCard.headerLabel, "Prior Incantato");
+  assert.equal(assistantCard.headerLabel, "Revelio");
 });
 
 test("system card stays compact and uses paragraph blocks", () => {

@@ -258,9 +258,9 @@ test("runInteractiveTui projects prompt submission, assistant output, and inspec
   );
   assert.equal(app?.latestState().inputLocked, false);
   assert.equal(app?.latestState().runtimeState, "ready");
-  assert.match(latestRenderedTimelineContent(app), /Badger Prompt/);
+  assert.match(latestRenderedTimelineContent(app), /Prior Incantato/);
   assert.match(latestRenderedTimelineContent(app), /inspect auth flow/);
-  assert.match(latestRenderedTimelineContent(app), /Badger Reply/);
+  assert.match(latestRenderedTimelineContent(app), /Revelio/);
   assert.match(latestRenderedTimelineContent(app), /assistant: inspect auth flow/);
 
   const currentState = app?.latestState();
@@ -1582,7 +1582,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     );
   }, "expected real timeline items after submitting a prompt");
 
-  assert.match(latestRenderedTimelineContent(app), /Badger Prompt/);
+  assert.match(latestRenderedTimelineContent(app), /Prior Incantato/);
   assert.match(latestRenderedTimelineContent(app), /assistant: ok/);
   assert.equal(app?.latestState().selectedTimelineIndex, 1);
 
@@ -1593,7 +1593,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     assert.ok(layout, "expected interactive TUI app to capture rendered timeline layout");
     const header = selectedRenderedHeaderText(layout);
     assert.match(header, /^> /);
-    assert.match(header, /Badger Prompt/);
+    assert.match(header, /Prior Incantato/);
     assert.doesNotMatch(header, /inspect auth flow/);
   }
 
@@ -1604,7 +1604,7 @@ test("runInteractiveTui uses composer selection keys for slash suggestions befor
     assert.ok(layout, "expected interactive TUI app to capture rendered timeline layout");
     const header = selectedRenderedHeaderText(layout);
     assert.match(header, /^> /);
-    assert.match(header, /Badger Reply:/);
+    assert.match(header, /Revelio:/);
   }
 
   app?.moveSelectionUp();
