@@ -1,7 +1,4 @@
-import type {
-  InteractionEvent,
-  RequestCompletedStatus,
-} from "../contracts/interaction-event-schema.ts";
+import type { DomainEvent } from "../protocol/domain-event-schema.ts";
 
 export type ForegroundRequestPhase =
   | "assistant_active"
@@ -10,6 +7,12 @@ export type ForegroundRequestPhase =
   | "awaiting_assistant_resume"
   | "interrupting"
   | "terminal";
+
+export type ForegroundRequestTerminalStatus =
+  | "completed"
+  | "interrupted"
+  | "error"
+  | "rejected";
 
 export interface ExecutionWaveLedger {
   planned: ReadonlySet<string>;
@@ -27,7 +30,7 @@ export interface ForegroundRequestLedger {
   currentExecutionWave: ExecutionWaveLedger | null;
   interruptRequested: boolean;
   terminalEventReceived: boolean;
-  terminalStatus: RequestCompletedStatus | null;
+  terminalStatus: ForegroundRequestTerminalStatus | null;
   phase: ForegroundRequestPhase;
   assistantStarted: boolean;
 }
@@ -61,9 +64,11 @@ export function createForegroundRequestLedger(
 
 export function reduceRequestLedger(
   ledger: ForegroundRequestLedger,
-  event: InteractionEvent,
+  event: DomainEvent,
 ): ForegroundRequestLedger {
-  if (!("requestId" in event) || event.requestId !== ledger.requestId) {
+  const eventRequestId = event.causation?.requestId ?? "";
+
+  if (eventRequestId === "" || eventRequestId !== ledger.requestId) {
     return ledger;
   }
 
@@ -71,8 +76,10 @@ export function reduceRequestLedger(
     return ledger;
   }
 
+  const p = event.payload as Record<string, unknown>;
+
   switch (event.eventType) {
-    case "assistant_response_started": {
+    case "assistant.response_started": {
       const currentWave = ledger.currentExecutionWave;
       const hasInFlightWave =
         currentWave !== null && currentWave.completed.size < currentWave.planned.size;
@@ -82,22 +89,22 @@ export function reduceRequestLedger(
 
       return withDerivedPhase({
         ...ledger,
-        activeResponseId: event.payload.responseId,
+        activeResponseId: p.responseId as string,
         assistantStarted: true,
         currentExecutionWave: hasInFlightWave ? currentWave : null,
       });
     }
-    case "assistant_response_completed": {
-      if (ledger.activeResponseId !== event.payload.responseId) {
+    case "assistant.response_completed": {
+      if (ledger.activeResponseId !== (p.responseId as string)) {
         return ledger;
       }
 
-      if (event.payload.finishReason === "tool_calls") {
+      if (p.finishReason === "tool_calls") {
         return withDerivedPhase({
           ...ledger,
           activeResponseId: null,
           currentExecutionWave: {
-            planned: new Set(event.payload.plannedExecutionIds),
+            planned: new Set(p.plannedExecutionIds as string[]),
             ...createEmptyWaveSets(),
           },
         });
@@ -108,50 +115,54 @@ export function reduceRequestLedger(
         activeResponseId: null,
       });
     }
-    case "execution_item_started": {
+    case "execution.started": {
       if (ledger.currentExecutionWave === null) {
         return ledger;
       }
 
-      if (!ledger.currentExecutionWave.planned.has(event.payload.executionId)) {
+      const executionId = p.executionId as string;
+
+      if (!ledger.currentExecutionWave.planned.has(executionId)) {
         return ledger;
       }
 
-      if (ledger.currentExecutionWave.started.has(event.payload.executionId)) {
+      if (ledger.currentExecutionWave.started.has(executionId)) {
         return ledger;
       }
 
-      if (ledger.currentExecutionWave.completed.has(event.payload.executionId)) {
+      if (ledger.currentExecutionWave.completed.has(executionId)) {
         return ledger;
       }
 
       const nextWave = cloneWave(ledger.currentExecutionWave);
-      nextWave.started.add(event.payload.executionId);
+      nextWave.started.add(executionId);
       return withDerivedPhase({
         ...ledger,
         currentExecutionWave: nextWave,
       });
     }
-    case "execution_item_completed": {
+    case "execution.completed": {
       if (ledger.currentExecutionWave === null) {
         return ledger;
       }
 
-      if (!ledger.currentExecutionWave.planned.has(event.payload.executionId)) {
+      const executionId = p.executionId as string;
+
+      if (!ledger.currentExecutionWave.planned.has(executionId)) {
         return ledger;
       }
 
-      if (ledger.currentExecutionWave.completed.has(event.payload.executionId)) {
+      if (ledger.currentExecutionWave.completed.has(executionId)) {
         return ledger;
       }
 
       const nextWave = cloneWave(ledger.currentExecutionWave);
-      nextWave.completed.add(event.payload.executionId);
+      nextWave.completed.add(executionId);
 
-      if (event.payload.status === "error") {
-        nextWave.failed.add(event.payload.executionId);
-      } else if (event.payload.status === "interrupted") {
-        nextWave.interrupted.add(event.payload.executionId);
+      if (p.status === "error") {
+        nextWave.failed.add(executionId);
+      } else if (p.status === "interrupted") {
+        nextWave.interrupted.add(executionId);
       }
 
       return withDerivedPhase({
@@ -159,17 +170,34 @@ export function reduceRequestLedger(
         currentExecutionWave: nextWave,
       });
     }
-    case "request_completed": {
+    case "request.succeeded":
+    case "request.rejected":
+    case "request.failed": {
       return withDerivedPhase({
         ...ledger,
         activeResponseId: null,
         terminalEventReceived: true,
-        terminalStatus: event.payload.status,
+        terminalStatus: deriveTerminalStatus(event.eventType, p),
       });
     }
     default:
       return ledger;
   }
+}
+
+function deriveTerminalStatus(
+  eventType: DomainEvent["eventType"],
+  payload: Record<string, unknown>,
+): ForegroundRequestTerminalStatus {
+  if (eventType === "request.succeeded") {
+    return "completed";
+  }
+
+  if (eventType === "request.rejected") {
+    return "rejected";
+  }
+
+  return payload.code === "INTERRUPTED" ? "interrupted" : "error";
 }
 
 export function isComposerLocked(ledger: ForegroundRequestLedger | null): boolean {

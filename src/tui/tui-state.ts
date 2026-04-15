@@ -1,4 +1,4 @@
-import type { InteractionEvent } from "../contracts/interaction-event-schema.ts";
+import type { DomainEvent } from "../protocol/domain-event-schema.ts";
 import { listImplementedCommands } from "../commands/command-registry.ts";
 import { PRODUCT_DISPLAY_NAME } from "../core/brand.ts";
 import {
@@ -189,17 +189,18 @@ function replaceTimelineItem(
   };
 }
 
-function createWelcomeCard(input: CreateInitialTuiStateInput): TimelineItem {
+function createWelcomeCard(input: CreateInitialTuiStateInput, activeThemeId: ThemeId): TimelineItem {
+  const spells = getThemeDefinition(activeThemeId).spells;
   return {
     id: "welcome",
     kind: "welcome",
     summary: `${PRODUCT_DISPLAY_NAME} is ready in ${input.projectLabel} on ${input.branchLabel}.`,
     body: [
-      "Enter send",
+      spells.hintEnter,
       "Alt+Enter newline",
-      "Ctrl+C interrupt",
+      spells.hintInterrupt,
       "Ctrl+J newline",
-      "/help commands",
+      `/help (${spells.commandHelp})`,
     ].join("\n"),
     collapsed: false,
   };
@@ -235,7 +236,10 @@ function findExecutionCardIndex(
 
 function ensureAssistantCard(
   state: TuiState,
-  event: Extract<InteractionEvent, { eventType: "assistant_response_started" }>,
+  event: {
+    requestId: string;
+    responseId: string;
+  },
 ): {
   state: TuiState;
   index: number;
@@ -243,7 +247,7 @@ function ensureAssistantCard(
   const existingIndex = findAssistantCardIndex(
     state,
     event.requestId,
-    event.payload.responseId,
+    event.responseId,
   );
 
   if (existingIndex !== -1) {
@@ -260,7 +264,7 @@ function ensureAssistantCard(
     body: "",
     collapsed: false,
     requestId: event.requestId,
-    responseId: event.payload.responseId,
+    responseId: event.responseId,
   });
 
   return {
@@ -310,15 +314,16 @@ function ensureExecutionCard(
   };
 }
 
-function isBuiltinCommandRequest(event: InteractionEvent): boolean {
-  return "requestId" in event && event.requestId.startsWith("request-command-");
+function isBuiltinCommandRequest(event: DomainEvent): boolean {
+  const requestId = event.causation?.requestId ?? "";
+  return requestId.startsWith("request-command-");
 }
 
-function isBuiltinCommandExecutionEvent(event: InteractionEvent): boolean {
+function isBuiltinCommandExecutionEvent(event: DomainEvent): boolean {
   if (
-    event.eventType !== "execution_item_started" &&
-    event.eventType !== "execution_item_chunk" &&
-    event.eventType !== "execution_item_completed"
+    event.eventType !== "execution.started" &&
+    event.eventType !== "execution.chunk" &&
+    event.eventType !== "execution.completed"
   ) {
     return false;
   }
@@ -327,25 +332,24 @@ function isBuiltinCommandExecutionEvent(event: InteractionEvent): boolean {
     return true;
   }
 
-  if (event.eventType !== "execution_item_started") {
+  if (event.eventType !== "execution.started") {
     return false;
   }
 
-  return event.payload.origin.source === "builtin_command";
+  const origin = (event.payload as Record<string, unknown>).origin as
+    | Record<string, unknown>
+    | undefined;
+  return origin?.source === "builtin_command";
 }
 
 function isDeclaredExecutionEventForActiveLedger(
   state: TuiState,
-  event: Extract<
-    InteractionEvent,
-    | { eventType: "execution_item_started" }
-    | { eventType: "execution_item_chunk" }
-    | { eventType: "execution_item_completed" }
-  >,
+  event: DomainEvent,
 ): boolean {
   const activeLedger = state.activeRequestLedger;
+  const eventRequestId = event.causation?.requestId ?? "";
 
-  if (activeLedger === null || event.requestId !== activeLedger.requestId) {
+  if (activeLedger === null || eventRequestId !== activeLedger.requestId) {
     return false;
   }
 
@@ -355,45 +359,50 @@ function isDeclaredExecutionEventForActiveLedger(
     return false;
   }
 
-  return wave.planned.has(event.payload.executionId);
+  const p = event.payload as Record<string, unknown>;
+  return wave.planned.has(p.executionId as string);
 }
 
 function shouldProjectPromptLifecycleEventIntoTimeline(
   state: TuiState,
-  event: InteractionEvent,
+  event: DomainEvent,
 ): boolean {
   const activeLedger = state.activeRequestLedger;
+  const eventRequestId = event.causation?.requestId ?? "";
 
-  if (activeLedger === null || !("requestId" in event) || event.requestId !== activeLedger.requestId) {
+  if (activeLedger === null || eventRequestId === "" || eventRequestId !== activeLedger.requestId) {
     return false;
   }
 
+  const p = event.payload as Record<string, unknown>;
+
   switch (event.eventType) {
-    case "assistant_response_started": {
+    case "assistant.response_started": {
       const wave = activeLedger.currentExecutionWave;
       const hasInFlightWave =
         wave !== null && wave.completed.size < wave.planned.size;
 
       return !hasInFlightWave;
     }
-    case "assistant_stream_chunk":
-      return activeLedger.activeResponseId === event.payload.responseId;
-    case "assistant_response_completed":
-      return activeLedger.activeResponseId === event.payload.responseId;
-    case "execution_item_started":
-    case "execution_item_chunk":
-    case "execution_item_completed":
+    case "assistant.stream_chunk":
+      return activeLedger.activeResponseId === (p.responseId as string);
+    case "assistant.response_completed":
+      return activeLedger.activeResponseId === (p.responseId as string);
+    case "execution.started":
+    case "execution.chunk":
+    case "execution.completed":
       return isDeclaredExecutionEventForActiveLedger(state, event);
-    case "request_completed":
+    case "request.succeeded":
+    case "request.failed":
       return false;
     default:
       return false;
   }
 }
 
-function shouldProjectInteractionEventIntoTimeline(
+function shouldProjectDomainEventIntoTimeline(
   state: TuiState,
-  event: InteractionEvent,
+  event: DomainEvent,
 ): boolean {
   if (isBuiltinCommandExecutionEvent(event)) {
     return true;
@@ -402,25 +411,28 @@ function shouldProjectInteractionEventIntoTimeline(
   return shouldProjectPromptLifecycleEventIntoTimeline(state, event);
 }
 
-function projectInteractionEventIntoTimeline(
+function projectDomainEventIntoTimeline(
   state: TuiState,
-  event: InteractionEvent,
+  event: DomainEvent,
 ): TuiState {
+  const p = event.payload as Record<string, unknown>;
+  const eventRequestId = event.causation?.requestId ?? "";
+
   switch (event.eventType) {
-    case "assistant_response_started": {
-      return ensureAssistantCard(state, event).state;
+    case "assistant.response_started": {
+      return ensureAssistantCard(state, {
+        requestId: eventRequestId,
+        responseId: p.responseId as string,
+      }).state;
     }
-    case "assistant_stream_chunk": {
-      if (event.payload.channel !== "output_text") {
+    case "assistant.stream_chunk": {
+      if (p.channel !== "output_text") {
         return state;
       }
 
       const assistant = ensureAssistantCard(state, {
-        ...event,
-        eventType: "assistant_response_started",
-        payload: {
-          responseId: event.payload.responseId,
-        },
+        requestId: eventRequestId,
+        responseId: p.responseId as string,
       });
       const assistantCard = assistant.state.timeline[assistant.index];
 
@@ -428,7 +440,7 @@ function projectInteractionEventIntoTimeline(
         return assistant.state;
       }
 
-      const nextBody = (assistantCard.body ?? "") + event.payload.delta;
+      const nextBody = (assistantCard.body ?? "") + (p.delta as string);
       const nextSummary = nextBody.trim().length > 0 ? nextBody : assistantCard.summary;
 
       return replaceTimelineItem(assistant.state, assistant.index, {
@@ -437,20 +449,20 @@ function projectInteractionEventIntoTimeline(
         body: nextBody,
       });
     }
-    case "assistant_response_completed":
+    case "assistant.response_completed":
       return state;
-    case "execution_item_started": {
+    case "execution.started": {
       return ensureExecutionCard(state, {
-        requestId: event.requestId,
-        executionId: event.payload.executionId,
-        title: event.payload.title,
+        requestId: eventRequestId,
+        executionId: p.executionId as string,
+        title: p.title as string,
       }).state;
     }
-    case "execution_item_chunk": {
+    case "execution.chunk": {
       const execution = ensureExecutionCard(state, {
-        requestId: event.requestId,
-        executionId: event.payload.executionId,
-        title: event.payload.executionId,
+        requestId: eventRequestId,
+        executionId: p.executionId as string,
+        title: p.executionId as string,
       });
       const executionCard = execution.state.timeline[execution.index];
 
@@ -460,7 +472,7 @@ function projectInteractionEventIntoTimeline(
 
       const previousBuffer =
         executionCard.executionTranscript ?? createExecutionTranscriptBuffer();
-      const nextBuffer = appendTranscriptChunk(previousBuffer, event.payload.output);
+      const nextBuffer = appendTranscriptChunk(previousBuffer, p.output as string);
 
       if (nextBuffer === previousBuffer) {
         return execution.state;
@@ -478,11 +490,11 @@ function projectInteractionEventIntoTimeline(
         unreadLineCount,
       });
     }
-    case "execution_item_completed": {
+    case "execution.completed": {
       const execution = ensureExecutionCard(state, {
-        requestId: event.requestId,
-        executionId: event.payload.executionId,
-        title: event.payload.summary,
+        requestId: eventRequestId,
+        executionId: p.executionId as string,
+        title: p.summary as string,
       });
       const executionCard = execution.state.timeline[execution.index];
 
@@ -492,19 +504,20 @@ function projectInteractionEventIntoTimeline(
 
       return replaceTimelineItem(execution.state, execution.index, {
         ...executionCard,
-        summary: event.payload.summary,
+        summary: p.summary as string,
       });
     }
-    case "request_completed":
+    case "request.succeeded":
+    case "request.failed":
       return state;
     default:
       return state;
   }
 }
 
-function projectInteractionEventIntoRequestLedger(
+function projectDomainEventIntoRequestLedger(
   state: TuiState,
-  event: InteractionEvent,
+  event: DomainEvent,
 ): TuiState {
   const activeLedger = state.activeRequestLedger;
 
@@ -512,7 +525,9 @@ function projectInteractionEventIntoRequestLedger(
     return state;
   }
 
-  if (!("requestId" in event) || event.requestId !== activeLedger.requestId) {
+  const eventRequestId = event.causation?.requestId ?? "";
+
+  if (eventRequestId === "" || eventRequestId !== activeLedger.requestId) {
     return state;
   }
 
@@ -542,7 +557,7 @@ export function createInitialTuiState(input: CreateInitialTuiStateInput): TuiSta
     runtimeState: "ready",
     activeRequestLedger: null,
     commandMenu: createEmptyCommandMenu(),
-    timeline: [createWelcomeCard(input)],
+    timeline: [createWelcomeCard(input, activeThemeId)],
     selectedTimelineIndex: 0,
     draft: "",
     draftAttachments: [],
@@ -708,12 +723,12 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         inputLocked: isComposerLocked(nextLedger),
       };
     }
-    case "project_interaction_event": {
-      const shouldProjectTimelineEvent = shouldProjectInteractionEventIntoTimeline(
+    case "project_domain_event": {
+      const shouldProjectTimelineEvent = shouldProjectDomainEventIntoTimeline(
         state,
         action.event,
       );
-      const withLedgerProjection = projectInteractionEventIntoRequestLedger(
+      const withLedgerProjection = projectDomainEventIntoRequestLedger(
         state,
         action.event,
       );
@@ -722,7 +737,7 @@ export function reduceTuiState(state: TuiState, action: TuiAction): TuiState {
         return withLedgerProjection;
       }
 
-      return projectInteractionEventIntoTimeline(
+      return projectDomainEventIntoTimeline(
         withLedgerProjection,
         action.event,
       );

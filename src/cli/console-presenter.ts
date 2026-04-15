@@ -1,4 +1,4 @@
-import type { InteractionEvent, ExecutionStatus } from "../contracts/interaction-event-schema.ts";
+import type { DomainEvent } from "../protocol/domain-event-schema.ts";
 
 export type ConsoleSurfaceStream = "stdout" | "stderr";
 
@@ -7,6 +7,8 @@ export type ConsoleSurface = {
   setActiveStatus: (text: string) => void;
   clearActiveStatus: () => void;
 };
+
+export type ExecutionStatus = "success" | "error" | "interrupted";
 
 export type RecordedExecution = {
   requestId: string;
@@ -19,8 +21,7 @@ export type RecordedExecution = {
 };
 
 export type ConsolePresenter = {
-  onSystemLine: (line: string) => void;
-  onInteractionEvent: (event: InteractionEvent) => void;
+  onDomainEvent: (event: DomainEvent) => void;
   consumeTerminalError: () => PresentedStreamRequestError | null;
   getRecordedExecution: (executionId: string) => RecordedExecution | null;
 };
@@ -69,33 +70,36 @@ export function createConsolePresenter(
   };
 
   return {
-    onSystemLine: (line: string) => {
-      surface.appendTimelineText(`${line}\n`, "stdout");
-    },
-    onInteractionEvent: (event: InteractionEvent) => {
+    onDomainEvent: (event: DomainEvent) => {
+      const payload = event.payload;
+
       switch (event.eventType) {
-        case "assistant_response_started": {
-          responseHasOutput.set(event.payload.responseId, false);
+        case "assistant.response_started": {
+          const responseId = payload.responseId as string;
+          responseHasOutput.set(responseId, false);
           surface.setActiveStatus("Thinking...");
           break;
         }
-        case "assistant_stream_chunk": {
-          if (event.payload.channel !== "output_text") {
+        case "assistant.stream_chunk": {
+          if (payload.channel !== "output_text") {
             break;
           }
 
-          surface.appendTimelineText(event.payload.delta, "stdout");
-          responseHasOutput.set(event.payload.responseId, true);
+          const responseId = payload.responseId as string;
+          const delta = payload.delta as string;
+          surface.appendTimelineText(delta, "stdout");
+          responseHasOutput.set(responseId, true);
           break;
         }
-        case "assistant_response_completed": {
-          const hadOutput = responseHasOutput.get(event.payload.responseId);
+        case "assistant.response_completed": {
+          const responseId = payload.responseId as string;
+          const hadOutput = responseHasOutput.get(responseId);
 
           if (hadOutput) {
             surface.appendTimelineText("\n", "stdout");
           }
 
-          responseHasOutput.delete(event.payload.responseId);
+          responseHasOutput.delete(responseId);
           if (activeExecutions.size === 0) {
             surface.clearActiveStatus();
           } else {
@@ -103,49 +107,61 @@ export function createConsolePresenter(
           }
           break;
         }
-        case "execution_item_started": {
-          activeExecutions.set(event.payload.executionId, event.payload.title);
-          recordedExecutions.set(event.payload.executionId, {
-            requestId: event.requestId,
-            executionId: event.payload.executionId,
-            title: event.payload.title,
+        case "execution.started": {
+          const executionId = payload.executionId as string;
+          const title = payload.title as string;
+          const requestId = event.causation?.requestId ?? "";
+          activeExecutions.set(executionId, title);
+          recordedExecutions.set(executionId, {
+            requestId,
+            executionId,
+            title,
             summary: null,
             status: "running",
           });
-          surface.appendTimelineText(`> ${event.payload.title}\n`, "stdout");
+          surface.appendTimelineText(`> ${title}\n`, "stdout");
           updateExecutionStatus();
           break;
         }
-        case "execution_item_chunk": {
-          surface.appendTimelineText(event.payload.output, event.payload.stream === "stderr" ? "stderr" : "stdout");
+        case "execution.chunk": {
+          const output = payload.output as string;
+          const stream = payload.stream as string;
+          surface.appendTimelineText(output, stream === "stderr" ? "stderr" : "stdout");
           break;
         }
-        case "execution_item_completed": {
-          activeExecutions.delete(event.payload.executionId);
-          const previousRecord = recordedExecutions.get(event.payload.executionId);
+        case "execution.completed": {
+          const executionId = payload.executionId as string;
+          const summary = payload.summary as string;
+          const status = payload.status as ExecutionStatus;
+          activeExecutions.delete(executionId);
+          const previousRecord = recordedExecutions.get(executionId);
           if (previousRecord) {
-            recordedExecutions.set(event.payload.executionId, {
+            const errorCode = payload.errorCode as string | undefined;
+            const exitCode = payload.exitCode as number | undefined;
+            recordedExecutions.set(executionId, {
               ...previousRecord,
-              summary: event.payload.summary,
-              status: event.payload.status,
-              ...(event.payload.errorCode ? { errorCode: event.payload.errorCode } : {}),
-              ...(event.payload.exitCode !== undefined ? { exitCode: event.payload.exitCode } : {}),
+              summary,
+              status,
+              ...(errorCode ? { errorCode } : {}),
+              ...(exitCode !== undefined ? { exitCode } : {}),
             });
           }
           updateExecutionStatus();
           break;
         }
-        case "request_completed": {
+        case "request.succeeded": {
+          surface.clearActiveStatus();
+          break;
+        }
+        case "request.failed": {
           surface.clearActiveStatus();
 
-          if (event.payload.status !== "error") {
-            break;
-          }
-
-          const message = event.payload.errorCode
-            ? `Request failed: ${event.payload.errorCode}`
-            : "Request failed";
-          terminalError = new PresentedStreamRequestError(message, event.payload.errorCode);
+          const code = payload.code as string | undefined;
+          const payloadMessage = payload.message as string | undefined;
+          const message = code
+            ? `Request failed: ${code}`
+            : (payloadMessage ?? "Request failed");
+          terminalError = new PresentedStreamRequestError(message, code);
           surface.appendTimelineText(`${message}\n`, "stderr");
           break;
         }

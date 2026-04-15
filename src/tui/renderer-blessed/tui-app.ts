@@ -51,11 +51,15 @@ function renderTimeline(
   wrapWidth?: number,
 ): { content: string; selectedLine: number; itemStartLines: number[] } {
   const options = wrapWidth === undefined ? undefined : { wrapWidth };
+  const activeThemeId = state.themePicker?.selectedThemeId ?? state.activeThemeId;
   return renderTimelineItems(
     state.timeline,
     state.selectedTimelineIndex,
     palette,
-    options,
+    {
+      ...options,
+      activeThemeId,
+    },
   );
 }
 

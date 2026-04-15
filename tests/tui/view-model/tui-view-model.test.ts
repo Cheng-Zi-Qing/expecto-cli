@@ -59,7 +59,7 @@ test("buildTuiViewModel derives transcript blocks and footer state from TuiState
   assert.equal(view.overlay, null);
   assert.equal(view.footer.composer.value, "inspect auth flow");
   assert.equal(view.footer.composer.locked, true);
-  assert.equal(view.footer.status.runtimeLabel, "Thinking");
+  assert.equal(view.footer.status.runtimeLabel, "Legilimency");
   assert.equal((view.footer as TuiFooterViewWithTheme).theme?.id, "hufflepuff");
 });
 

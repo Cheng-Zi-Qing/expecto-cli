@@ -59,6 +59,10 @@ export type TuiFooterView = {
     id: ThemeId;
     palette: ThemePalette;
   };
+  labels: {
+    composerTitle: string;
+    themePickerTitle: string;
+  };
   composer: {
     value: string;
     locked: boolean;
@@ -95,6 +99,10 @@ export type TuiThemePickerSampleThemeView = {
 export type TuiThemePickerOverlayView = {
   kind: "theme_picker";
   reason: ThemePickerReason;
+  labels: {
+    composerTitle: string;
+    themePickerTitle: string;
+  };
   entries: TuiThemePickerEntryView[];
   sampleTheme: TuiThemePickerSampleThemeView;
 };

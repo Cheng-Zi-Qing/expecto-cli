@@ -1,4 +1,5 @@
 import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
+import type { ThemeSpellLabels } from "../tui/theme/theme-types.ts";
 import { resolveGitBranch } from "../core/git-branch.ts";
 import { createHelpSections, findCommandByInput } from "./command-registry.ts";
 import { parseSlashCommand } from "./command-parser.ts";
@@ -19,7 +20,14 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled command id: ${String(value)}`);
 }
 
-function buildHelpEffects(): CommandExecutionEffect[] {
+const COMMAND_SPELL_KEYS: Record<string, keyof ThemeSpellLabels> = {
+  "/help": "commandHelp",
+  "/clear": "commandClear",
+  "/theme": "commandTheme",
+  "/exit": "commandExit",
+};
+
+function buildHelpEffects(spellLabels?: ThemeSpellLabels): CommandExecutionEffect[] {
   const sections = createHelpSections();
   const lines: string[] = ["Available commands", ""];
 
@@ -27,7 +35,12 @@ function buildHelpEffects(): CommandExecutionEffect[] {
     lines.push(section.title);
 
     section.commands.forEach((command) => {
-      lines.push(`${command.name}    ${command.description}`);
+      const spellKey = COMMAND_SPELL_KEYS[command.name];
+      const spellAnnotation =
+        spellLabels && spellKey && spellLabels[spellKey].toLowerCase() !== command.name.slice(1).toLowerCase()
+          ? ` (${spellLabels[spellKey]})`
+          : "";
+      lines.push(`${command.name}${spellAnnotation}    ${command.description}`);
     });
 
     if (sectionIndex < sections.length - 1) {
@@ -41,6 +54,7 @@ function buildHelpEffects(): CommandExecutionEffect[] {
 export async function executeBuiltinCommand(
   input: string,
   context: BootstrapContext,
+  spellLabels?: ThemeSpellLabels,
 ): Promise<CommandExecutionResult> {
   const parsed = parseSlashCommand(input);
 
@@ -73,16 +87,21 @@ export async function executeBuiltinCommand(
     case "session.help":
       return {
         handled: true,
-        effects: buildHelpEffects(),
+        effects: buildHelpEffects(spellLabels),
       };
     case "session.clear":
-      return {
-        handled: true,
-        effects: [
-          { type: "clear_conversation" },
-          { type: "system_message", line: "conversation cleared" },
-        ],
-      };
+      {
+        const clearSpell = spellLabels && spellLabels.commandClear !== "Clear"
+          ? `${spellLabels.commandClear}! `
+          : "";
+        return {
+          handled: true,
+          effects: [
+            { type: "clear_conversation" },
+            { type: "system_message", line: `${clearSpell}conversation cleared` },
+          ],
+        };
+      }
     case "session.status":
       return {
         handled: true,
@@ -148,10 +167,17 @@ export async function executeBuiltinCommand(
         effects: [{ type: "open_theme_picker" }],
       };
     case "session.exit":
-      return {
-        handled: true,
-        effects: [{ type: "exit_session" }],
-      };
+      {
+        const exitEffects: CommandExecutionEffect[] = [];
+        if (spellLabels && spellLabels.commandExit !== "Exit") {
+          exitEffects.push({ type: "system_message", line: `${spellLabels.commandExit}!` });
+        }
+        exitEffects.push({ type: "exit_session" });
+        return {
+          handled: true,
+          effects: exitEffects,
+        };
+      }
     default:
       return assertNever(command.id);
   }

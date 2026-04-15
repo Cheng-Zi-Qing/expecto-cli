@@ -9,35 +9,36 @@ import {
 } from "../../src/tui/request-ledger.ts";
 import type {
   ExecutionStatus,
-  InteractionEvent,
-  RequestCompletedStatus,
-} from "../../src/contracts/interaction-event-schema.ts";
+} from "../../src/protocol/domain-event-payload-schema.ts";
+import type { DomainEvent } from "../../src/protocol/domain-event-schema.ts";
+import type { ForegroundRequestTerminalStatus } from "../../src/tui/request-ledger.ts";
 
-const baseEnvelope = {
-  timestamp: "2026-03-26T10:00:00.000Z",
-  sessionId: "session-1",
-  turnId: "turn-1",
-} as const;
+let eventSequence = 0;
 
-function createEvent<TEventType extends InteractionEvent["eventType"]>(
+function createDomainEvent(
   input: {
     requestId?: string;
-    eventType: TEventType;
-    payload: Extract<InteractionEvent, { eventType: TEventType }>["payload"];
+    eventType: string;
+    payload: Record<string, unknown>;
   },
-): Extract<InteractionEvent, { eventType: TEventType }> {
+): DomainEvent {
+  eventSequence += 1;
   return {
-    ...baseEnvelope,
-    requestId: input.requestId ?? "request-1",
+    protocolVersion: "1.0",
+    eventId: `evt-${eventSequence}`,
+    sessionId: "session-1",
     eventType: input.eventType,
+    sequence: eventSequence,
+    timestamp: "2026-03-26T10:00:00.000Z",
+    ...(input.requestId ? { causation: { requestId: input.requestId } } : {}),
     payload: input.payload,
-  } as Extract<InteractionEvent, { eventType: TEventType }>;
+  };
 }
 
-function assistantResponseStarted(requestId: string, responseId: string): InteractionEvent {
-  return createEvent({
+function assistantResponseStarted(requestId: string, responseId: string): DomainEvent {
+  return createDomainEvent({
     requestId,
-    eventType: "assistant_response_started",
+    eventType: "assistant.response_started",
     payload: { responseId },
   });
 }
@@ -46,10 +47,10 @@ function assistantResponseCompletedToolCalls(
   requestId: string,
   responseId: string,
   plannedExecutionIds: string[],
-): InteractionEvent {
-  return createEvent({
+): DomainEvent {
+  return createDomainEvent({
     requestId,
-    eventType: "assistant_response_completed",
+    eventType: "assistant.response_completed",
     payload: {
       responseId,
       finishReason: "tool_calls",
@@ -59,10 +60,10 @@ function assistantResponseCompletedToolCalls(
   });
 }
 
-function executionItemStarted(requestId: string, executionId: string): InteractionEvent {
-  return createEvent({
+function executionItemStarted(requestId: string, executionId: string): DomainEvent {
+  return createDomainEvent({
     requestId,
-    eventType: "execution_item_started",
+    eventType: "execution.started",
     payload: {
       executionId,
       executionKind: "command",
@@ -78,10 +79,10 @@ function executionItemCompleted(
   requestId: string,
   executionId: string,
   status: ExecutionStatus,
-): InteractionEvent {
-  return createEvent({
+): DomainEvent {
+  return createDomainEvent({
     requestId,
-    eventType: "execution_item_completed",
+    eventType: "execution.completed",
     payload: {
       executionId,
       status,
@@ -90,11 +91,38 @@ function executionItemCompleted(
   });
 }
 
-function requestCompleted(requestId: string, status: RequestCompletedStatus): InteractionEvent {
-  return createEvent({
+function requestSucceeded(requestId: string): DomainEvent {
+  return createDomainEvent({
     requestId,
-    eventType: "request_completed",
-    payload: { status },
+    eventType: "request.succeeded",
+    payload: {},
+  });
+}
+
+function requestFailed(
+  requestId: string,
+  input: { code: string; message?: string; retryable?: boolean },
+): DomainEvent {
+  return createDomainEvent({
+    requestId,
+    eventType: "request.failed",
+    payload: {
+      code: input.code,
+      message: input.message ?? input.code,
+      retryable: input.retryable ?? false,
+    },
+  });
+}
+
+function requestRejected(requestId: string): DomainEvent {
+  return createDomainEvent({
+    requestId,
+    eventType: "request.rejected",
+    payload: {
+      code: "POLICY_BLOCKED",
+      message: "blocked by policy",
+      retryable: false,
+    },
   });
 }
 
@@ -112,7 +140,7 @@ function snapshotLedger(ledger: ReturnType<typeof createForegroundRequestLedger>
   } | null;
   interruptRequested: boolean;
   terminalEventReceived: boolean;
-  terminalStatus: RequestCompletedStatus | null;
+  terminalStatus: ForegroundRequestTerminalStatus | null;
   phase: string;
   assistantStarted: boolean;
 } {
@@ -151,7 +179,7 @@ if (false) {
   }
 }
 
-test("request ledger stays locked until matching request_completed even after all planned ids finish", () => {
+test("request ledger stays locked until matching request terminal event even after all planned ids finish", () => {
   const requestId = "request-1";
   let ledger = createForegroundRequestLedger({
     requestId,
@@ -218,7 +246,10 @@ test("request ledger stays locked until matching request_completed even after al
   assert.deepEqual([...completedWave.failed], ["execution-2"]);
   assert.deepEqual([...completedWave.interrupted], ["execution-3"]);
 
-  ledger = reduceRequestLedger(ledger, requestCompleted(requestId, "error"));
+  ledger = reduceRequestLedger(
+    ledger,
+    requestFailed(requestId, { code: "UNKNOWN", message: "request failed" }),
+  );
   assert.equal(ledger.phase, "terminal");
   assert.equal(ledger.terminalEventReceived, true);
   assert.equal(ledger.terminalStatus, "error");
@@ -241,7 +272,7 @@ test("request ledger marks interrupt intent and stays locked until request compl
 
   const terminal = reduceRequestLedger(
     interrupting,
-    requestCompleted(requestId, "interrupted"),
+    requestFailed(requestId, { code: "INTERRUPTED", message: "generation interrupted" }),
   );
 
   assert.equal(terminal.phase, "terminal");
@@ -317,7 +348,7 @@ test("request ledger ignores mismatched request ids and remains locked for the a
     startedAt: "2026-03-26T10:00:00.000Z",
   });
 
-  ledger = reduceRequestLedger(ledger, requestCompleted("request-2", "completed"));
+  ledger = reduceRequestLedger(ledger, requestSucceeded("request-2"));
   assert.equal(ledger.terminalEventReceived, false);
   assert.equal(isComposerLocked(ledger), true);
 });
@@ -426,7 +457,7 @@ test("assistant response started preserves an in-flight execution wave", () => {
   assert.equal(ledger.phase, "executing");
 });
 
-test("request ledger is immutable after request_completed for later assistant and execution events", () => {
+test("request ledger is immutable after request terminal events for later assistant and execution events", () => {
   const requestId = "request-1";
   let ledger = createForegroundRequestLedger({
     requestId,
@@ -439,7 +470,10 @@ test("request ledger is immutable after request_completed for later assistant an
     ledger,
     assistantResponseCompletedToolCalls(requestId, "response-1", ["execution-1"]),
   );
-  ledger = reduceRequestLedger(ledger, requestCompleted(requestId, "error"));
+  ledger = reduceRequestLedger(
+    ledger,
+    requestFailed(requestId, { code: "UNKNOWN", message: "request failed" }),
+  );
 
   assert.equal(ledger.terminalEventReceived, true);
   assert.equal(ledger.phase, "terminal");
@@ -462,6 +496,22 @@ test("request ledger is immutable after request_completed for later assistant an
     executionItemCompleted(requestId, "execution-1", "success"),
   );
   assert.deepEqual(snapshotLedger(afterLateExecutionCompleted), terminalSnapshot);
+});
+
+test("request ledger treats request.rejected as a terminal outcome", () => {
+  const requestId = "request-1";
+  const initial = createForegroundRequestLedger({
+    requestId,
+    turnId: "turn-1",
+    startedAt: "2026-03-26T12:30:00.000Z",
+  });
+
+  const terminal = reduceRequestLedger(initial, requestRejected(requestId));
+
+  assert.equal(terminal.phase, "terminal");
+  assert.equal(terminal.terminalEventReceived, true);
+  assert.equal(terminal.terminalStatus, "rejected");
+  assert.equal(isComposerLocked(terminal), false);
 });
 
 test("request ledger ignores duplicate execution completion for an already-terminal execution id", () => {

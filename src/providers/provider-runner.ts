@@ -1,6 +1,6 @@
 import type { AssistantStepInput, AssistantStepResult } from "../runtime/runtime-session.ts";
 import type { SessionMode } from "../runtime/bootstrap-context.ts";
-import type { AssistantNonToolCallFinishReason } from "../contracts/interaction-event-schema.ts";
+import type { AssistantNonToolCallFinishReason } from "../protocol/domain-event-payload-schema.ts";
 import { ProviderRegistry } from "./provider-registry.ts";
 import { ProviderRouter } from "./provider-router.ts";
 import {

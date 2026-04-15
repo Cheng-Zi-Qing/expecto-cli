@@ -1,4 +1,5 @@
 import type { ThemeDefinition } from "../theme-types.ts";
+import { HOUSE_SPELL_LABELS } from "../spell-labels.ts";
 
 export const slytherinTheme: ThemeDefinition = {
   id: "slytherin",
@@ -82,7 +83,7 @@ export const slytherinTheme: ThemeDefinition = {
   },
   sample: {
     tipTitle: "Tips",
-    tipText: "Run /help to inspect available commands.",
+    tipText: "Cast /help (Lumos) to see your spellbook.",
     highlightTitle: "Highlights",
     highlightTokens: [
       { kind: "command", text: "/theme" },
@@ -91,4 +92,9 @@ export const slytherinTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Serpent Prompt",
+    assistant: "Serpent Reply",
+  },
+  spells: HOUSE_SPELL_LABELS,
 };

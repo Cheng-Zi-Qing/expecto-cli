@@ -1,4 +1,5 @@
 import type { ThemeDefinition } from "../theme-types.ts";
+import { ORIGIN_SPELL_LABELS } from "../spell-labels.ts";
 
 export const originTheme: ThemeDefinition = {
   id: "origin",
@@ -59,4 +60,9 @@ export const originTheme: ThemeDefinition = {
       { kind: "status", text: "ready" },
     ],
   },
+  conversation: {
+    user: "Submitted Input",
+    assistant: "Assistant",
+  },
+  spells: ORIGIN_SPELL_LABELS,
 };

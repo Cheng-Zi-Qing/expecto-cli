@@ -14,7 +14,6 @@ import {
   wrapPlainText,
 } from "./text-layout.ts";
 
-const USER_HEADER_LABEL = "Submitted Input";
 const FRAME_SIDE_WIDTH = 4;
 const THEME_PICKER_COLUMN_GAP = 5;
 
@@ -661,7 +660,7 @@ function renderThemePickerPreviewLines(
 
 function buildThemePickerApplyLine(overlay: TuiThemePickerOverlayView): string {
   const availabilityLabel = overlay.reason === "first_launch"
-    ? "Required before entering the Room of Requirement"
+    ? `Required before entering the ${overlay.labels.composerTitle}`
     : "Press /theme any time";
 
   return `  [ Enter ] apply · ${availabilityLabel}`;
@@ -746,7 +745,7 @@ function renderCard(
     };
 
     return [
-      renderStyledFrameLine(width, "╭", "╮", ` ${USER_HEADER_LABEL} `, borderStyle, frameInnerStyle),
+      renderStyledFrameLine(width, "╭", "╮", ` ${card.headerLabel} `, borderStyle, frameInnerStyle),
       ...bodyLines.map((line) => renderFilledBodyLine(line, width, borderStyle, contentStyle)),
       renderStyledFrameLine(width, "╰", "╯", "", borderStyle, frameInnerStyle),
     ];
@@ -935,7 +934,7 @@ export function renderThemePickerOverlay(
   ];
 
   const output = [
-    renderStyledFrameLine(normalizedWidth, "╭", "╮", " 🧙 Sorting Hat ", outerBorderStyle, outerBorderStyle),
+    renderStyledFrameLine(normalizedWidth, "╭", "╮", ` 🧙 ${overlay.labels.themePickerTitle} `, outerBorderStyle, outerBorderStyle),
   ];
 
   for (const line of bodyLines) {

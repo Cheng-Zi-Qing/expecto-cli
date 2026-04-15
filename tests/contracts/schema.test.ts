@@ -8,7 +8,6 @@ import {
   artifactRefSchema,
   artifactWriteInputSchema,
 } from "../../src/contracts/artifact-schema.ts";
-import { runtimeEventSchema } from "../../src/contracts/event-schema.ts";
 import { sessionSnapshotSchema } from "../../src/contracts/session-snapshot-schema.ts";
 import { taskPacketSchema } from "../../src/contracts/task-packet-schema.ts";
 import { toolResultSchema } from "../../src/contracts/tool-result-schema.ts";
@@ -126,19 +125,6 @@ test("task packet accepts a reviewer packet with constraints", () => {
   });
 
   assert.equal(parsed.role, "reviewer");
-});
-
-test("runtime event accepts a tool event", () => {
-  const parsed = runtimeEventSchema.parse({
-    type: "tool:post",
-    sessionId: "session-1",
-    timestamp: "2026-03-23T10:00:00.000Z",
-    payload: {
-      tool: "read",
-    },
-  });
-
-  assert.equal(parsed.type, "tool:post");
 });
 
 test("session snapshot accepts active artifacts and session state", () => {

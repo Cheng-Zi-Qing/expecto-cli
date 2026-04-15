@@ -1,4 +1,6 @@
 import type { MarkdownBlock } from "../block-model/block-types.ts";
+import { getDefaultThemeId } from "../theme/theme-registry.ts";
+import type { ThemeId } from "../theme/theme-types.ts";
 import type { TimelineItem } from "../tui-types.ts";
 import type {
   ThemeWelcomeBlock,
@@ -14,8 +16,6 @@ import {
   renderInlineTextTokens,
   styleText,
 } from "./tui-theme.ts";
-
-const USER_HEADER_LABEL = "Submitted Input";
 
 type CardChrome = {
   title: string;
@@ -35,7 +35,7 @@ function cardChrome(card: TimelineCard, palette: RendererPalette): CardChrome {
   switch (card.kind) {
     case "user":
       return {
-        title: USER_HEADER_LABEL,
+        title: card.headerLabel,
         accent: palette.timeline.card.user.label,
         border: palette.timeline.card.user.border,
         summary: palette.timeline.card.user.summary,
@@ -362,10 +362,15 @@ export function renderTimelineItems(
   palette: RendererPalette,
   options?: {
     wrapWidth?: number;
+    activeThemeId?: ThemeId;
   },
 ): RenderedTimelineLayout {
   return renderTimelineCards(
-    buildTimelineCards(timeline, selectedIndex),
+    buildTimelineCards(
+      timeline,
+      selectedIndex,
+      options?.activeThemeId ?? getDefaultThemeId(),
+    ),
     palette,
     options,
   );

@@ -61,6 +61,7 @@ function createComposerSnapshot(state: TuiState): ComposerSnapshot {
           ? "Waiting for response..."
           : "Write a prompt",
     statusLabel: footerView.status.runtimeLabel,
+    labels: footerView.labels,
     theme: footerView.theme,
   };
 }

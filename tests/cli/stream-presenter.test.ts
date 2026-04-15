@@ -1,14 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import type { DomainEvent } from "../../src/protocol/domain-event-schema.ts";
 import { createStreamPresenter } from "../../src/cli/stream-presenter.ts";
 
-const baseEvent = {
-  timestamp: "2024-01-01T00:00:00.000Z",
-  sessionId: "session-1",
-  turnId: "turn-1",
-  requestId: "request-1",
-} as const;
+let eventSequence = 0;
+
+function makeDomainEvent(
+  eventType: string,
+  payload: Record<string, unknown>,
+  causation?: { requestId: string },
+): DomainEvent {
+  eventSequence += 1;
+  return {
+    protocolVersion: "1.0",
+    eventId: `evt-${eventSequence}`,
+    sessionId: "session-1",
+    eventType,
+    sequence: eventSequence,
+    timestamp: "2024-01-01T00:00:00.000Z",
+    ...(causation ? { causation } : {}),
+    payload,
+  };
+}
 
 test("stream presenter writes assistant output chunks to stdout", () => {
   let stdout = "";
@@ -22,26 +36,26 @@ test("stream presenter writes assistant output chunks to stdout", () => {
     },
   });
 
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_stream_chunk",
-    payload: {
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.stream_chunk",
+    {
       responseId: "response-1",
       channel: "output_text",
       format: "markdown",
       delta: "Hello, ",
     },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_stream_chunk",
-    payload: {
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.stream_chunk",
+    {
       responseId: "response-1",
       channel: "output_text",
       format: "markdown",
       delta: "world!",
     },
-  });
+    { requestId: "request-1" },
+  ));
 
   assert.equal(stdout, "Hello, world!");
   assert.equal(stderr, "");
@@ -59,32 +73,30 @@ test("stream presenter appends a trailing newline when assistant output complete
     },
   });
 
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_response_started",
-    payload: {
-      responseId: "response-1",
-    },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_stream_chunk",
-    payload: {
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.response_started",
+    { responseId: "response-1" },
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.stream_chunk",
+    {
       responseId: "response-1",
       channel: "output_text",
       format: "markdown",
       delta: "Hello",
     },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_response_completed",
-    payload: {
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.response_completed",
+    {
       responseId: "response-1",
       finishReason: "stop",
       continuation: "none",
     },
-  });
+    { requestId: "request-1" },
+  ));
 
   assert.equal(stdout, "Hello\n");
   assert.equal(stderr, "");
@@ -102,27 +114,25 @@ test("stream presenter renders execution title and stdout chunk on stdout", () =
     },
   });
 
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "execution_item_started",
-    payload: {
+  presenter.onDomainEvent(makeDomainEvent(
+    "execution.started",
+    {
       executionId: "exec-1",
       executionKind: "tool",
       title: "Run tests",
-      origin: {
-        source: "unit",
-      },
+      origin: { source: "unit" },
     },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "execution_item_chunk",
-    payload: {
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "execution.chunk",
+    {
       executionId: "exec-1",
       stream: "stdout",
       output: "all green",
     },
-  });
+    { requestId: "request-1" },
+  ));
 
   assert.equal(stdout, "> Run tests\nall green");
   assert.equal(stderr, "");
@@ -140,40 +150,37 @@ test("stream presenter ignores reasoning chunks and routes execution stderr", ()
     },
   });
 
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "assistant_stream_chunk",
-    payload: {
+  presenter.onDomainEvent(makeDomainEvent(
+    "assistant.stream_chunk",
+    {
       responseId: "response-2",
       channel: "reasoning_text",
       format: "plain_text",
       delta: "hidden",
     },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "execution_item_started",
-    payload: {
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "execution.started",
+    {
       executionId: "exec-1",
       executionKind: "tool",
       title: "Run tests",
-      origin: {
-        source: "unit",
-      },
+      origin: { source: "unit" },
     },
-  });
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "execution_item_chunk",
-    payload: {
+    { requestId: "request-1" },
+  ));
+  presenter.onDomainEvent(makeDomainEvent(
+    "execution.chunk",
+    {
       executionId: "exec-1",
       stream: "stderr",
       output: "error output",
     },
-  });
-  presenter.onSystemLine("system line");
+    { requestId: "request-1" },
+  ));
 
-  assert.equal(stdout, "> Run tests\nsystem line\n");
+  assert.equal(stdout, "> Run tests\n");
   assert.equal(stderr, "error output");
 });
 
@@ -189,14 +196,14 @@ test("stream presenter writes request-level terminal errors to stderr", () => {
     },
   });
 
-  presenter.onInteractionEvent({
-    ...baseEvent,
-    eventType: "request_completed",
-    payload: {
-      status: "error",
-      errorCode: "AGENT_LOOP_LIMIT_EXCEEDED",
+  presenter.onDomainEvent(makeDomainEvent(
+    "request.failed",
+    {
+      code: "AGENT_LOOP_LIMIT_EXCEEDED",
+      message: "Agent loop limit exceeded",
     },
-  });
+    { requestId: "request-1" },
+  ));
 
   assert.equal(stdout, "");
   assert.match(stderr, /AGENT_LOOP_LIMIT_EXCEEDED/);

@@ -62,6 +62,10 @@ function createThemePickerOverlay(
   return {
     kind: "theme_picker" as const,
     reason: "first_launch" as const,
+    labels: {
+      composerTitle: "Room of Requirement",
+      themePickerTitle: "Sorting Hat",
+    },
     entries: houseThemes.map((theme) => ({
       id: theme.id,
       displayName: theme.displayName,
@@ -85,6 +89,7 @@ function createThemePickerOverlay(
 test("renderTranscript appends visible block lines without mouse-only affordances", () => {
   const view = buildTuiViewModel(
     createSampleTuiState({
+      activeThemeId: "origin",
       timeline: [
         {
           id: "assistant-1",
@@ -259,6 +264,7 @@ test("diffTranscriptLines reports append-only updates separately from replay-req
 test("renderTranscriptLines shows submitted input text only once for user cards", () => {
   const view = buildTuiViewModel(
     createSampleTuiState({
+      activeThemeId: "origin",
       timeline: [
         {
           id: "user-1",
@@ -280,6 +286,7 @@ test("renderTranscriptLines shows submitted input text only once for user cards"
 test("renderTranscript keeps submitted input framed while assistant content stays rail-only", () => {
   const view = buildTuiViewModel(
     createSampleTuiState({
+      activeThemeId: "origin",
       timeline: [
         {
           id: "user-1",
@@ -309,6 +316,7 @@ test("renderTranscript keeps submitted input framed while assistant content stay
 test("renderTranscript does not repeat assistant body text in the header", () => {
   const view = buildTuiViewModel(
     createSampleTuiState({
+      activeThemeId: "origin",
       timeline: [
         {
           id: "assistant-1",
@@ -324,6 +332,35 @@ test("renderTranscript does not repeat assistant body text in the header", () =>
 
   assert.match(output, /^Assistant:\s*$/m);
   assert.equal((output.match(/hello there/g) ?? []).length, 1);
+});
+
+test("renderTranscript maps user and assistant headers through the active house theme", () => {
+  const view = buildTuiViewModel(
+    createSampleTuiState({
+      activeThemeId: "hufflepuff",
+      timeline: [
+        {
+          id: "user-themed",
+          kind: "user",
+          summary: "hello",
+          body: "hello",
+        },
+        {
+          id: "assistant-themed",
+          kind: "assistant",
+          summary: "hi there",
+          body: "hi there",
+        },
+      ],
+    }),
+  );
+
+  const output = stripAnsi(renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n"));
+
+  assert.match(output, /╭ Prior Incantato/);
+  assert.match(output, /^Revelio:\s*$/m);
+  assert.doesNotMatch(output, /Submitted Input/);
+  assert.doesNotMatch(output, /^Assistant:\s*$/m);
 });
 
 test("renderTranscript renders system and execution entries as plain transcript lines instead of utility rails", () => {
@@ -391,6 +428,7 @@ test("renderTranscript renders blank system separators as plain blank lines", ()
 test("renderTranscript applies ANSI chrome to submitted input and assistant headers", () => {
   const view = buildTuiViewModel(
     createSampleTuiState({
+      activeThemeId: "origin",
       timeline: [
         {
           id: "user-1",
@@ -445,7 +483,7 @@ test("renderTranscript uses the Hufflepuff user-card fill and muted secondary ch
   const output = renderTranscript(view.transcript, { width: 80, height: 20 }).join("\n");
 
   assert.match(output, /\u001b\[[0-9;]*48;2;251;246;234mhello\s+\u001b\[0m/);
-  assert.match(output, /\u001b\[1;38;2;138;146;143mAssistant:\s*\u001b\[0m/);
+  assert.match(output, /\u001b\[1;38;2;138;146;143mRevelio:\s*\u001b\[0m/);
   assert.match(output, /\u001b\[1;38;2;117;108;96mExecution: Read git branch/);
   assert.match(output, /\u001b\[2;38;2;122;116;108mDetails hidden\u001b\[0m/);
 });

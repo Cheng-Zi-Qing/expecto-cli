@@ -1,4 +1,4 @@
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { execa } from "execa";
@@ -21,6 +21,11 @@ import { createInitialTuiState, reduceTuiState } from "./tui-state.ts";
 import { createTuiEventBridge } from "./tui-event-bridge.ts";
 import { QueuedInteractiveInput } from "./queued-interactive-input.ts";
 import type { ContextMetrics, TuiAction, TuiState } from "./tui-types.ts";
+import { createProtocolEmitter } from "../protocol/protocol-emitter.ts";
+import { createProtocolTransport, writeEventToTransport } from "../protocol/protocol-transport.ts";
+import { createAuditWriter } from "../protocol/audit-writer.ts";
+import { currentAppPath } from "../core/brand.ts";
+import type { CommandExecutionEffect } from "../commands/command-executor.ts";
 
 export type RunInteractiveTuiOptions = {
   createApp: CreateInteractiveTuiApp;
@@ -122,10 +127,19 @@ export async function runInteractiveTui(
   // app is assigned after bridge and initial seed; applyAction uses optional
   // chaining so calls before app is ready update state without triggering render
   let app!: InteractiveTuiApp;
+  const pendingThemeSaves = new Set<Promise<void>>();
 
   const applyAction = (action: TuiAction): void => {
     state = reduceTuiState(state, action);
     app?.update(state);
+  };
+
+  const trackPendingThemeSave = (promise: Promise<void>): Promise<void> => {
+    pendingThemeSaves.add(promise);
+    void promise.finally(() => {
+      pendingThemeSaves.delete(promise);
+    });
+    return promise;
   };
 
   const bridge = createTuiEventBridge({
@@ -181,8 +195,16 @@ export async function runInteractiveTui(
       return;
     }
 
-    await userConfigStore.save({ themeId: picker.selectedThemeId });
     applyAction({ type: "toggle_selected_item" });
+    const selectedThemeId = picker.selectedThemeId;
+    await trackPendingThemeSave(
+      userConfigStore.save({ themeId: selectedThemeId }).catch(() => {
+        applyAction({
+          type: "append_system_message",
+          line: `Failed to save theme ${selectedThemeId}; it only applies to this session.`,
+        });
+      }),
+    );
   };
 
   const inspectExecution = async (
@@ -248,6 +270,10 @@ export async function runInteractiveTui(
         void inspectExecution(executionId, app);
       },
       onInterrupt: () => {
+        const spells = getThemeDefinition(state.activeThemeId).spells;
+        if (spells.hintInterrupt !== "Ctrl+C interrupt") {
+          applyAction({ type: "append_system_message", line: `${spells.hintInterrupt}!` });
+        }
         applyAction({ type: "mark_interrupt_intent" });
         interruptController.interruptCurrentTurn();
       },
@@ -315,6 +341,29 @@ export async function runInteractiveTui(
 
   await app.start();
 
+  const transport = createProtocolTransport();
+  const auditWriter = createAuditWriter(join(context.projectRoot, currentAppPath("state")));
+  const emitter = createProtocolEmitter({
+    onEvent: (event) => {
+      writeEventToTransport(transport, event);
+      void auditWriter.write(event);
+      bridge.onDomainEvent(event);
+    },
+  });
+
+  const handleLocalEffect = (effect: CommandExecutionEffect): void => {
+    if (effect.type === "system_message") {
+      applyAction({ type: "append_system_message", line: effect.line });
+    }
+    if (effect.type === "open_theme_picker") {
+      applyAction({ type: "open_theme_picker", reason: "command" });
+    }
+    if (effect.type === "exit_session") {
+      interruptController.interruptCurrentTurn();
+      queuedInput.close();
+    }
+  };
+
   const manager = new SessionManager({
     write: options.write ?? noopWrite,
     readLine: () => queuedInput.readLine(),
@@ -322,14 +371,17 @@ export async function runInteractiveTui(
     ...(options.assistantStep ? { assistantStep: options.assistantStep } : {}),
     ...(options.providerRunner ? { providerRunner: options.providerRunner } : {}),
     interruptController,
-    onSystemLine: bridge.onSystemLine,
-    onInteractionEvent: bridge.onInteractionEvent,
+    emitFact: emitter.emit,
+    onLocalEffect: handleLocalEffect,
+    resolveSpellLabels: () => getThemeDefinition(state.activeThemeId).spells,
   });
 
   try {
     return await manager.run(context);
   } finally {
     shutdownSignal?.removeEventListener("abort", handleShutdown);
+    await Promise.allSettled([...pendingThemeSaves]);
+    await auditWriter.close();
     await app.close();
   }
 }

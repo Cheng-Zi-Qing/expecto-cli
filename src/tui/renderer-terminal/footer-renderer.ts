@@ -199,7 +199,7 @@ export function renderFooter(view: TuiFooterView, options: FooterRenderOptions):
           ? "Preview only · not yet available"
           : "Enter apply",
         view.themePicker.required
-          ? "Required before entering the Room of Requirement"
+          ? `Required before entering the ${view.labels.composerTitle}`
           : "Press /theme any time",
       ];
   const composerText = pickerLines
@@ -225,7 +225,7 @@ export function renderFooter(view: TuiFooterView, options: FooterRenderOptions):
         width,
         "╭",
         "╮",
-        view.themePicker ? " Theme Picker " : " Composer ",
+        view.themePicker ? ` ${view.labels.themePickerTitle} ` : ` ${view.labels.composerTitle} `,
         borderStyle,
         frameInnerStyle,
       ),

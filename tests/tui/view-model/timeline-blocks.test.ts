@@ -138,12 +138,12 @@ test("user card presents prompt text through a paragraph block", () => {
     }),
   ];
 
-  const cards = buildTimelineCards(timeline, 0);
+  const cards = buildTimelineCards(timeline, 0, "origin");
   const card = cards[0];
   assert.ok(card);
 
   assert.equal(card.kind, "user");
-  assert.equal(card.headerLabel, "User");
+  assert.equal(card.headerLabel, "Submitted Input");
   assert.equal(card.blocks.length, 1);
   const paragraphBlock = card.blocks[0];
   assert.ok(paragraphBlock);
@@ -185,7 +185,7 @@ test("assistant card reuses markdown blocks for structured content", () => {
     }),
   ];
 
-  const cards = buildTimelineCards(timeline, 0);
+  const cards = buildTimelineCards(timeline, 0, "origin");
   const card = cards[0];
   assert.ok(card);
 
@@ -196,6 +196,34 @@ test("assistant card reuses markdown blocks for structured content", () => {
   assert.ok(listBlock);
   assert.equal(listBlock.kind, "list");
   assert.equal(listBlock.items.length, 2);
+});
+
+test("house themes map user and assistant card titles away from the generic labels", () => {
+  const cards = buildTimelineCards(
+    [
+      createItem({
+        id: "user-themed",
+        kind: "user",
+        summary: "hello",
+        body: "hello",
+      }),
+      createItem({
+        id: "assistant-themed",
+        kind: "assistant",
+        summary: "hi there",
+        body: "hi there",
+      }),
+    ],
+    1,
+    "hufflepuff",
+  );
+
+  const userCard = cards[0];
+  const assistantCard = cards[1];
+  assert.ok(userCard);
+  assert.ok(assistantCard);
+  assert.equal(userCard.headerLabel, "Prior Incantato");
+  assert.equal(assistantCard.headerLabel, "Revelio");
 });
 
 test("system card stays compact and uses paragraph blocks", () => {

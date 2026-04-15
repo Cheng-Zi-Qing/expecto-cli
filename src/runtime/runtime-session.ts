@@ -4,21 +4,19 @@ import type {
   SessionState,
 } from "../contracts/session-snapshot-schema.ts";
 import type { BootstrapContext } from "./bootstrap-context.ts";
-import { EventLogStore } from "./event-log-store.ts";
 import type { ReadLine, CloseInteractiveInput } from "./interactive-input.ts";
 import type { SessionInterruptController } from "./session-interrupt.ts";
 import { SessionSnapshotStore } from "./session-snapshot-store.ts";
 import type { CommandExecutionEffect } from "../commands/command-executor.ts";
 import { executeBuiltinCommand } from "../commands/command-executor.ts";
+import type { ThemeSpellLabels } from "../tui/theme/theme-types.ts";
 import type {
   AssistantUsageStats,
   ExecutionKind,
   ExecutionStatus,
   ExecutionStream,
-  InteractionEvent,
-  RequestCompletedStatus,
-} from "../contracts/interaction-event-schema.ts";
-import { PRIMARY_CLI_BINARY_NAME } from "../core/brand.ts";
+} from "../protocol/domain-event-payload-schema.ts";
+import type { DomainFact } from "../protocol/domain-event-schema.ts";
 
 export type RuntimeSessionResult = {
   sessionId: string;
@@ -75,15 +73,9 @@ export type AssistantStepResult =
 
 export type RuntimeSessionState = "ready" | "streaming" | "interrupted" | "error";
 
-export type RuntimeSessionHooks = {
-  onSystemLine?: (line: string) => void;
-  onInteractionEvent?: (event: InteractionEvent) => void;
-};
-
-export type RuntimeSessionOptions = RuntimeSessionHooks & {
+export type RuntimeSessionOptions = {
   sessionId: string;
   context: BootstrapContext;
-  eventLogStore: EventLogStore;
   snapshotStore: SessionSnapshotStore;
   write: (chunk: string) => void;
   readLine?: ReadLine;
@@ -91,6 +83,9 @@ export type RuntimeSessionOptions = RuntimeSessionHooks & {
   assistantStep?: (input: AssistantStepInput) => Promise<AssistantStepResult | null> | AssistantStepResult | null;
   interruptController?: SessionInterruptController;
   maxTurnLimit?: number;
+  emitFact?: (fact: DomainFact) => void;
+  onLocalEffect?: (effect: CommandExecutionEffect) => void;
+  resolveSpellLabels?: () => ThemeSpellLabels;
 };
 
 const DEFAULT_MAX_TURN_LIMIT = 15;
@@ -237,50 +232,9 @@ function normalizeExecutionIds(executionIds: unknown): string[] {
   return [...new Set(executionIds.filter(isNonEmptyString))];
 }
 
-function promptFromEntry(entry: BootstrapContext["entry"]): string | undefined {
-  switch (entry.kind) {
-    case "interactive":
-      return entry.initialPrompt;
-    case "print":
-      return entry.prompt;
-    case "continue":
-      return undefined;
-    case "resume":
-      return undefined;
-  }
-}
-
-function buildTurnPayload(entry: BootstrapContext["entry"]): Record<string, unknown> {
-  switch (entry.kind) {
-    case "interactive":
-      return {
-        turnId: "turn-1",
-        entryKind: entry.kind,
-        ...(entry.initialPrompt ? { prompt: entry.initialPrompt } : {}),
-      };
-    case "print":
-      return {
-        turnId: "turn-1",
-        entryKind: entry.kind,
-        prompt: entry.prompt,
-      };
-    case "continue":
-      return {
-        turnId: "turn-1",
-        entryKind: entry.kind,
-      };
-    case "resume":
-      return {
-        turnId: "turn-1",
-        entryKind: entry.kind,
-      };
-  }
-}
-
 export class RuntimeSession {
   private readonly sessionId: string;
   private readonly context: BootstrapContext;
-  private readonly eventLogStore: EventLogStore;
   private readonly snapshotStore: SessionSnapshotStore;
   private readonly write: (chunk: string) => void;
   private readonly readLine: ReadLine | undefined;
@@ -288,7 +242,9 @@ export class RuntimeSession {
   private readonly assistantStep?: RuntimeSessionOptions["assistantStep"];
   private readonly interruptController: SessionInterruptController | undefined;
   private readonly maxTurnLimit: number;
-  private readonly hooks: RuntimeSessionHooks;
+  private readonly emitFact: (fact: DomainFact) => void;
+  private readonly onLocalEffect: ((effect: CommandExecutionEffect) => void) | undefined;
+  private readonly resolveSpellLabels: (() => ThemeSpellLabels) | undefined;
   private readonly conversation: ProviderMessage[] = [];
   private activeTurnAbortController: AbortController | undefined;
   private builtInCommandRequestCount = 0;
@@ -298,7 +254,6 @@ export class RuntimeSession {
   constructor(options: RuntimeSessionOptions) {
     this.sessionId = options.sessionId;
     this.context = options.context;
-    this.eventLogStore = options.eventLogStore;
     this.snapshotStore = options.snapshotStore;
     this.write = options.write;
     this.readLine = options.readLine;
@@ -306,10 +261,9 @@ export class RuntimeSession {
     this.assistantStep = options.assistantStep;
     this.interruptController = options.interruptController;
     this.maxTurnLimit = normalizeMaxTurnLimit(options.maxTurnLimit);
-    this.hooks = {
-      ...(options.onSystemLine ? { onSystemLine: options.onSystemLine } : {}),
-      ...(options.onInteractionEvent ? { onInteractionEvent: options.onInteractionEvent } : {}),
-    };
+    this.emitFact = options.emitFact ?? (() => {});
+    this.onLocalEffect = options.onLocalEffect;
+    this.resolveSpellLabels = options.resolveSpellLabels;
   }
 
   private buildSnapshotSummary(): SessionSnapshotSummary | undefined {
@@ -335,8 +289,8 @@ export class RuntimeSession {
   async run(): Promise<RuntimeSessionResult> {
     let terminalState: SessionState = "idle";
 
-    await this.eventLogStore.append({
-      type: "session:start",
+    this.emitFact({
+      eventType: "session.started",
       sessionId: this.sessionId,
       timestamp: nowIsoString(),
       payload: {
@@ -345,7 +299,6 @@ export class RuntimeSession {
       },
     });
 
-    this.renderHeader();
     this.emitRuntimeState("ready");
 
     const unsubscribeInterrupt = this.interruptController?.subscribe(() => {
@@ -376,7 +329,7 @@ export class RuntimeSession {
     try {
       switch (this.context.entry.kind) {
         case "interactive":
-          this.renderEntryDetails();
+
 
           if (this.context.entry.initialPrompt) {
             const initialPrompt = normalizeInteractiveCommandInput(
@@ -398,14 +351,14 @@ export class RuntimeSession {
           }
           break;
         case "print":
-          this.renderEntryDetails();
+
           await this.processInput(this.context.entry.prompt);
           break;
         case "continue":
-          this.renderEntryDetails();
+
           break;
         case "resume": {
-          this.renderEntryDetails();
+
           const resumeTarget = this.context.resumeTarget;
           if (!resumeTarget) {
             throw new Error("No snapshot found. Nothing to resume.");
@@ -420,13 +373,11 @@ export class RuntimeSession {
       terminalState = "blocked";
       throw error;
     } finally {
-      await this.eventLogStore.append({
-        type: "session:stop",
+      this.emitFact({
+        eventType: "session.stopped",
         sessionId: this.sessionId,
         timestamp: nowIsoString(),
-        payload: {
-          state: terminalState,
-        },
+        payload: { state: terminalState },
       });
 
       const snapshotSummary = this.buildSnapshotSummary();
@@ -460,50 +411,6 @@ export class RuntimeSession {
     };
   }
 
-  private renderHeader(): void {
-    switch (this.context.entry.kind) {
-      case "interactive":
-        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} interactive session`);
-        break;
-      case "print":
-        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} one-shot session`);
-        break;
-      case "continue":
-        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} continue session`);
-        break;
-      case "resume":
-        this.emitSystemLine(`${PRIMARY_CLI_BINARY_NAME} resume session`);
-        break;
-    }
-
-    this.emitInteractionEvent({
-      eventType: "session_initialized",
-      sessionId: this.sessionId,
-      timestamp: nowIsoString(),
-      payload: {
-        sessionId: this.sessionId,
-      },
-    });
-    this.emitSystemLine(`mode: ${this.context.mode}`);
-    this.emitSystemLine(`project: ${this.context.projectRoot}`);
-  }
-
-  private renderEntryDetails(): void {
-    switch (this.context.entry.kind) {
-      case "interactive":
-        if (this.context.entry.initialPrompt) {
-          this.emitSystemLine(`initial prompt: ${this.context.entry.initialPrompt}`);
-        }
-        break;
-      case "print":
-        this.emitSystemLine(`prompt: ${this.context.entry.prompt}`);
-        break;
-      case "continue":
-        break;
-      case "resume":
-        break;
-    }
-  }
 
   private createSnapshotId(): string {
     return `snapshot-${this.sessionId}-${Date.now()}`;
@@ -645,27 +552,24 @@ export class RuntimeSession {
   }
 
   private emitAssistantOutputLifecycle(
-    turnId: string,
     requestId: string,
     result: AssistantOutputStepResult,
   ): void {
     const timestamp = nowIsoString();
-    this.emitInteractionEvent({
-      eventType: "assistant_response_started",
+    this.emitFact({
+      eventType: "assistant.response_started",
       timestamp,
       sessionId: this.sessionId,
-      turnId,
-      requestId,
+      causation: { requestId },
       payload: {
         responseId: result.responseId,
       },
     });
-    this.emitInteractionEvent({
-      eventType: "assistant_stream_chunk",
+    this.emitFact({
+      eventType: "assistant.stream_chunk",
       timestamp,
       sessionId: this.sessionId,
-      turnId,
-      requestId,
+      causation: { requestId },
       payload: {
         responseId: result.responseId,
         channel: "output_text",
@@ -673,12 +577,11 @@ export class RuntimeSession {
         delta: result.output,
       },
     });
-    this.emitInteractionEvent({
-      eventType: "assistant_response_completed",
+    this.emitFact({
+      eventType: "assistant.response_completed",
       timestamp,
       sessionId: this.sessionId,
-      turnId,
-      requestId,
+      causation: { requestId },
       payload: {
         responseId: result.responseId,
         finishReason: result.finishReason,
@@ -689,27 +592,24 @@ export class RuntimeSession {
   }
 
   private emitAssistantToolCallsLifecycle(
-    turnId: string,
     requestId: string,
     result: AssistantToolCallsStepResult,
   ): void {
     const timestamp = nowIsoString();
-    this.emitInteractionEvent({
-      eventType: "assistant_response_started",
+    this.emitFact({
+      eventType: "assistant.response_started",
       timestamp,
       sessionId: this.sessionId,
-      turnId,
-      requestId,
+      causation: { requestId },
       payload: {
         responseId: result.responseId,
       },
     });
-    this.emitInteractionEvent({
-      eventType: "assistant_response_completed",
+    this.emitFact({
+      eventType: "assistant.response_completed",
       timestamp,
       sessionId: this.sessionId,
-      turnId,
-      requestId,
+      causation: { requestId },
       payload: {
         responseId: result.responseId,
         finishReason: "tool_calls",
@@ -720,27 +620,28 @@ export class RuntimeSession {
     });
   }
 
-  private emitRequestCompleted(
-    turnId: string,
-    requestId: string,
-    status: RequestCompletedStatus,
-    errorCode?: string,
-  ): void {
-    this.emitInteractionEvent({
-      eventType: "request_completed",
-      timestamp: nowIsoString(),
+  private emitRequestSucceeded(requestId: string): void {
+    this.emitFact({
+      eventType: "request.succeeded",
       sessionId: this.sessionId,
-      turnId,
-      requestId,
-      payload: {
-        status,
-        ...(errorCode ? { errorCode } : {}),
-      },
+      timestamp: nowIsoString(),
+      causation: { requestId },
+      payload: {},
+    });
+  }
+
+  private emitRequestFailed(requestId: string, code: string, message: string, retryable: boolean): void {
+    this.emitFact({
+      eventType: "request.failed",
+      sessionId: this.sessionId,
+      timestamp: nowIsoString(),
+      causation: { requestId },
+      payload: { code, message, retryable },
     });
   }
 
   private async processInput(input: string): Promise<boolean> {
-    const commandResult = await executeBuiltinCommand(input, this.context);
+    const commandResult = await executeBuiltinCommand(input, this.context, this.resolveSpellLabels?.());
 
     if (commandResult.handled) {
       return this.applyCommandEffects(
@@ -757,25 +658,12 @@ export class RuntimeSession {
     const initialTurnId = this.createPromptTurnId();
     const requestId = this.createRequestId(initialTurnId);
 
-    await this.eventLogStore.append({
-      type: "turn:start",
+    this.emitFact({
+      eventType: "user.prompt_received",
       sessionId: this.sessionId,
       timestamp: nowIsoString(),
-      payload: {
-        turnId: initialTurnId,
-        ...(buildTurnPayloadForPrompt(this.context.entry.kind, prompt)),
-      },
-    });
-
-    this.emitInteractionEvent({
-      eventType: "user_prompt_received",
-      timestamp: nowIsoString(),
-      sessionId: this.sessionId,
-      turnId: initialTurnId,
-      requestId,
-      payload: {
-        prompt,
-      },
+      causation: { requestId },
+      payload: { prompt },
     });
 
     this.conversation.push({
@@ -798,33 +686,33 @@ export class RuntimeSession {
         const result = this.normalizeAssistantStepResult(assistantTurnId, rawResult);
 
         if (!result) {
-          this.emitRequestCompleted(assistantTurnId, requestId, "completed");
+          this.emitRequestSucceeded(requestId);
           this.turnCount += 1;
           break;
         }
 
         if (result.kind === "output") {
-          this.emitAssistantOutputLifecycle(assistantTurnId, requestId, result);
+          this.emitAssistantOutputLifecycle(requestId, result);
           this.conversation.push({
             role: "assistant",
             content: result.output,
           });
           writeLine(this.write, result.output);
-          this.emitRequestCompleted(assistantTurnId, requestId, "completed");
+          this.emitRequestSucceeded(requestId);
           this.turnCount += 1;
           break;
         }
 
-        this.emitAssistantToolCallsLifecycle(assistantTurnId, requestId, result);
-        this.emitAssistantExecutionWave(assistantTurnId, requestId, result);
+        this.emitAssistantToolCallsLifecycle(requestId, result);
+        this.emitAssistantExecutionWave(requestId, result);
 
         if (assistantTurnCount >= this.maxTurnLimit) {
           this.removePromptFromConversation(prompt);
-          this.emitRequestCompleted(
-            assistantTurnId,
+          this.emitRequestFailed(
             requestId,
-            "error",
             "AGENT_LOOP_LIMIT_EXCEEDED",
+            "agent loop limit exceeded",
+            false,
           );
           break;
         }
@@ -833,53 +721,17 @@ export class RuntimeSession {
         assistantPrompt = undefined;
       }
       this.emitRuntimeState("ready");
-
-      await this.eventLogStore.append({
-        type: "turn:end",
-        sessionId: this.sessionId,
-        timestamp: nowIsoString(),
-        payload: {
-          turnId: initialTurnId,
-          state: "idle",
-        },
-      });
     } catch (error) {
       if (isAbortError(error)) {
         this.removePromptFromConversation(prompt);
 
-        this.emitInteractionEvent({
-          eventType: "prompt_interrupted",
-          sessionId: this.sessionId,
-          timestamp: nowIsoString(),
-          payload: { prompt },
-        });
         this.emitRuntimeState("interrupted");
-        this.emitSystemLine("generation interrupted");
         this.emitRuntimeState("ready");
-        this.emitRequestCompleted(initialTurnId, requestId, "interrupted");
-
-        await this.eventLogStore.append({
-          type: "turn:end",
-          sessionId: this.sessionId,
-          timestamp: nowIsoString(),
-          payload: {
-            turnId: initialTurnId,
-            state: "interrupted",
-          },
-        });
+        this.emitRequestFailed(requestId, "INTERRUPTED", "generation interrupted", false);
         return;
       }
 
-      this.emitRequestCompleted(initialTurnId, requestId, "error", errorCodeFromError(error));
-      await this.eventLogStore.append({
-        type: "turn:end",
-        sessionId: this.sessionId,
-        timestamp: nowIsoString(),
-        payload: {
-          turnId: initialTurnId,
-          state: "blocked",
-        },
-      });
+      this.emitRequestFailed(requestId, errorCodeFromError(error) ?? "UNKNOWN", "request failed", false);
       this.emitRuntimeState("error");
       throw error;
     } finally {
@@ -917,18 +769,12 @@ export class RuntimeSession {
     return this.assistantStep(input);
   }
 
-  private emitInteractionEvent(event: InteractionEvent): void {
-    this.hooks.onInteractionEvent?.(event);
-  }
-
   private createBuiltInCommandInteractionContext(): {
-    turnId: string;
     requestId: string;
   } {
     this.builtInCommandRequestCount += 1;
 
     return {
-      turnId: `turn-command-${this.builtInCommandRequestCount}`,
       requestId: `request-command-${this.builtInCommandRequestCount}`,
     };
   }
@@ -945,7 +791,6 @@ export class RuntimeSession {
 
   private emitBuiltInExecutionItemEvents(
     interactionContext: {
-      turnId: string;
       requestId: string;
     },
     executionIndex: number,
@@ -953,12 +798,11 @@ export class RuntimeSession {
   ): void {
     const executionId = `execution-command-${interactionContext.requestId}-${executionIndex + 1}`;
     const summary = this.sanitizeExecutionSummary(item.summary);
-    this.emitInteractionEvent({
-      eventType: "execution_item_started",
+    this.emitFact({
+      eventType: "execution.started",
       timestamp: nowIsoString(),
       sessionId: this.sessionId,
-      turnId: interactionContext.turnId,
-      requestId: interactionContext.requestId,
+      causation: { requestId: interactionContext.requestId },
       payload: {
         executionId,
         executionKind: "command",
@@ -970,12 +814,11 @@ export class RuntimeSession {
     });
 
     if (item.body) {
-      this.emitInteractionEvent({
-        eventType: "execution_item_chunk",
+      this.emitFact({
+        eventType: "execution.chunk",
         timestamp: nowIsoString(),
         sessionId: this.sessionId,
-        turnId: interactionContext.turnId,
-        requestId: interactionContext.requestId,
+        causation: { requestId: interactionContext.requestId },
         payload: {
           executionId,
           stream: "system",
@@ -984,12 +827,11 @@ export class RuntimeSession {
       });
     }
 
-    this.emitInteractionEvent({
-      eventType: "execution_item_completed",
+    this.emitFact({
+      eventType: "execution.completed",
       timestamp: nowIsoString(),
       sessionId: this.sessionId,
-      turnId: interactionContext.turnId,
-      requestId: interactionContext.requestId,
+      causation: { requestId: interactionContext.requestId },
       payload: {
         executionId,
         status: "success",
@@ -999,7 +841,6 @@ export class RuntimeSession {
   }
 
   private emitAssistantExecutionWave(
-    turnId: string,
     requestId: string,
     result: AssistantToolCallsStepResult,
   ): void {
@@ -1013,12 +854,11 @@ export class RuntimeSession {
       const summary = this.sanitizeExecutionSummary(item?.summary ?? title);
       const output = item?.output;
 
-      this.emitInteractionEvent({
-        eventType: "execution_item_started",
+      this.emitFact({
+        eventType: "execution.started",
         timestamp: nowIsoString(),
         sessionId: this.sessionId,
-        turnId,
-        requestId,
+        causation: { requestId },
         payload: {
           executionId,
           executionKind: item?.executionKind ?? "tool",
@@ -1033,12 +873,11 @@ export class RuntimeSession {
       });
 
       if (output !== undefined) {
-        this.emitInteractionEvent({
-          eventType: "execution_item_chunk",
+        this.emitFact({
+          eventType: "execution.chunk",
           timestamp: nowIsoString(),
           sessionId: this.sessionId,
-          turnId,
-          requestId,
+          causation: { requestId },
           payload: {
             executionId,
             stream: item?.stream ?? "system",
@@ -1047,12 +886,11 @@ export class RuntimeSession {
         });
       }
 
-      this.emitInteractionEvent({
-        eventType: "execution_item_completed",
+      this.emitFact({
+        eventType: "execution.completed",
         timestamp: nowIsoString(),
         sessionId: this.sessionId,
-        turnId,
-        requestId,
+        causation: { requestId },
         payload: {
           executionId,
           status: item?.status ?? "success",
@@ -1064,15 +902,9 @@ export class RuntimeSession {
     }
   }
 
-  private emitSystemLine(line: string): void {
-    this.hooks.onSystemLine?.(line);
-    writeLine(this.write, line);
-  }
-
   private applyCommandEffects(
     effects: CommandExecutionEffect[],
     interactionContext: {
-      turnId: string;
       requestId: string;
     },
   ): boolean {
@@ -1082,7 +914,8 @@ export class RuntimeSession {
     for (const effect of effects) {
       switch (effect.type) {
         case "system_message":
-          this.emitSystemLine(effect.line);
+          writeLine(this.write, effect.line);
+          this.onLocalEffect?.(effect);
           break;
         case "execution_item":
           this.emitBuiltInExecutionItemEvents(interactionContext, executionIndex, effect);
@@ -1090,41 +923,33 @@ export class RuntimeSession {
           break;
         case "clear_conversation":
           this.conversation.length = 0;
-          this.emitInteractionEvent({
-            eventType: "conversation_cleared",
+          this.emitFact({
+            eventType: "session.conversation_cleared",
             sessionId: this.sessionId,
             timestamp: nowIsoString(),
             payload: {},
           });
           break;
         case "open_theme_picker":
-          this.emitInteractionEvent({
-            eventType: "command_effect",
-            sessionId: this.sessionId,
-            timestamp: nowIsoString(),
-            payload: { kind: "open_theme_picker" },
-          });
+          this.onLocalEffect?.(effect);
           break;
         case "exit_session":
           shouldExit = true;
+          this.onLocalEffect?.(effect);
           break;
       }
     }
 
     if (executionIndex > 0) {
-      this.emitRequestCompleted(
-        interactionContext.turnId,
-        interactionContext.requestId,
-        "completed",
-      );
+      this.emitRequestSucceeded(interactionContext.requestId);
     }
 
     return shouldExit;
   }
 
   private emitRuntimeState(state: RuntimeSessionState): void {
-    this.emitInteractionEvent({
-      eventType: "session_state_changed",
+    this.emitFact({
+      eventType: "session.state_changed",
       sessionId: this.sessionId,
       timestamp: nowIsoString(),
       payload: { state },
@@ -1142,16 +967,6 @@ function normalizeMaxTurnLimit(maxTurnLimit: number | undefined): number {
   }
 
   return Math.floor(maxTurnLimit);
-}
-
-function buildTurnPayloadForPrompt(
-  entryKind: BootstrapContext["entry"]["kind"],
-  prompt: string,
-): Record<string, unknown> {
-  return {
-    entryKind,
-    prompt,
-  };
 }
 
 function normalizeInteractiveCommandInput(input: string): string {
