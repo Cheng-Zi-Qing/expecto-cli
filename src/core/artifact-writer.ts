@@ -36,6 +36,12 @@ type SupportedSubtype = (typeof SUPPORTED_SUBTYPES)[number];
 // leading non-letter-digit, uppercase slug, missing digits, etc.
 const TASK_ID_PATTERN = /^T-\d{3,}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$/;
 
+// Filename-safe sessionId: first char alphanumeric, rest alphanumeric / dash /
+// underscore. Rejects path separators (`/`, `\`), parent-dir traversals (`..`),
+// dots, whitespace and shell metacharacters — anything that could escape the
+// summaries directory when embedded in a derived filename.
+const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
 const DOCS_TASKS_ACTIVE = currentAppPath("docs", "tasks", "active");
 const DOCS_SUMMARIES = currentAppPath("docs", "summaries");
 
@@ -189,6 +195,11 @@ function requireSessionId(metadata: Record<string, unknown> | undefined, subtype
   if (typeof sessionId !== "string" || sessionId.length === 0) {
     throw new ArtifactWriterError(
       `summary(${subtype}) requires metadata.sessionId`,
+    );
+  }
+  if (!SESSION_ID_PATTERN.test(sessionId)) {
+    throw new ArtifactWriterError(
+      `summary(${subtype}) metadata.sessionId '${sessionId}' contains characters that are not filename-safe. Expected pattern: [A-Za-z0-9][A-Za-z0-9_-]*`,
     );
   }
   return sessionId;

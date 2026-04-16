@@ -432,3 +432,66 @@ test("ArtifactWriter rejects unknown kind values with a validation error (not th
     },
   );
 });
+
+// ---------- sessionId filename-safety (review follow-up) ----------
+
+test("ArtifactWriter rejects sessionId values that would escape the summaries directory", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot);
+
+  const unsafe = [
+    "/../../../evil",
+    "..",
+    "../sibling",
+    "a/b",
+    "a\\b",
+    "a.b",
+    "with space",
+    "with\ttab",
+    "a*b",
+    "",
+  ];
+
+  for (const sessionId of unsafe) {
+    for (const subtype of ["session", "compact", "resume_catch_up"] as const) {
+      await assert.rejects(
+        () =>
+          writer.write({
+            kind: "summary",
+            title: "x",
+            content: "y",
+            metadata: { artifact_subtype: subtype, sessionId },
+          }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(error.name, "ArtifactWriterError");
+          assert.match(error.message, /sessionId/);
+          return true;
+        },
+        `expected rejection for subtype=${subtype} sessionId=${JSON.stringify(sessionId)}`,
+      );
+    }
+  }
+});
+
+test("ArtifactWriter accepts conventional alphanumeric sessionIds with dashes and underscores", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot, { clock: fixedClock("2026-04-17T09:00:00.000Z") });
+
+  const valid = ["abcdef1234567890", "session-abc-123", "abc_def_ghi", "0123456789abcdef"];
+
+  for (const sessionId of valid) {
+    const ref = await writer.write({
+      kind: "summary",
+      title: "x",
+      content: "y",
+      metadata: { artifact_subtype: "session", sessionId },
+    });
+    const sid8 = sessionId.slice(0, 8);
+    assert.equal(
+      ref.path,
+      `${currentAppPath("docs", "summaries")}/session-${sid8}-2026-04-17.md`,
+      `path for sessionId=${sessionId}`,
+    );
+  }
+});
