@@ -119,7 +119,7 @@ export async function buildBootstrapContext(
   });
 
   const stateLayerContent = resumeTarget
-    ? resumeTarget.summary
+    ? `${resumeTarget.summary}\n\n${sessionSummary}`
     : sessionSummary;
 
   const resolvedInstructionStack = resumeTarget

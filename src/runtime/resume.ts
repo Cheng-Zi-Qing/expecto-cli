@@ -10,10 +10,11 @@ export type ResumeTarget = {
   summary: string;
 };
 
-function formatList(items: string[]): string {
-  return items.length > 0 ? items.join(", ") : "none";
-}
-
+// buildResumeSummary emits ONLY resume-specific metadata (session identity,
+// checkpoint, headline, next step, compacted summary). The active artifact set
+// is intentionally NOT listed here — renderSessionSummary is the single source
+// of truth for that, and the bootstrap pipeline appends its output alongside
+// this metadata when building the state layer on resume.
 export function buildResumeSummary(snapshot: SessionSnapshot): string {
   return [
     `session: ${snapshot.sessionId}`,
@@ -21,9 +22,6 @@ export function buildResumeSummary(snapshot: SessionSnapshot): string {
     `state: ${snapshot.state}`,
     `updated: ${snapshot.updatedAt}`,
     `checkpoint: ${snapshot.checkpoint?.id ?? "none"}`,
-    `active artifacts (required): ${formatList(snapshot.activeArtifacts.required.map((artifact) => artifact.title))}`,
-    `active artifacts (optional): ${formatList(snapshot.activeArtifacts.optional.map((artifact) => artifact.title))}`,
-    `active artifacts (on-demand): ${formatList(snapshot.activeArtifacts.onDemand.map((artifact) => artifact.title))}`,
     ...(snapshot.summary?.headline ? [`headline: ${snapshot.summary.headline}`] : []),
     ...(snapshot.summary?.currentTaskId ? [`current task: ${snapshot.summary.currentTaskId}`] : []),
     ...(snapshot.summary?.nextStep ? [`next step: ${snapshot.summary.nextStep}`] : []),
