@@ -146,7 +146,11 @@ export async function executeBuiltinCommand(
       }
     case "project.write_artifact":
       {
-        const rawArg = parsed.args.join(" ").trim();
+        // The default parser destroys internal whitespace via split(/\s+/), which
+        // corrupts JSON content payloads that include nested markdown, indented
+        // lists, or any multi-space sequence. For /write_artifact we re-extract
+        // the raw argument from the original `input` string (parser untouched).
+        const rawArg = input.replace(/^\s*\/[^\s]+\s*/, "");
 
         if (rawArg.length === 0) {
           return {

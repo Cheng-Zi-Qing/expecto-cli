@@ -297,3 +297,50 @@ test("/write_artifact is registered as hidden and not listed in /help output", a
 
   assert.doesNotMatch(helpText, /\/write_artifact/);
 });
+
+test("executeBuiltinCommand /write_artifact preserves internal whitespace of JSON content", async () => {
+  const { mkdtemp, mkdir, readFile } = await import("node:fs/promises");
+  const { currentAppPath } = await import("../../src/core/brand.ts");
+
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-writecmd-ws-"));
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "active")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "backlog")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "summaries")), { recursive: true });
+
+  try {
+    // Content has a literal newline followed by two spaces and a dash — a typical
+    // nested markdown list. parsed.args.join(" ") would collapse the two spaces to one.
+    const body = "line1\n  - item\n    nested\n- item2";
+    const payload = JSON.stringify({
+      kind: "task",
+      title: "whitespace probe",
+      content: body,
+    });
+    const result = await executeBuiltinCommand(
+      `/write_artifact ${payload}`,
+      createContext("ready", projectRoot),
+    );
+
+    assert.equal(result.handled, true);
+    const confirmation = result.effects.find(
+      (effect): effect is { type: "system_message"; line: string } =>
+        effect.type === "system_message" && /artifact written/.test((effect as { line: string }).line),
+    );
+    assert.ok(confirmation, "expected artifact written confirmation");
+
+    // Extract file path from the confirmation line
+    const pathMatch = confirmation.line.match(/\(([^)]+)\)$/);
+    assert.ok(pathMatch, `could not extract path from: ${confirmation.line}`);
+    const relativePath = pathMatch[1];
+    assert.ok(relativePath, "expected capture group to be non-empty");
+
+    const rawFile = await readFile(join(projectRoot, relativePath), "utf8");
+    // Verify exact whitespace preserved by locating the nested-list portion verbatim
+    assert.ok(
+      rawFile.includes("line1\n  - item\n    nested\n- item2"),
+      `expected whitespace preserved; got:\n${rawFile}`,
+    );
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
