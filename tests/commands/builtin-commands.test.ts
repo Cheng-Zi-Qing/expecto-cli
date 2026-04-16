@@ -27,6 +27,7 @@ test("listAllCommands exposes namespaced ids with category and availability meta
       "session.exit",
       "project.branch",
       "project.init",
+      "project.write_artifact",
       "debug.inspect",
       "debug.stack",
     ],
@@ -104,7 +105,7 @@ test("findCommandByInput resolves hidden /inspect without exposing it in visible
 test("builtin compatibility layer preserves legacy command ids for existing consumers", () => {
   assert.deepEqual(
     listBuiltinCommands().map((command) => command.id),
-    ["help", "clear", "status", "branch", "init", "inspect", "theme", "exit", "stack"],
+    ["help", "clear", "status", "branch", "init", "write_artifact", "inspect", "theme", "exit", "stack"],
   );
 });
 

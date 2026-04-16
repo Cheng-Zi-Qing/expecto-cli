@@ -62,6 +62,14 @@ const commandRegistry: CommandDescriptor[] = [
     availability: "implemented",
   },
   {
+    id: "project.write_artifact",
+    category: "project",
+    name: "/write_artifact",
+    aliases: [],
+    description: "Write an artifact through the structured ArtifactWriter service (hidden).",
+    availability: "hidden",
+  },
+  {
     id: "debug.inspect",
     category: "debug",
     name: "/inspect",

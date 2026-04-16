@@ -14,6 +14,7 @@ const legacyIdByCommandId: Record<CommandId, BuiltinCommandId> = {
   "session.exit": "exit",
   "project.branch": "branch",
   "project.init": "init",
+  "project.write_artifact": "write_artifact",
   "debug.inspect": "inspect",
   "debug.stack": "stack",
 };
@@ -24,6 +25,7 @@ const legacyBuiltinOrder: BuiltinCommandId[] = [
   "status",
   "branch",
   "init",
+  "write_artifact",
   "inspect",
   "theme",
   "exit",

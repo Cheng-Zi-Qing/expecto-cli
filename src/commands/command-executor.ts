@@ -2,6 +2,7 @@ import type { BootstrapContext } from "../runtime/bootstrap-context.ts";
 import type { ThemeSpellLabels } from "../tui/theme/theme-types.ts";
 import { resolveGitBranch } from "../core/git-branch.ts";
 import { ArtifactWorkspace } from "../core/artifact-workspace.ts";
+import { ArtifactWriter } from "../core/artifact-writer.ts";
 import { createHelpSections, findCommandByInput } from "./command-registry.ts";
 import { parseSlashCommand } from "./command-parser.ts";
 
@@ -142,6 +143,67 @@ export async function executeBuiltinCommand(
         }));
         effects.unshift({ type: "system_message", line: "Workspace initialized" });
         return { handled: true, effects };
+      }
+    case "project.write_artifact":
+      {
+        const rawArg = parsed.args.join(" ").trim();
+
+        if (rawArg.length === 0) {
+          return {
+            handled: true,
+            effects: [{
+              type: "system_message",
+              line: "write_artifact: argument must be a JSON object describing { kind, title, content, status?, metadata? }",
+            }],
+          };
+        }
+
+        let parsedInput: unknown;
+        try {
+          parsedInput = JSON.parse(rawArg);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          return {
+            handled: true,
+            effects: [{
+              type: "system_message",
+              line: `write_artifact: invalid JSON — ${reason}`,
+            }],
+          };
+        }
+
+        if (typeof parsedInput !== "object" || parsedInput === null || Array.isArray(parsedInput)) {
+          return {
+            handled: true,
+            effects: [{
+              type: "system_message",
+              line: "write_artifact: input must be a JSON object",
+            }],
+          };
+        }
+
+        try {
+          const writer = new ArtifactWriter(context.projectRoot);
+          const ref = await writer.write(parsedInput as Parameters<ArtifactWriter["write"]>[0]);
+          return {
+            handled: true,
+            effects: [
+              {
+                type: "system_message",
+                line: `artifact written: ${ref.title} (${ref.path})`,
+              },
+            ],
+          };
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          return {
+            handled: true,
+            effects: [{
+              type: "system_message",
+              line: `write_artifact: ${reason}`,
+            }],
+          };
+        }
       }
     case "debug.inspect":
       return {

@@ -210,3 +210,90 @@ test("executeBuiltinCommand returns an open theme picker effect for /theme", asy
     },
   ]);
 });
+
+test("executeBuiltinCommand /write_artifact routes task input through ArtifactWriter", async () => {
+  const { mkdtemp, mkdir } = await import("node:fs/promises");
+  const { currentAppPath } = await import("../../src/core/brand.ts");
+
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-writecmd-"));
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "active")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "backlog")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "summaries")), { recursive: true });
+
+  try {
+    const payload = JSON.stringify({
+      kind: "task",
+      title: "smoke test",
+      content: "# Smoke\n",
+    });
+    const result = await executeBuiltinCommand(
+      `/write_artifact ${payload}`,
+      createContext("ready", projectRoot),
+    );
+
+    assert.equal(result.handled, true);
+    const messageLines = result.effects
+      .filter((effect) => effect.type === "system_message")
+      .map((effect) => (effect as { line: string }).line);
+
+    assert.ok(
+      messageLines.some((line) => /artifact written/i.test(line) && /T-001-smoke-test/.test(line)),
+      `expected confirmation line, got ${messageLines.join(" | ")}`,
+    );
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("executeBuiltinCommand /write_artifact reports invalid JSON", async () => {
+  const result = await executeBuiltinCommand("/write_artifact not-json", createContext());
+
+  assert.equal(result.handled, true);
+  const messageLines = result.effects
+    .filter((effect) => effect.type === "system_message")
+    .map((effect) => (effect as { line: string }).line);
+
+  assert.ok(
+    messageLines.some((line) => /JSON/i.test(line)),
+    `expected JSON error, got ${messageLines.join(" | ")}`,
+  );
+});
+
+test("executeBuiltinCommand /write_artifact reports writer validation errors", async () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), "expecto-writecmd-bad-"));
+
+  try {
+    const payload = JSON.stringify({
+      kind: "summary",
+      title: "x",
+      content: "y",
+      // Missing metadata.artifact_subtype on purpose
+    });
+    const result = await executeBuiltinCommand(
+      `/write_artifact ${payload}`,
+      createContext("ready", projectRoot),
+    );
+
+    assert.equal(result.handled, true);
+    const messageLines = result.effects
+      .filter((effect) => effect.type === "system_message")
+      .map((effect) => (effect as { line: string }).line);
+
+    assert.ok(
+      messageLines.some((line) => /artifact_subtype/.test(line)),
+      `expected writer validation error to surface, got ${messageLines.join(" | ")}`,
+    );
+  } finally {
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("/write_artifact is registered as hidden and not listed in /help output", async () => {
+  const helpResult = await executeBuiltinCommand("/help", createContext());
+  const helpText = helpResult.effects
+    .filter((effect) => effect.type === "system_message")
+    .map((effect) => (effect as { line: string }).line)
+    .join("\n");
+
+  assert.doesNotMatch(helpText, /\/write_artifact/);
+});
