@@ -247,3 +247,100 @@ test("buildBootstrapContext does not populate resumeTarget for non-resume comman
 
   assert.equal(context.resumeTarget, undefined);
 });
+
+test("buildBootstrapContext on resume rehydrates onDemand refs into loadedArtifacts.onDemand", async () => {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { buildBootstrapContext } = await import("../../src/runtime/bootstrap-context.ts");
+  const { currentAppPath } = await import("../../src/core/brand.ts");
+
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-resume-ondemand-"));
+  await mkdir(join(projectRoot, currentAppPath("docs", "specs")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
+  await writeFile(
+    join(projectRoot, currentAppPath("docs", "findings.md")),
+    "# Findings\n\nEvidence of prior auth research.\n",
+  );
+
+  const findingsRef = {
+    id: currentAppPath("docs", "findings.md"),
+    kind: "finding" as const,
+    path: currentAppPath("docs", "findings.md"),
+    title: "findings",
+  };
+
+  const snapshot = makeSnapshot({ sessionId: "session-ondemand" });
+  const snapshotWithOnDemand = {
+    ...snapshot,
+    activeArtifacts: {
+      ...snapshot.activeArtifacts,
+      onDemand: [findingsRef],
+    },
+  };
+
+  const store = new SessionSnapshotStore(projectRoot);
+  await store.save(snapshotWithOnDemand);
+
+  const context = await buildBootstrapContext({
+    command: { kind: "resume" },
+    cwd: projectRoot,
+  });
+
+  // 1. activeArtifacts.onDemand recovered from snapshot (refs)
+  assert.deepEqual(
+    context.activeArtifacts.onDemand.map((ref) => ref.id),
+    [findingsRef.id],
+  );
+  assert.equal(context.activeArtifacts.onDemand[0]?.title, "findings");
+
+  // 2. loadedArtifacts.onDemand populated with eager-read docs (content)
+  assert.equal(
+    context.loadedArtifacts.onDemand.length,
+    1,
+    "loadedArtifacts.onDemand should contain the eager-read finding",
+  );
+  assert.equal(context.loadedArtifacts.onDemand[0]?.id, findingsRef.id);
+  assert.match(
+    context.loadedArtifacts.onDemand[0]?.content ?? "",
+    /Evidence of prior auth research/,
+  );
+
+  // 3. instructionStack must NOT receive an onDemand artifact layer
+  // Only required artifacts become artifact_summary layers (see instruction-resolver).
+  // Onboarding onDemand into prompt layers is explicitly deferred to Phase C budgeting.
+  const artifactLayerPaths = (context.instructionStack ?? [])
+    .filter((layer) => layer.kind === "artifact_summary")
+    .map((layer) => layer.path);
+
+  assert.ok(
+    !artifactLayerPaths.includes(findingsRef.path),
+    `instructionStack should not contain onDemand artifact ${findingsRef.path}, got layers: ${artifactLayerPaths.join(",")}`,
+  );
+});
+
+test("buildBootstrapContext on non-resume returns empty loadedArtifacts.onDemand", async () => {
+  const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { buildBootstrapContext } = await import("../../src/runtime/bootstrap-context.ts");
+  const { currentAppPath } = await import("../../src/core/brand.ts");
+
+  const projectRoot = await mkdtemp(join(tmpdir(), "expecto-interactive-ondemand-"));
+  await mkdir(join(projectRoot, currentAppPath("docs", "specs")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "findings.md")), "# Findings\n");
+
+  const context = await buildBootstrapContext({
+    command: { kind: "interactive" },
+    cwd: projectRoot,
+  });
+
+  // Resolver puts findings under activeArtifacts.onDemand by default, but on a fresh
+  // bootstrap we do not eager-load them into loadedArtifacts.onDemand. That stays empty
+  // until a resume path explicitly rehydrates.
+  assert.ok(context.activeArtifacts.onDemand.length > 0, "resolver should surface onDemand refs");
+  assert.deepEqual(context.loadedArtifacts.onDemand, []);
+});
