@@ -1,7 +1,10 @@
 import { stat } from "node:fs/promises";
 import { join, parse as parsePath } from "node:path";
 
+import { z } from "zod";
+
 import {
+  artifactKindSchema,
   type ArtifactKind,
   type ArtifactRef,
 } from "../contracts/artifact-schema.ts";
@@ -36,6 +39,20 @@ const TASK_ID_PATTERN = /^T-\d{3,}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?$/;
 const DOCS_TASKS_ACTIVE = currentAppPath("docs", "tasks", "active");
 const DOCS_SUMMARIES = currentAppPath("docs", "summaries");
 
+// Service-facing schema. Does NOT include `path` — the writer derives that.
+// sessionId injection is the caller's responsibility (see Open Question in the
+// B-004 review): slash handler relays what the user/script provided; the future
+// tool runtime handler will inject from the session context.
+const writeServiceInputSchema = z.object({
+  kind: artifactKindSchema,
+  title: z.string().min(1),
+  content: z.string(),
+  status: z.string().min(1).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+type ValidatedWriteInput = z.infer<typeof writeServiceInputSchema>;
+
 // ---------- errors ----------
 
 class ArtifactWriterError extends Error {
@@ -43,6 +60,15 @@ class ArtifactWriterError extends Error {
     super(message);
     this.name = "ArtifactWriterError";
   }
+}
+
+function formatZodIssueList(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
 }
 
 // ---------- slug + id helpers ----------
@@ -199,20 +225,28 @@ export class ArtifactWriter {
   }
 
   async write(input: ArtifactWriteServiceInput): Promise<ArtifactRef> {
-    if (!SUPPORTED_KINDS.includes(input.kind)) {
+    const parseResult = writeServiceInputSchema.safeParse(input);
+    if (!parseResult.success) {
       throw new ArtifactWriterError(
-        `kind=${input.kind} is not supported by ArtifactWriter. Supported: ${SUPPORTED_KINDS.join(", ")}`,
+        `invalid input — ${formatZodIssueList(parseResult.error)}`,
+      );
+    }
+    const validated = parseResult.data;
+
+    if (!SUPPORTED_KINDS.includes(validated.kind)) {
+      throw new ArtifactWriterError(
+        `kind=${validated.kind} is not supported by ArtifactWriter. Supported: ${SUPPORTED_KINDS.join(", ")}`,
       );
     }
 
-    if (input.kind === "task") {
-      return this.writeTask(input);
+    if (validated.kind === "task") {
+      return this.writeTask(validated);
     }
 
-    return this.writeSummary(input);
+    return this.writeSummary(validated);
   }
 
-  private async writeTask(input: ArtifactWriteServiceInput): Promise<ArtifactRef> {
+  private async writeTask(input: ValidatedWriteInput): Promise<ArtifactRef> {
     if (input.metadata && "taskId" in input.metadata) {
       throw new ArtifactWriterError(
         "kind=task does not accept metadata.taskId — the writer derives the task serial",
@@ -235,7 +269,7 @@ export class ArtifactWriter {
     });
   }
 
-  private async writeSummary(input: ArtifactWriteServiceInput): Promise<ArtifactRef> {
+  private async writeSummary(input: ValidatedWriteInput): Promise<ArtifactRef> {
     const subtype = requireSubtype(input.metadata);
     const date = formatDateYMD(this.clock());
 

@@ -355,3 +355,80 @@ test("ArtifactWriter preserves caller-provided status in frontmatter", async () 
   assert.equal(file.data.status, "active");
   assert.equal(ref.status, "active");
 });
+
+// ---------- defensive schema validation (Issue 3) ----------
+
+test("ArtifactWriter rejects missing title with a validation error, not a raw TypeError", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot);
+
+  await assert.rejects(
+    () =>
+      writer.write({
+        // intentionally missing title
+        kind: "task",
+        content: "x",
+      } as unknown as Parameters<ArtifactWriter["write"]>[0]),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, "ArtifactWriterError");
+      assert.match(error.message, /title/i);
+      return true;
+    },
+  );
+});
+
+test("ArtifactWriter rejects empty title with a validation error", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot);
+
+  await assert.rejects(
+    () => writer.write({ kind: "task", title: "", content: "x" }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, "ArtifactWriterError");
+      assert.match(error.message, /title/i);
+      return true;
+    },
+  );
+});
+
+test("ArtifactWriter rejects non-string content with a validation error", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot);
+
+  await assert.rejects(
+    () =>
+      writer.write({
+        kind: "task",
+        title: "foo",
+        // intentionally non-string
+        content: 42 as unknown as string,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, "ArtifactWriterError");
+      assert.match(error.message, /content/i);
+      return true;
+    },
+  );
+});
+
+test("ArtifactWriter rejects unknown kind values with a validation error (not thrown before whitelist check)", async () => {
+  const projectRoot = await makeProjectRoot();
+  const writer = new ArtifactWriter(projectRoot);
+
+  await assert.rejects(
+    () =>
+      writer.write({
+        kind: "bogus" as unknown as "task",
+        title: "foo",
+        content: "bar",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.name, "ArtifactWriterError");
+      return true;
+    },
+  );
+});
