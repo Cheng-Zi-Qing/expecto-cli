@@ -110,8 +110,12 @@ test("resolveResumeTarget returns the newest snapshot for a session with a resum
   assert.equal(resumed?.snapshot.id, "snapshot-newer");
   assert.match(resumed?.summary ?? "", /session: session-1/);
   assert.match(resumed?.summary ?? "", /state: planning/);
-  assert.match(resumed?.summary ?? "", /active artifacts \(required\): 01-plan/);
-  assert.match(resumed?.summary ?? "", /active artifacts \(optional\): T-001-auth/);
+  // Active artifact listing is intentionally NOT in the resume summary anymore;
+  // it is covered by the fresh renderSessionSummary output when the bootstrap
+  // pipeline assembles the state layer.
+  assert.doesNotMatch(resumed?.summary ?? "", /active artifacts \(required\)/);
+  assert.doesNotMatch(resumed?.summary ?? "", /active artifacts \(optional\)/);
+  assert.doesNotMatch(resumed?.summary ?? "", /active artifacts \(on-demand\)/);
   assert.match(resumed?.summary ?? "", /headline: Continue the auth task from the active workspace docs\./);
   assert.match(resumed?.summary ?? "", /current task: T-001-auth/);
   assert.match(resumed?.summary ?? "", /next step: Run the targeted auth tests before editing\./);
@@ -210,6 +214,19 @@ test("buildBootstrapContext uses resumeTarget.summary as session_state layer con
   assert.ok(stateLayer, "session_state layer should exist");
   assert.match(stateLayer.content, /session: session-state-test/, "state layer should contain resume target summary");
   assert.match(stateLayer.content, /compacted summary: auth checkpoint/);
+
+  // Issue 1 fix: state layer on resume must ALSO include the fresh layered
+  // renderSessionSummary output, not only the resume-specific metadata.
+  assert.match(stateLayer.content, /\nartifacts:\n/, "state layer should include renderSessionSummary artifacts block");
+  assert.match(
+    stateLayer.content,
+    /\n {2}\[required]/,
+    "state layer should contain layered [required]/[optional]/[onDemand] rows",
+  );
+  // And the OLD overlapping lines must no longer appear
+  assert.doesNotMatch(stateLayer.content, /active artifacts \(required\):/);
+  assert.doesNotMatch(stateLayer.content, /active artifacts \(optional\):/);
+  assert.doesNotMatch(stateLayer.content, /active artifacts \(on-demand\):/);
 });
 
 test("buildBootstrapContext sets resumeTarget to undefined when no snapshot exists", async () => {

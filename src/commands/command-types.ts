@@ -6,6 +6,7 @@ export type CommandId =
   | "session.exit"
   | "project.branch"
   | "project.init"
+  | "project.write_artifact"
   | "debug.inspect"
   | "debug.stack";
 
@@ -37,6 +38,7 @@ export type BuiltinCommandId =
   | "exit"
   | "branch"
   | "init"
+  | "write_artifact"
   | "inspect"
   | "stack";
 
