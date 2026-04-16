@@ -25,6 +25,7 @@ function makeContext(entry: BootstrapContext["entry"]): BootstrapContext {
     loadedArtifacts: {
       required: [],
       optional: [],
+      onDemand: [],
     },
     degradedArtifactIds: [],
     sessionSummary: "",

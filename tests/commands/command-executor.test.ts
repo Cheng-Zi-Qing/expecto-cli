@@ -28,6 +28,7 @@ function createContext(
     loadedArtifacts: {
       required: [],
       optional: [],
+      onDemand: [],
     },
     degradedArtifactIds: [],
     sessionSummary,
