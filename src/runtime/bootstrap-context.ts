@@ -97,9 +97,11 @@ export async function buildBootstrapContext(
     mode: "balanced",
     instructions,
     memory,
-    requiredArtifacts: resolvedRequiredArtifacts,
-    optionalArtifactRefs: resolvedActiveArtifacts.optional,
-    optionalArtifacts: resolvedOptionalArtifacts,
+    artifacts: {
+      required: resolvedActiveArtifacts.required,
+      optional: resolvedActiveArtifacts.optional,
+      onDemand: resolvedActiveArtifacts.onDemand,
+    },
   });
 
   const stateLayerContent = resumeTarget
