@@ -17,9 +17,12 @@ import {
 import { currentAppPath } from "./brand.ts";
 
 const artifactPatterns: Partial<Record<ArtifactKind, string[]>> = {
-  requirements: [currentAppPath("docs", "00-requirements.md")],
-  plan: [currentAppPath("docs", "01-plan.md")],
-  task: [currentAppPath("docs", "tasks", "*.md")],
+  requirements: [currentAppPath("docs", "specs", "00-requirements.md")],
+  plan: [currentAppPath("docs", "specs", "01-plan.md")],
+  task: [
+    currentAppPath("docs", "tasks", "active", "*.md"),
+    currentAppPath("docs", "tasks", "backlog", "*.md"),
+  ],
   summary: [currentAppPath("docs", "summaries", "*.md")],
   finding: [currentAppPath("docs", "findings.md")],
 };
@@ -81,11 +84,11 @@ function classifyArtifactPath(path: string): ArtifactKind | null {
   const normalizedPath = normalizeRelativePath(path);
   const currentDocsRoot = currentAppPath("docs");
 
-  if (normalizedPath === `${currentDocsRoot}/00-requirements.md`) {
+  if (normalizedPath === `${currentDocsRoot}/specs/00-requirements.md`) {
     return "requirements";
   }
 
-  if (normalizedPath === `${currentDocsRoot}/01-plan.md`) {
+  if (normalizedPath === `${currentDocsRoot}/specs/01-plan.md`) {
     return "plan";
   }
 
@@ -94,7 +97,8 @@ function classifyArtifactPath(path: string): ArtifactKind | null {
   }
 
   if (
-    normalizedPath.startsWith(`${currentDocsRoot}/tasks/`) &&
+    (normalizedPath.startsWith(`${currentDocsRoot}/tasks/active/`) ||
+     normalizedPath.startsWith(`${currentDocsRoot}/tasks/backlog/`)) &&
     normalizedPath.endsWith(".md")
   ) {
     return "task";

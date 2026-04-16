@@ -54,6 +54,14 @@ const commandRegistry: CommandDescriptor[] = [
     availability: "implemented",
   },
   {
+    id: "project.init",
+    category: "project",
+    name: "/init",
+    aliases: [],
+    description: "Initialize the artifact workspace directory structure.",
+    availability: "implemented",
+  },
+  {
     id: "debug.inspect",
     category: "debug",
     name: "/inspect",

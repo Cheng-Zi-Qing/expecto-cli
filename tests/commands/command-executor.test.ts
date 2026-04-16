@@ -68,6 +68,10 @@ test("executeBuiltinCommand renders grouped help from visible registry sections"
       type: "system_message",
       line: "/branch    Show the current git branch for the project root.",
     },
+    {
+      type: "system_message",
+      line: "/init    Initialize the artifact workspace directory structure.",
+    },
     { type: "system_message", line: "" },
     { type: "system_message", line: "Debug" },
     {

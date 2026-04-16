@@ -28,17 +28,17 @@ function makeSnapshot(
     activeArtifacts: {
       required: [
         {
-          id: currentAppPath("docs", "01-plan.md"),
+          id: currentAppPath("docs", "specs", "01-plan.md"),
           kind: "plan" as const,
-          path: currentAppPath("docs", "01-plan.md"),
+          path: currentAppPath("docs", "specs", "01-plan.md"),
           title: "01-plan",
         },
       ],
       optional: [
         {
-          id: currentAppPath("docs", "tasks", "T-001-auth.md"),
+          id: currentAppPath("docs", "tasks", "active", "T-001-auth.md"),
           kind: "task" as const,
-          path: currentAppPath("docs", "tasks", "T-001-auth.md"),
+          path: currentAppPath("docs", "tasks", "active", "T-001-auth.md"),
           title: "T-001-auth",
         },
       ],
@@ -166,9 +166,10 @@ test("buildBootstrapContext loads resumeTarget when kind is resume and snapshot 
   const { currentAppPath } = await import("../../src/core/brand.ts");
 
   const projectRoot = await mkdtemp(join(tmpdir(), "expecto-resume-bootstrap-"));
-  await mkdir(join(projectRoot, currentAppPath("docs", "tasks")), { recursive: true });
-  await writeFile(join(projectRoot, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
-  await writeFile(join(projectRoot, currentAppPath("docs", "01-plan.md")), "# Plan\n");
+  await mkdir(join(projectRoot, currentAppPath("docs", "specs")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "active")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
 
   const store = new SessionSnapshotStore(projectRoot);
   await store.save(makeSnapshot({ sessionId: "session-abc", compactedSummary: "auth work in progress" }));
@@ -192,9 +193,10 @@ test("buildBootstrapContext uses resumeTarget.summary as session_state layer con
   const { currentAppPath } = await import("../../src/core/brand.ts");
 
   const projectRoot = await mkdtemp(join(tmpdir(), "expecto-resume-state-"));
-  await mkdir(join(projectRoot, currentAppPath("docs", "tasks")), { recursive: true });
-  await writeFile(join(projectRoot, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
-  await writeFile(join(projectRoot, currentAppPath("docs", "01-plan.md")), "# Plan\n");
+  await mkdir(join(projectRoot, currentAppPath("docs", "specs")), { recursive: true });
+  await mkdir(join(projectRoot, currentAppPath("docs", "tasks", "active")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
 
   const store = new SessionSnapshotStore(projectRoot);
   await store.save(makeSnapshot({ sessionId: "session-state-test", compactedSummary: "auth checkpoint" }));
@@ -235,8 +237,8 @@ test("buildBootstrapContext does not populate resumeTarget for non-resume comman
   const { currentAppPath } = await import("../../src/core/brand.ts");
 
   const projectRoot = await mkdtemp(join(tmpdir(), "expecto-resume-interactive-"));
-  await mkdir(join(projectRoot, currentAppPath("docs")), { recursive: true });
-  await writeFile(join(projectRoot, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
+  await mkdir(join(projectRoot, currentAppPath("docs", "specs")), { recursive: true });
+  await writeFile(join(projectRoot, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
 
   const context = await buildBootstrapContext({
     command: { kind: "interactive" },

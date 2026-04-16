@@ -24,7 +24,7 @@ test("artifact reference rejects unknown kinds", () => {
       artifactRefSchema.parse({
         id: "a1",
         kind: "unknown",
-        path: currentAppPath("docs", "tasks", "T-001.md"),
+        path: currentAppPath("docs", "tasks", "active", "T-001.md"),
         title: "Task 1",
       }),
     /Invalid enum value/,
@@ -48,9 +48,9 @@ test("artifact write input accepts markdown content and metadata", () => {
 
 test("artifact reference accepts lifecycle metadata for workspace orchestration", () => {
   const parsed = artifactRefSchema.parse({
-    id: currentAppPath("docs", "tasks", "T-001-auth.md"),
+    id: currentAppPath("docs", "tasks", "active", "T-001-auth.md"),
     kind: "task",
-    path: currentAppPath("docs", "tasks", "T-001-auth.md"),
+    path: currentAppPath("docs", "tasks", "active", "T-001-auth.md"),
     title: "T-001-auth",
     status: "in_progress",
     metadata: {

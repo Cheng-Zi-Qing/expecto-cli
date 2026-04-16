@@ -15,16 +15,16 @@ test("instruction resolver builds runtime, project, and artifact layers in prior
     ],
     requiredArtifacts: [
       {
-        id: currentAppPath("docs", "00-requirements.md"),
+        id: currentAppPath("docs", "specs", "00-requirements.md"),
         kind: "requirements",
-        path: currentAppPath("docs", "00-requirements.md"),
+        path: currentAppPath("docs", "specs", "00-requirements.md"),
         title: "00-requirements",
         content: "# Requirements\n\nBuild a Markdown-driven runtime.\n",
       },
       {
-        id: currentAppPath("docs", "01-plan.md"),
+        id: currentAppPath("docs", "specs", "01-plan.md"),
         kind: "plan",
-        path: currentAppPath("docs", "01-plan.md"),
+        path: currentAppPath("docs", "specs", "01-plan.md"),
         title: "01-plan",
         content: "# Plan\n\nCurrent phase: foundation.\n",
       },

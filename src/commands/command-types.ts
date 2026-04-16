@@ -5,6 +5,7 @@ export type CommandId =
   | "session.theme"
   | "session.exit"
   | "project.branch"
+  | "project.init"
   | "debug.inspect"
   | "debug.stack";
 
@@ -35,6 +36,7 @@ export type BuiltinCommandId =
   | "theme"
   | "exit"
   | "branch"
+  | "init"
   | "inspect"
   | "stack";
 

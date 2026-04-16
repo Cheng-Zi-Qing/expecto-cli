@@ -19,9 +19,9 @@ function assistantOutputResult(output: string, responseId = "response-1") {
 
 async function makeProjectRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "expecto-interactive-"));
-  await mkdir(join(root, currentAppPath("docs")), { recursive: true });
-  await writeFile(join(root, currentAppPath("docs", "00-requirements.md")), "# Requirements\n");
-  await writeFile(join(root, currentAppPath("docs", "01-plan.md")), "# Plan\n");
+  await mkdir(join(root, currentAppPath("docs", "specs")), { recursive: true });
+  await writeFile(join(root, currentAppPath("docs", "specs", "00-requirements.md")), "# Requirements\n");
+  await writeFile(join(root, currentAppPath("docs", "specs", "01-plan.md")), "# Plan\n");
   return root;
 }
 
